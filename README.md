@@ -57,13 +57,17 @@ El workflow [deploy-pages.yml](./.github/workflows/deploy-pages.yml) ejecuta las
 
 La URL y la clave `publishable/anon` del frontend son visibles para los visitantes del sitio; la seguridad depende de RLS. La clave `service_role` nunca debe publicarse. Esta versión está conectada al proyecto Supabase configurado para la app: quienes tengan cuentas válidas compartirán sus datos y cambios. No compartas el sitio con testers externos si no quieres que accedan a los datos de ese proyecto.
 
+## Experiencia móvil
+
+La interfaz se adapta a teléfonos y tabletas: el encabezado y los filtros se reorganizan para pantallas estrechas, las columnas del tablero Kanban se recorren horizontalmente y el calendario permite desplazarse para consultar sus días. Los formularios y detalles de tickets se presentan como paneles adaptados a la pantalla, manteniendo el desplazamiento dentro del diálogo cuando su contenido es más alto que el dispositivo.
+
 ## Notas
 
 - Las cuentas y los tickets ya no se crean desde datos semilla locales. El primer Admin se aprovisiona desde Supabase; los demás usuarios se crean desde **Administrar usuarios**.
 - Los cambios de estado se registran en `ticket_status_history` mediante un trigger de PostgreSQL. El frontend no puede escribir ni modificar directamente ese historial.
 - Cada equipo tiene un espacio compartido: los Admins pueden asignar tickets a los Agent y Reporter creados para su equipo, y esos miembros ven los tickets del espacio según sus roles. Otros espacios siguen aislados por RLS. Los tickets existentes e historiales se conservan; las asignaciones que cruzaban espacios se quitaron durante la primera migración.
 - La vista **Calendario** agrupa tickets por fecha límite en una cuadrícula mensual; Admin y Agent pueden arrastrarlos a otro día para reprogramarlos o a **Sin fecha** para quitar el plazo. Los filtros del tablero también se aplican al calendario.
-- Cada ticket puede tener hasta 100 subtareas con su propio progreso. Admin y Agent con permiso para editar el ticket pueden añadir, completar y quitar subtareas; el avance aparece en la tarjeta y en el calendario. Ejecuta la migración nueva de `supabase/migrations/` con `npx.cmd supabase db push --linked` para habilitar el guardado en Supabase.
+- Cada ticket puede tener hasta 100 subtareas con su propio progreso. Admin y Agent con permiso para editar el ticket pueden añadir, completar y quitar subtareas; el avance aparece en la tarjeta y en el calendario, y la barra cambia de color según el porcentaje completado. Ejecuta la migración nueva de `supabase/migrations/` con `npx.cmd supabase db push --linked` para habilitar el guardado en Supabase.
 - Las políticas RLS y el trigger del esquema son la autoridad para permisos; los controles de interfaz y las validaciones JavaScript solo mejoran la experiencia.
 - El tema visual se puede cambiar entre oscuro, claro y rosa desde el encabezado; la preferencia queda guardada en el navegador.
 - Las pruebas unitarias se ejecutan con `npm.cmd test`; las comprobaciones de sintaxis con `npm.cmd run check`.
