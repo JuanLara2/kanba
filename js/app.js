@@ -89,18 +89,21 @@ async function bootstrap() {
   }, SLA_REFRESH_INTERVAL_MS);
 }
 
-async function loadUsers() {
+async function loadUsers(user = activeUser) {
   const users = await db.getAll('users');
   usersMap.clear();
   users.forEach((user) => usersMap.set(user.id, user));
-  populateAssigneeSelect(users);
+  populateAssigneeSelect(users, user);
 }
 
-function populateAssigneeSelect(users) {
+function populateAssigneeSelect(users, currentUser = activeUser) {
+  const workspaceUsers = currentUser
+    ? users.filter((user) => user.workspaceId === currentUser.workspaceId)
+    : [];
   const select = document.getElementById('formAssignee');
   select.innerHTML = '<option value="">Sin asignar</option>';
 
-  users.filter((user) => user.role === 'Admin' || user.role === 'Agent').forEach((user) => {
+  workspaceUsers.filter((user) => user.role === 'Admin' || user.role === 'Agent').forEach((user) => {
     const option = document.createElement('option');
     option.value = user.id;
     option.textContent = `${user.fullName} (${user.role})`;
@@ -109,7 +112,7 @@ function populateAssigneeSelect(users) {
 
   const filterSelect = filters.assignedTo;
   filterSelect.innerHTML = '<option value="ALL">Todos los miembros</option>';
-  users.forEach((user) => {
+  workspaceUsers.forEach((user) => {
     const option = document.createElement('option');
     option.value = user.id;
     option.textContent = user.fullName;
@@ -294,7 +297,7 @@ async function syncAuthState() {
   const btnManageUsers = document.getElementById('btnManageUsers');
 
   if (currentUser) {
-    await Promise.all([loadUsers(), loadTickets()]);
+    await Promise.all([loadUsers(currentUser), loadTickets()]);
     activeUser = currentUser;
     modalView.hideLogin();
     btnNewTicket.disabled = false;

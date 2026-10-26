@@ -80,16 +80,13 @@ Deno.serve(async (request: Request) => {
     return jsonResponse({ error: createError?.message || 'No fue posible crear la cuenta.' }, 400);
   }
 
-  const { data: profile, error: insertError } = await adminClient
-    .from('profiles')
-    .insert({
-      id: created.user.id,
-      full_name: fullName,
-      email,
-      role
-    })
-    .select('id,full_name,email,role')
-    .single();
+  const { error: insertError } = await adminClient.rpc('admin_create_user_workspace', {
+    p_user_id: created.user.id,
+    p_full_name: fullName,
+    p_email: email,
+    p_role: role,
+    p_created_by_admin_id: authData.user.id
+  });
 
   if (insertError) {
     const { error: deleteError } = await adminClient.auth.admin.deleteUser(created.user.id);
@@ -97,10 +94,22 @@ Deno.serve(async (request: Request) => {
     return jsonResponse({ error: insertError.message }, 400);
   }
 
+  const { data: profile, error: selectError } = await adminClient
+    .from('profiles')
+    .select('id,full_name,email,role,workspace_id,created_by_admin_id')
+    .eq('id', created.user.id)
+    .single();
+  if (selectError || !profile) {
+    console.error('User profile was created but could not be retrieved:', selectError?.message);
+    return jsonResponse({ error: 'La cuenta se creó, pero no se pudo recuperar su perfil.' }, 500);
+  }
+
   return jsonResponse({
     id: profile.id,
     fullName: profile.full_name,
     email: profile.email,
-    role: profile.role
+    role: profile.role,
+    workspaceId: profile.workspace_id,
+    createdByAdminId: profile.created_by_admin_id
   }, 201);
 });

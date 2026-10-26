@@ -9,9 +9,9 @@ import { initializeThemeController, THEME_STORAGE_KEY } from '../js/ui/themeCont
 
 function createContext() {
   const users = [
-    { id: 'usr-admin-01', fullName: 'Carlos Administrador', email: 'admin@nexus.com', role: 'Admin', password: 'AdminPassword123!' },
-    { id: 'usr-agent-01', fullName: 'Laura Agente', email: 'laura@nexus.com', role: 'Agent', password: 'AgentPassword123!' },
-    { id: 'usr-reporter-01', fullName: 'Pedro Reportero', email: 'pedro@nexus.com', role: 'Reporter', password: 'ReporterPassword123!' }
+    { id: 'usr-admin-01', fullName: 'Carlos Administrador', email: 'admin@nexus.com', role: 'Admin', workspaceId: 'workspace-test', password: 'AdminPassword123!' },
+    { id: 'usr-agent-01', fullName: 'Laura Agente', email: 'laura@nexus.com', role: 'Agent', workspaceId: 'workspace-test', password: 'AgentPassword123!' },
+    { id: 'usr-reporter-01', fullName: 'Pedro Reportero', email: 'pedro@nexus.com', role: 'Reporter', workspaceId: 'workspace-test', password: 'ReporterPassword123!' }
   ];
   const tickets = [];
   const stores = { users, tickets };
@@ -37,7 +37,8 @@ function createContext() {
       if (index !== -1) store.splice(index, 1);
     },
     async createUser({ fullName, email, role }) {
-      const user = { id: `usr-created-${++createdUserId}`, fullName, email, role };
+      const id = `usr-created-${++createdUserId}`;
+      const user = { id, fullName, email, role, workspaceId: `workspace-${id}` };
       users.push(user);
       return user;
     }
@@ -277,6 +278,26 @@ test('only administrators delete tickets and invalid ticket fields are rejected'
   assert.equal(tickets.length, 0);
 });
 
+test('ticket assignment rejects users from a different workspace', async () => {
+  const { auth, ticketService } = createContext();
+  await auth.login('admin@nexus.com', 'AdminPassword123!');
+  const createdAgent = await auth.registerUser({
+    fullName: 'Agente aislado',
+    email: 'isolated.agent@example.com',
+    password: 'SecurePassword123',
+    role: 'Agent'
+  });
+
+  await assert.rejects(
+    () => ticketService.createTicket({
+      title: 'Ticket aislado',
+      description: 'No debe compartir su responsable.',
+      assignedTo: createdAgent.id
+    }),
+    /responsable debe pertenecer a tu espacio/
+  );
+});
+
 test('unconfigured Supabase client refuses network requests with setup instructions', async () => {
   const client = new SupabaseClient({ url: '', anonKey: '' });
   await assert.rejects(() => client.requestAuth('token?grant_type=password', { method: 'POST' }), /SUPABASE_URL/);
@@ -292,6 +313,7 @@ test('Supabase adapter maps ticket rows and requests the database audit history'
     priority: 'Alta',
     assigned_to: 'agent-id',
     created_by: 'reporter-id',
+    workspace_id: 'workspace-id',
     created_at: '2026-10-20T09:00:00.000Z',
     updated_at: '2026-10-20T10:00:00.000Z',
     due_date: null
@@ -301,6 +323,16 @@ test('Supabase adapter maps ticket rows and requests the database audit history'
       calls.push({ path, options });
       if (path === 'tickets') return [ticketRow];
       if (path.startsWith('tickets?')) return [ticketRow];
+      if (path.startsWith('profiles?')) {
+        return [{
+          id: 'admin-id',
+          full_name: 'Admin',
+          email: 'admin@example.com',
+          role: 'Admin',
+          workspace_id: 'workspace-id',
+          created_by_admin_id: null
+        }];
+      }
       if (path.startsWith('ticket_status_history?')) {
         return [{
           ticket_id: 'TCK-1001',
@@ -318,6 +350,7 @@ test('Supabase adapter maps ticket rows and requests the database audit history'
   const [ticket] = await adapter.getAll('tickets');
 
   assert.equal(ticket.assignedTo, 'agent-id');
+  assert.equal(ticket.workspaceId, 'workspace-id');
   assert.deepEqual(ticket.statusHistory, [{
     from: 'new',
     to: 'open',
@@ -340,6 +373,10 @@ test('Supabase adapter maps ticket rows and requests the database audit history'
   });
   assert.equal(calls[2].options.body.id, undefined);
   assert.equal(calls[2].options.body.created_by, undefined);
+
+  const [profile] = await adapter.getAll('users');
+  assert.equal(profile.workspaceId, 'workspace-id');
+  assert.equal(profile.createdByAdminId, null);
 });
 
 test('SLA filters classify overdue, warning, and future deadlines using configured windows', () => {

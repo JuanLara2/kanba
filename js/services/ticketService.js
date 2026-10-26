@@ -20,7 +20,15 @@ export class TicketService {
       throw new Error('Tu rol no puede asignar responsables ni modificar plazos.');
     }
 
-    const validated = await this.validateTicketFields({ title, description, priority, initialStatus, assignedTo, dueDate });
+    const validated = await this.validateTicketFields({
+      title,
+      description,
+      priority,
+      initialStatus,
+      assignedTo,
+      dueDate,
+      workspaceId: user.workspaceId
+    });
     const now = new Date().toISOString();
     const newTicket = {
       title: validated.title,
@@ -66,7 +74,8 @@ export class TicketService {
       priority: canEditContent ? priority : ticket.priority,
       assignedTo: canManageAssignment && assignedTo !== undefined ? assignedTo : ticket.assignedTo,
       dueDate: canManageAssignment && dueDate !== undefined ? dueDate : ticket.dueDate,
-      initialStatus: ticket.status
+      initialStatus: ticket.status,
+      workspaceId: user.workspaceId
     });
     const now = new Date().toISOString();
     ticket.title = validated.title;
@@ -122,7 +131,7 @@ export class TicketService {
     return this.db.put('tickets', ticket);
   }
 
-  async validateTicketFields({ title, description, priority, initialStatus, assignedTo, dueDate }) {
+  async validateTicketFields({ title, description, priority, initialStatus, assignedTo, dueDate, workspaceId }) {
     const normalizedTitle = String(title ?? '').trim();
     const normalizedDescription = String(description ?? '').trim();
     if (normalizedTitle.length < 4) throw new Error('El título debe tener al menos 4 caracteres.');
@@ -141,6 +150,9 @@ export class TicketService {
       const assignee = await this.db.getById('users', assignedTo);
       if (!assignee || !['Admin', 'Agent'].includes(assignee.role)) {
         throw new Error('El responsable seleccionado no es válido.');
+      }
+      if (assignee.workspaceId !== workspaceId) {
+        throw new Error('El responsable debe pertenecer a tu espacio de trabajo.');
       }
     }
 
