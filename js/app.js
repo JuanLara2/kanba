@@ -6,6 +6,7 @@ import { FilterSortService } from './services/filterService.js';
 import { BoardView } from './ui/boardView.js';
 import { ModalView } from './ui/modalView.js';
 import { DragDropController } from './ui/dragDrop.js';
+import { initializeThemeController } from './ui/themeController.js';
 import { SLA_REFRESH_INTERVAL_MS } from './config/constants.js';
 
 const client = new SupabaseClient();
@@ -38,6 +39,7 @@ let modalView;
 let dragDropController;
 
 async function bootstrap() {
+  initializeThemeController();
   boardView = new BoardView(boardEl, ticketService, usersMap);
   modalView = new ModalView({
     modalEl,

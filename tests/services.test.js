@@ -5,6 +5,7 @@ import { SupabaseAdapter } from '../js/data/db.js';
 import { FilterSortService } from '../js/services/filterService.js';
 import { SupabaseClient } from '../js/data/supabaseClient.js';
 import { TicketService } from '../js/services/ticketService.js';
+import { initializeThemeController, THEME_STORAGE_KEY } from '../js/ui/themeController.js';
 
 function createContext() {
   const users = [
@@ -84,6 +85,44 @@ function createContext() {
   const auth = new AuthService(client, db);
   return { users, tickets, db, auth, ticketService: new TicketService(db, auth) };
 }
+
+test('theme selector restores, applies, and persists only supported themes', () => {
+  const stored = new Map([[THEME_STORAGE_KEY, 'pink']]);
+  const listeners = new Map();
+  const selector = {
+    value: '',
+    addEventListener(event, handler) {
+      listeners.set(event, handler);
+    }
+  };
+  const documentRef = {
+    documentElement: { dataset: {} },
+    getElementById(id) {
+      assert.equal(id, 'themeSelect');
+      return selector;
+    }
+  };
+  const storage = {
+    getItem(key) {
+      return stored.get(key) ?? null;
+    },
+    setItem(key, value) {
+      stored.set(key, value);
+    }
+  };
+
+  const setTheme = initializeThemeController(documentRef, storage);
+  assert.equal(documentRef.documentElement.dataset.theme, 'pink');
+  assert.equal(selector.value, 'pink');
+
+  selector.value = 'light';
+  listeners.get('change')();
+  assert.equal(documentRef.documentElement.dataset.theme, 'light');
+  assert.equal(stored.get(THEME_STORAGE_KEY), 'light');
+
+  setTheme('unknown');
+  assert.equal(documentRef.documentElement.dataset.theme, 'light');
+});
 
 test('Supabase login authenticates each configured role and stores a managed session', async () => {
   const { auth } = createContext();

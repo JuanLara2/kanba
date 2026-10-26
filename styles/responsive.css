@@ -15,6 +15,11 @@
   .header-right {
     width: 100%;
     justify-content: space-between;
+    flex-wrap: wrap;
+  }
+
+  .header-right {
+    gap: 0.65rem;
   }
 
   .kanban-grid {
@@ -49,5 +54,9 @@
   .control-group {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .theme-picker {
+    justify-content: space-between;
   }
 }

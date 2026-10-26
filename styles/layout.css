@@ -20,7 +20,7 @@
   display: grid;
   place-items: center;
   border-radius: 12px;
-  background: linear-gradient(135deg, #38bdf8, #8b5cf6);
+  background: linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end));
   font-weight: 700;
 }
 
@@ -38,13 +38,14 @@
   flex-wrap: wrap;
   gap: 0.75rem;
   padding: 0.75rem 1.5rem;
-  background: rgba(30, 41, 59, 0.75);
+  background: var(--bg-toolbar);
   border-bottom: 1px solid var(--border-subtle);
   align-items: center;
 }
 
 .search-box {
   flex: 1 1 220px;
+  position: relative;
 }
 
 .search-box input,
@@ -58,6 +59,19 @@
   padding: 0.5rem 0.75rem;
 }
 
+.search-box input {
+  padding-left: 2.25rem;
+}
+
+.search-icon {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
 .control-group {
   display: flex;
   align-items: center;
@@ -68,6 +82,26 @@
 .control-group label {
   color: var(--text-muted);
   font-size: 0.85rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.theme-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.theme-picker select {
+  background: var(--bg-app);
+  color: var(--text-main);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 0.55rem 0.65rem;
 }
 
 .board-wrapper {
@@ -84,7 +118,7 @@
 }
 
 .kanban-col {
-  background: rgba(15, 23, 42, 0.65);
+  background: var(--bg-column);
   border: 1px solid var(--border-subtle);
   border-radius: 12px;
   min-height: 420px;
@@ -94,7 +128,7 @@
 .kanban-col-header {
   border-top: 4px solid var(--color-new);
   padding: 0.9rem 1rem;
-  background: rgba(15, 23, 42, 0.8);
+  background: var(--bg-column-header);
 }
 
 .col-title-group {
