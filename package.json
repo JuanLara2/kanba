@@ -1,0 +1,13 @@
+{
+  "name": "kanban-ticket-management",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "node --check js/app.js",
+    "test": "node --test"
+  },
+  "devDependencies": {
+    "supabase": "^2.122.0"
+  }
+}

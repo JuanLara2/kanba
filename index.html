@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NexusDesk Kanban</title>
+    <link rel="stylesheet" href="styles/base.css" />
+    <link rel="stylesheet" href="styles/layout.css" />
+    <link rel="stylesheet" href="styles/components.css" />
+    <link rel="stylesheet" href="styles/responsive.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="header-left">
+        <div class="logo-mark">NK</div>
+        <div>
+          <h1 class="app-title">NexusDesk Kanban</h1>
+          <p class="app-subtitle">Sistema empresarial de tickets</p>
+        </div>
+      </div>
+
+      <div class="header-right">
+        <div id="sessionUserBox" class="user-session-pill">
+          <span id="sessionUserName">Cargando...</span>
+          <span id="sessionUserRole" class="role-badge">...</span>
+        </div>
+        <button id="btnNewTicket" class="btn btn-primary">+ Crear una Nota / Ticket</button>
+        <button id="btnManageUsers" class="btn btn-outline hidden">Administrar usuarios</button>
+        <button id="btnLogout" class="btn btn-outline">Salir</button>
+      </div>
+    </header>
+
+    <nav class="controls-toolbar" aria-label="Filtros del tablero">
+      <div class="search-box">
+        <input type="text" id="filterSearch" placeholder="Buscar por palabra clave, ID o asignado..." />
+      </div>
+
+      <div class="control-group">
+        <label for="filterAssignee">Asignado:</label>
+        <select id="filterAssignee">
+          <option value="ALL">Todos los miembros</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <label for="filterStatus">Estado:</label>
+        <select id="filterStatus">
+          <option value="ALL">Todos los estados</option>
+          <option value="new">Nuevo</option>
+          <option value="open">Abierto</option>
+          <option value="in_progress">En Progreso</option>
+          <option value="resolved">Resuelto</option>
+          <option value="closed">Cerrado</option>
+          <option value="blocked">Bloqueado</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <label for="filterPriority">Prioridad:</label>
+        <select id="filterPriority">
+          <option value="ALL">Todas</option>
+          <option value="Baja">Baja</option>
+          <option value="Media">Media</option>
+          <option value="Alta">Alta</option>
+          <option value="Urgente">Urgente</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <label for="filterSla">Plazo / SLA:</label>
+        <select id="filterSla">
+          <option value="ALL">Cualquier plazo</option>
+          <option value="overdue">⚠️ Vencidos</option>
+          <option value="warning">⏳ Próximos a vencer</option>
+          <option value="future">En plazo regular</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <label for="sortField">Ordenar por:</label>
+        <select id="sortField">
+          <option value="createdAt">Fecha de creación</option>
+          <option value="updatedAt">Última modificación</option>
+          <option value="dueDate">Fecha de entrega</option>
+        </select>
+        <select id="sortDirection">
+          <option value="desc">Descendente</option>
+          <option value="asc">Ascendente</option>
+        </select>
+      </div>
+    </nav>
+
+    <main class="board-wrapper">
+      <div id="kanbanBoard" class="kanban-grid" role="region" aria-label="Tablero Kanban"></div>
+    </main>
+
+    <div id="ticketModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modalHeading">
+      <div class="modal-card">
+        <header class="modal-header">
+          <h3 id="modalHeading">Crear nueva solicitud</h3>
+          <button id="modalCloseBtn" class="close-x" aria-label="Cerrar">&times;</button>
+        </header>
+
+        <form id="ticketForm" class="modal-body">
+          <input type="hidden" id="formTicketId" />
+
+          <div class="form-row">
+            <label for="formTitle">Título del requerimiento *</label>
+            <input type="text" id="formTitle" required minlength="4" placeholder="Ej: Error en procesamiento de pagos" />
+          </div>
+
+          <div class="form-row grid-2">
+            <div id="formStatusField">
+              <label for="formInitialStatus">Estado inicial</label>
+              <select id="formInitialStatus" aria-describedby="formStatusHelp">
+                <option value="new">Nuevo</option>
+                <option value="open">Abierto</option>
+                <option value="in_progress">En Progreso</option>
+                <option value="resolved">Resuelto</option>
+                <option value="closed">Cerrado</option>
+                <option value="blocked">Bloqueado</option>
+              </select>
+              <small id="formStatusHelp">El estado solo se define al crear; luego se cambia desde el tablero.</small>
+            </div>
+            <div>
+              <label for="formPriority">Prioridad</label>
+              <select id="formPriority">
+                <option value="Baja">Baja</option>
+                <option value="Media" selected>Media</option>
+                <option value="Alta">Alta</option>
+                <option value="Urgente">Urgente</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row grid-2">
+            <div>
+              <label for="formAssignee">Asignar a:</label>
+              <select id="formAssignee">
+                <option value="">Sin asignar</option>
+              </select>
+            </div>
+            <div>
+              <label for="formDueDate">Fecha límite</label>
+              <input type="datetime-local" id="formDueDate" />
+            </div>
+          </div>
+
+          <div class="form-row">
+            <label for="formDescription">Descripción detallada *</label>
+            <textarea id="formDescription" rows="4" required placeholder="Detalles del requerimiento..."></textarea>
+          </div>
+
+          <section id="ticketHistorySection" class="ticket-history hidden" aria-labelledby="ticketHistoryHeading">
+            <h4 id="ticketHistoryHeading">Historial de estados</h4>
+            <ol id="ticketHistoryList"></ol>
+          </section>
+
+          <footer class="modal-actions">
+            <button type="button" id="btnDeleteTicket" class="btn btn-danger hidden">Eliminar ticket</button>
+            <button type="button" id="btnCancelModal" class="btn btn-outline">Cancelar</button>
+            <button type="submit" class="btn btn-primary">Guardar solicitud</button>
+          </footer>
+        </form>
+      </div>
+    </div>
+
+    <div id="toastNotification" class="toast hidden" role="status" aria-live="polite"></div>
+
+    <div id="usersModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="usersHeading">
+      <div class="modal-card">
+        <header class="modal-header">
+          <h3 id="usersHeading">Administrar usuarios</h3>
+          <button id="usersModalCloseBtn" class="close-x" aria-label="Cerrar">×</button>
+        </header>
+
+        <div class="modal-body">
+          <section class="user-list-section" aria-labelledby="usersListHeading">
+            <h4 id="usersListHeading">Usuarios registrados</h4>
+            <ul id="userList" class="user-list"></ul>
+          </section>
+
+          <form id="userForm" class="user-create-form">
+            <h4>Crear usuario</h4>
+            <div class="form-row">
+              <label for="userFullName">Nombre completo *</label>
+              <input id="userFullName" type="text" autocomplete="name" required maxlength="100" />
+            </div>
+            <div class="form-row">
+              <label for="userEmail">Correo electrónico *</label>
+              <input id="userEmail" type="email" autocomplete="email" required maxlength="254" />
+            </div>
+            <div class="form-row">
+              <label for="userRole">Rol *</label>
+              <select id="userRole" required>
+                <option value="Reporter">Reporter</option>
+                <option value="Agent">Agent</option>
+                <option value="Admin">Admin</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <label for="userPassword">Contraseña (mínimo 12 caracteres) *</label>
+              <input id="userPassword" type="password" autocomplete="new-password" required minlength="12" />
+            </div>
+            <div class="form-row">
+              <label for="userPasswordConfirm">Confirmar contraseña *</label>
+              <input id="userPasswordConfirm" type="password" autocomplete="new-password" required minlength="12" />
+            </div>
+            <footer class="modal-actions">
+              <button type="button" id="usersModalCancelBtn" class="btn btn-outline">Cerrar</button>
+              <button type="submit" class="btn btn-primary">Crear usuario</button>
+            </footer>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div id="loginModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="loginHeading">
+      <div class="modal-card">
+        <header class="modal-header">
+          <h3 id="loginHeading">Iniciar sesión</h3>
+        </header>
+
+        <form id="loginForm" class="modal-body">
+          <div class="form-row">
+            <label for="loginEmail">Correo electrónico</label>
+            <input id="loginEmail" type="email" autocomplete="username" required />
+          </div>
+
+          <div class="form-row">
+            <label for="loginPassword">Contraseña</label>
+            <input id="loginPassword" type="password" autocomplete="current-password" required />
+          </div>
+
+          <footer class="modal-actions">
+            <button type="submit" class="btn btn-primary">Entrar</button>
+          </footer>
+        </form>
+      </div>
+    </div>
+
+    <script type="module" src="js/app.js"></script>
+  </body>
+</html>

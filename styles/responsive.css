@@ -1,0 +1,53 @@
+@media (max-width: 1024px) {
+  .kanban-grid {
+    grid-template-columns: repeat(3, minmax(220px, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .app-header,
+  .controls-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .header-left,
+  .header-right {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .kanban-grid {
+    grid-template-columns: repeat(2, minmax(220px, 1fr));
+  }
+
+  .grid-2 {
+    grid-template-columns: 1fr;
+  }
+
+  .user-list li {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .user-list-details {
+    text-align: left;
+    overflow-wrap: anywhere;
+  }
+}
+
+@media (max-width: 560px) {
+  .kanban-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .controls-toolbar {
+    padding: 0.75rem;
+  }
+
+  .control-group {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

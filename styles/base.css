@@ -1,0 +1,65 @@
+:root {
+  --color-new: #f59e0b;
+  --color-open: #06b6d4;
+  --color-in_progress: #3b82f6;
+  --color-resolved: #10b981;
+  --color-closed: #64748b;
+  --color-blocked: #ef4444;
+
+  --sla-warning: #f97316;
+  --sla-overdue: #dc2626;
+
+  --bg-app: #0f172a;
+  --bg-surface: #1e293b;
+  --bg-card: #334155;
+  --border-subtle: #475569;
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+
+  --radius-card: 10px;
+  --font-sans: "Inter", "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", Consolas, monospace;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  font-family: var(--font-sans);
+  background: var(--bg-app);
+  color: var(--text-main);
+  min-height: 100vh;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+.ticket-card:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 2px;
+}
+
+.hidden {
+  display: none !important;
+}
