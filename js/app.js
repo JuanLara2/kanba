@@ -6,6 +6,7 @@ import { FilterSortService } from './services/filterService.js';
 import { BoardView } from './ui/boardView.js';
 import { ModalView } from './ui/modalView.js';
 import { DragDropController } from './ui/dragDrop.js';
+import { CalendarView, dueDateForCalendarDay } from './ui/calendarView.js';
 import { initializeThemeController } from './ui/themeController.js';
 import { SLA_REFRESH_INTERVAL_MS } from './config/constants.js';
 
@@ -35,6 +36,7 @@ let allTickets = [];
 let usersMap = new Map();
 let activeUser = null;
 let boardView;
+let calendarView;
 let modalView;
 let dragDropController;
 
@@ -66,17 +68,13 @@ async function bootstrap() {
         showToast(error.message || 'No tienes permisos para mover este ticket');
       }
     },
-    onEditRequest: async (ticketId) => {
-      const ticket = allTickets.find((item) => item.id === ticketId);
-      if (ticket) {
-        const user = await auth.getCurrentUser();
-        modalView.openTicket(ticket, {
-          canEdit: auth.canEditTicket(user, ticket),
-          canManageAssignment: auth.canAssignOrSetDue(user),
-          canDelete: auth.canDelete(user)
-        });
-      }
-    }
+    onEditRequest: openTicketForEditing
+  });
+
+  calendarView = new CalendarView({
+    container: document.getElementById('ticketCalendar'),
+    onDateChange: handleCalendarDateChange,
+    onTicketClick: openTicketForEditing
   });
 
   bindStaticEvents();
@@ -125,6 +123,23 @@ async function loadTickets() {
 }
 
 function bindStaticEvents() {
+  document.getElementById('boardTab').addEventListener('click', () => setActiveView('board'));
+  document.getElementById('calendarTab').addEventListener('click', () => setActiveView('calendar'));
+  document.querySelector('.view-tabs').addEventListener('keydown', (event) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    const tabs = [...document.querySelectorAll('.view-tabs [role="tab"]')];
+    const currentIndex = tabs.indexOf(event.target.closest('[role="tab"]'));
+    if (currentIndex === -1) return;
+    event.preventDefault();
+    const nextIndex = event.key === 'Home'
+      ? 0
+      : event.key === 'End'
+        ? tabs.length - 1
+        : (currentIndex + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+    const nextView = tabs[nextIndex].id === 'calendarTab' ? 'calendar' : 'board';
+    setActiveView(nextView);
+    tabs[nextIndex].focus();
+  });
   document.getElementById('btnNewTicket').addEventListener('click', async () => {
     const user = await auth.getCurrentUser();
     modalView.openTicket(null, { canManageAssignment: auth.canAssignOrSetDue(user) });
@@ -179,6 +194,47 @@ function bindStaticEvents() {
     event.preventDefault();
     dragDropController.onEditRequest(card.dataset.ticketId);
   });
+}
+
+async function openTicketForEditing(ticketId) {
+  const ticket = allTickets.find((item) => item.id === ticketId);
+  if (!ticket) return;
+  const user = await auth.getCurrentUser();
+  modalView.openTicket(ticket, {
+    canEdit: auth.canEditTicket(user, ticket),
+    canManageAssignment: auth.canAssignOrSetDue(user),
+    canDelete: auth.canDelete(user)
+  });
+}
+
+async function handleCalendarDateChange(ticketId, dateKey) {
+  const ticket = allTickets.find((item) => item.id === ticketId);
+  if (!ticket) return;
+
+  try {
+    const dueDate = dateKey
+      ? dueDateForCalendarDay(new Date(`${dateKey}T12:00:00`), ticket.dueDate)
+      : null;
+    await ticketService.rescheduleTicket(ticketId, dueDate);
+    await loadTickets();
+    renderBoard();
+    showToast(dateKey ? 'Fecha límite actualizada' : 'Fecha límite quitada');
+  } catch (error) {
+    showToast(error.message || 'No se pudo cambiar la fecha límite');
+    renderBoard();
+  }
+}
+
+function setActiveView(view) {
+  const showCalendar = view === 'calendar';
+  document.getElementById('boardPanel').classList.toggle('hidden', showCalendar);
+  document.getElementById('calendarPanel').classList.toggle('hidden', !showCalendar);
+  document.getElementById('boardTab').classList.toggle('is-active', !showCalendar);
+  document.getElementById('calendarTab').classList.toggle('is-active', showCalendar);
+  document.getElementById('boardTab').setAttribute('aria-selected', String(!showCalendar));
+  document.getElementById('calendarTab').setAttribute('aria-selected', String(showCalendar));
+  document.getElementById('boardTab').tabIndex = showCalendar ? -1 : 0;
+  document.getElementById('calendarTab').tabIndex = showCalendar ? 0 : -1;
 }
 
 async function handleTicketSubmit(event) {
@@ -266,6 +322,7 @@ function renderBoard() {
 
   if (!activeUser) {
     boardEl.innerHTML = '';
+    if (calendarView) calendarView.render([], false);
     return;
   }
 
@@ -281,6 +338,9 @@ function renderBoard() {
 
   const visibleTickets = FilterSortService.apply(allTickets, criteria, usersMap);
   boardView.render(visibleTickets);
+  if (calendarView) {
+    calendarView.render(visibleTickets, auth.canAssignOrSetDue(activeUser));
+  }
 }
 
 function showToast(message) {
@@ -316,6 +376,7 @@ async function syncAuthState() {
     usersMap.clear();
     allTickets = [];
     boardEl.innerHTML = '';
+    if (calendarView) calendarView.render([], false);
     populateAssigneeSelect([]);
   }
 }

@@ -62,6 +62,7 @@ La URL y la clave `publishable/anon` del frontend son visibles para los visitant
 - Las cuentas y los tickets ya no se crean desde datos semilla locales. El primer Admin se aprovisiona desde Supabase; los demás usuarios se crean desde **Administrar usuarios**.
 - Los cambios de estado se registran en `ticket_status_history` mediante un trigger de PostgreSQL. El frontend no puede escribir ni modificar directamente ese historial.
 - Cada equipo tiene un espacio compartido: los Admins pueden asignar tickets a los Agent y Reporter creados para su equipo, y esos miembros ven los tickets del espacio según sus roles. Otros espacios siguen aislados por RLS. Los tickets existentes e historiales se conservan; las asignaciones que cruzaban espacios se quitaron durante la primera migración.
+- La vista **Calendario** agrupa tickets por fecha límite en una cuadrícula mensual; Admin y Agent pueden arrastrarlos a otro día para reprogramarlos o a **Sin fecha** para quitar el plazo. Los filtros del tablero también se aplican al calendario.
 - Las políticas RLS y el trigger del esquema son la autoridad para permisos; los controles de interfaz y las validaciones JavaScript solo mejoran la experiencia.
 - El tema visual se puede cambiar entre oscuro, claro y rosa desde el encabezado; la preferencia queda guardada en el navegador.
 - Las pruebas unitarias se ejecutan con `npm.cmd test`; las comprobaciones de sintaxis con `npm.cmd run check`.

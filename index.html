@@ -101,7 +101,22 @@
     </nav>
 
     <main class="board-wrapper">
-      <div id="kanbanBoard" class="kanban-grid" role="region" aria-label="Tablero Kanban"></div>
+      <nav class="view-tabs" role="tablist" aria-label="Vistas de tickets">
+        <button id="boardTab" class="view-tab is-active" type="button" role="tab" tabindex="0" aria-selected="true" aria-controls="boardPanel">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="5" height="16" rx="1"/><rect x="10" y="4" width="5" height="11" rx="1"/><rect x="17" y="4" width="4" height="13" rx="1"/></svg>
+          Tablero
+        </button>
+        <button id="calendarTab" class="view-tab" type="button" role="tab" tabindex="-1" aria-selected="false" aria-controls="calendarPanel">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18M8 14h2M14 14h2M8 17h2"/></svg>
+          Calendario
+        </button>
+      </nav>
+      <section id="boardPanel" role="tabpanel" aria-labelledby="boardTab">
+        <div id="kanbanBoard" class="kanban-grid" role="region" aria-label="Tablero Kanban"></div>
+      </section>
+      <section id="calendarPanel" class="hidden" role="tabpanel" aria-labelledby="calendarTab">
+        <div id="ticketCalendar"></div>
+      </section>
     </main>
 
     <div id="ticketModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modalHeading">

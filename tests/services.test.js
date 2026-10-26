@@ -6,6 +6,7 @@ import { FilterSortService } from '../js/services/filterService.js';
 import { SupabaseClient } from '../js/data/supabaseClient.js';
 import { TicketService } from '../js/services/ticketService.js';
 import { initializeThemeController, THEME_STORAGE_KEY } from '../js/ui/themeController.js';
+import { dueDateForCalendarDay, getMonthGridDates, localDateKey } from '../js/ui/calendarView.js';
 
 function createContext() {
   const users = [
@@ -246,6 +247,77 @@ test('ticket operations enforce roles and preserve state audit history', async (
     priority: 'Urgente'
   });
   assert.equal(ticket.title, originalTitle);
+});
+
+test('calendar rescheduling is restricted to team admins and agents and changes only the due date', async () => {
+  const { auth, db, users, ticketService } = createContext();
+  const admin = users.find((user) => user.role === 'Admin');
+  const agent = users.find((user) => user.role === 'Agent');
+  const reporter = users.find((user) => user.role === 'Reporter');
+
+  await auth.login(admin.email, 'AdminPassword123!');
+  const ticket = await ticketService.createTicket({
+    title: 'Ticket para calendario',
+    description: 'Debe conservar el resto de sus datos.',
+    assignedTo: agent.id,
+    dueDate: '2026-10-25T09:30:00.000Z'
+  });
+  const original = { ...ticket };
+
+  await auth.login(agent.email, 'AgentPassword123!');
+  await ticketService.rescheduleTicket(ticket.id, '2026-10-26T09:30:00.000Z');
+  assert.equal(ticket.dueDate, '2026-10-26T09:30:00.000Z');
+  assert.equal(ticket.title, original.title);
+  assert.equal(ticket.description, original.description);
+  assert.equal(ticket.status, original.status);
+  assert.equal(ticket.priority, original.priority);
+  assert.equal(ticket.assignedTo, original.assignedTo);
+  assert.equal(ticket.createdBy, original.createdBy);
+
+  await auth.login(reporter.email, 'ReporterPassword123!');
+  await assert.rejects(
+    () => ticketService.rescheduleTicket(ticket.id, null),
+    /Solo Admin y Agent/
+  );
+  assert.equal(ticket.dueDate, '2026-10-26T09:30:00.000Z');
+
+  await auth.login(agent.email, 'AgentPassword123!');
+  await assert.rejects(
+    () => ticketService.rescheduleTicket(ticket.id, 'invalid-date'),
+    /fecha límite no es válida/
+  );
+
+  const otherWorkspaceTicket = {
+    ...ticket,
+    id: 'TCK-9999',
+    workspaceId: 'another-workspace'
+  };
+  await db.put('tickets', otherWorkspaceTicket);
+  await assert.rejects(
+    () => ticketService.rescheduleTicket(otherWorkspaceTicket.id, null),
+    /otro espacio de trabajo/
+  );
+  assert.equal(otherWorkspaceTicket.dueDate, '2026-10-26T09:30:00.000Z');
+});
+
+test('calendar date helpers build Monday-first month grids and preserve the due time', () => {
+  const month = new Date(2026, 9, 1);
+  const dates = getMonthGridDates(month);
+  assert.equal(dates.length, 42);
+  assert.equal(dates[0].getDay(), 1);
+  assert.equal(dates.at(-1).getDay(), 0);
+  assert.equal(localDateKey(new Date(2026, 9, 25)), '2026-10-25');
+  assert.equal(localDateKey(null), '');
+
+  const priorDueDate = new Date(2026, 9, 25, 9, 30);
+  const movedDueDate = new Date(dueDateForCalendarDay(new Date(2026, 9, 26), priorDueDate));
+  assert.equal(localDateKey(movedDueDate), '2026-10-26');
+  assert.equal(movedDueDate.getHours(), 9);
+  assert.equal(movedDueDate.getMinutes(), 30);
+
+  const newlyScheduledDate = new Date(dueDateForCalendarDay(new Date(2026, 9, 26)));
+  assert.equal(newlyScheduledDate.getHours(), 17);
+  assert.equal(newlyScheduledDate.getMinutes(), 0);
 });
 
 test('only administrators delete tickets and invalid ticket fields are rejected', async () => {

@@ -88,6 +88,32 @@ export class TicketService {
     return this.db.put('tickets', ticket);
   }
 
+  async rescheduleTicket(ticketId, dueDate) {
+    const user = await this.auth.getCurrentUser();
+    if (!this.auth.canAssignOrSetDue(user)) {
+      throw new Error('Solo Admin y Agent pueden cambiar la fecha límite desde el calendario.');
+    }
+
+    const ticket = await this.db.getById('tickets', ticketId);
+    if (!ticket) throw new Error('El ticket no existe.');
+    if (ticket.workspaceId && ticket.workspaceId !== user.workspaceId) {
+      throw new Error('No puedes cambiar fechas de tickets de otro espacio de trabajo.');
+    }
+
+    const validated = await this.validateTicketFields({
+      title: ticket.title,
+      description: ticket.description,
+      priority: ticket.priority,
+      initialStatus: ticket.status,
+      assignedTo: ticket.assignedTo,
+      dueDate,
+      workspaceId: user.workspaceId
+    });
+    ticket.dueDate = validated.dueDate;
+    ticket.updatedAt = new Date().toISOString();
+    return this.db.put('tickets', ticket);
+  }
+
   async deleteTicket(ticketId) {
     const user = await this.auth.getCurrentUser();
     const ticket = await this.db.getById('tickets', ticketId);
