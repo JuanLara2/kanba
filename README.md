@@ -1,4 +1,4 @@
-# NexusDesk Kanban
+# Vortex Task
 
 Aplicación de tickets con frontend Vanilla JavaScript y backend Supabase (Auth, Postgres y Row Level Security).
 
@@ -52,7 +52,7 @@ La función usa `SUPABASE_SERVICE_ROLE_KEY` solo en el entorno aislado de Supaba
 El workflow [deploy-pages.yml](./.github/workflows/deploy-pages.yml) ejecuta las pruebas y publica los archivos estáticos al hacer push a `main`.
 
 1. En el repositorio GitHub, abre **Settings → Pages** y selecciona **GitHub Actions** como fuente del despliegue.
-2. Publica el proyecto en la rama `main`. El workflow construye el sitio estático y despliega NexusDesk en `https://juanlara2.github.io/kanba/`.
+2. Publica el proyecto en la rama `main`. El workflow construye el sitio estático y despliega Vortex Task en `https://juanlara2.github.io/kanba/`.
 3. En Supabase, abre **Authentication → URL Configuration** y agrega `https://juanlara2.github.io/kanba/` a **Redirect URLs**.
 
 La URL y la clave `publishable/anon` del frontend son visibles para los visitantes del sitio; la seguridad depende de RLS. La clave `service_role` nunca debe publicarse. Esta versión está conectada al proyecto Supabase configurado para la app: quienes tengan cuentas válidas compartirán sus datos y cambios. No compartas el sitio con testers externos si no quieres que accedan a los datos de ese proyecto.

@@ -3,19 +3,21 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>NexusDesk Kanban</title>
+    <title>Vortex Task</title>
+    <link rel="icon" type="image/png" href="img/icono.png" />
     <link rel="stylesheet" href="styles/base.css" />
     <link rel="stylesheet" href="styles/layout.css" />
     <link rel="stylesheet" href="styles/components.css" />
     <link rel="stylesheet" href="styles/responsive.css" />
   </head>
   <body>
+    <div id="appShell" class="app-shell hidden">
     <header class="app-header">
       <div class="header-left">
-        <div class="logo-mark">NK</div>
+        <div class="logo-mark">VT</div>
         <div>
-          <h1 class="app-title">NexusDesk Kanban</h1>
-          <p class="app-subtitle">Sistema empresarial de tickets</p>
+          <h1 class="app-title">Vortex Task</h1>
+          <p class="app-subtitle">Acelera tu flujo de trabajo</p>
         </div>
       </div>
 
@@ -118,6 +120,7 @@
         <div id="ticketCalendar"></div>
       </section>
     </main>
+    </div>
 
     <div id="ticketModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modalHeading">
       <div class="modal-card">
@@ -240,29 +243,37 @@
       </div>
     </div>
 
-    <div id="loginModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="loginHeading">
-      <div class="modal-card">
-        <header class="modal-header">
-          <h3 id="loginHeading">Iniciar sesión</h3>
-        </header>
+    <main id="loginModal" class="login-screen" aria-labelledby="loginHeading">
+      <section class="login-brand-panel" aria-label="Vortex Task">
+        <div class="login-brand-content">
+          <img class="vortex-logo" src="img/icono.png" alt="Símbolo Vortex" />
+          <p class="login-wordmark">Vortex<span>Task</span></p>
+          <p class="login-tagline">Acelera tu flujo de trabajo</p>
+        </div>
+        <span class="login-decoration login-decoration-one" aria-hidden="true"></span>
+        <span class="login-decoration login-decoration-two" aria-hidden="true"></span>
+      </section>
 
-        <form id="loginForm" class="modal-body">
+      <section class="login-form-panel">
+        <form id="loginForm" class="login-form" aria-labelledby="loginHeading">
+          <div class="login-heading-group">
+            <p class="login-eyebrow">BIENVENIDO</p>
+            <h1 id="loginHeading">Iniciar sesión</h1>
+            <p>Ingresa a tu espacio de trabajo</p>
+          </div>
           <div class="form-row">
             <label for="loginEmail">Correo electrónico</label>
-            <input id="loginEmail" type="email" autocomplete="username" required />
+            <input id="loginEmail" type="email" autocomplete="username" placeholder="nombre@empresa.com" required />
           </div>
-
           <div class="form-row">
             <label for="loginPassword">Contraseña</label>
-            <input id="loginPassword" type="password" autocomplete="current-password" required />
+            <input id="loginPassword" type="password" autocomplete="current-password" placeholder="Ingresa tu contraseña" required />
           </div>
-
-          <footer class="modal-actions">
-            <button type="submit" class="btn btn-primary">Entrar</button>
-          </footer>
+          <button type="submit" class="btn btn-primary login-submit">Ingresar al tablero</button>
+          <p class="login-security-note">Acceso seguro a tu espacio de trabajo</p>
         </form>
-      </div>
-    </div>
+      </section>
+    </main>
 
     <script type="module" src="js/app.js"></script>
   </body>

@@ -198,9 +198,12 @@ export class ModalView {
 
   showLogin() {
     this.loginModal.classList.remove('hidden');
+    document.getElementById('appShell').classList.add('hidden');
+    document.getElementById('loginEmail').focus();
   }
 
   hideLogin() {
     this.loginModal.classList.add('hidden');
+    document.getElementById('appShell').classList.remove('hidden');
   }
 }

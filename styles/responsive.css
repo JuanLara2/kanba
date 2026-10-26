@@ -18,6 +18,34 @@
 }
 
 @media (max-width: 768px) {
+  .login-screen {
+    grid-template-columns: 1fr;
+  }
+
+  .login-brand-panel {
+    min-height: 34vh;
+    padding: 1.5rem;
+  }
+
+  .vortex-logo {
+    width: 92px;
+    margin-bottom: 0.25rem;
+  }
+
+  .login-wordmark {
+    font-size: 2.2rem;
+  }
+
+  .login-tagline {
+    margin-top: 0.4rem;
+    font-size: 1rem;
+  }
+
+  .login-form-panel {
+    min-height: 66vh;
+    padding: 2.5rem 1.5rem;
+  }
+
   .app-header,
   .controls-toolbar {
     flex-direction: column;
