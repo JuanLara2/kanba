@@ -229,7 +229,9 @@ export class ModalView {
     const completed = this.checklistDraft.filter((item) => item.completed).length;
     const percentage = total ? Math.round((completed / total) * 100) : 0;
     document.getElementById('checklistProgressText').textContent = `${completed}/${total} · ${percentage}%`;
-    document.getElementById('checklistProgressFill').style.width = `${percentage}%`;
+    const fill = document.getElementById('checklistProgressFill');
+    fill.style.width = `${percentage}%`;
+    fill.style.setProperty('--progress-hue', String(Math.round(percentage * 1.2)));
     document.getElementById('checklistProgressTrack').setAttribute('aria-valuenow', String(percentage));
     document.getElementById('checklistAddRow').classList.toggle('hidden', !this.canManageChecklist);
     document.getElementById('checklistNewItem').disabled = !this.canManageChecklist || total >= 100;

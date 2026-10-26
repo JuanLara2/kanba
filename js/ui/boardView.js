@@ -90,7 +90,7 @@ export class BoardView {
             <span>${checklistProgress.completed}/${checklistProgress.total} · ${checklistProgress.percentage}%</span>
           </div>
           <div class="checklist-progress-track">
-            <span class="checklist-progress-fill" style="width: ${checklistProgress.percentage}%"></span>
+            <span class="checklist-progress-fill" style="width: ${checklistProgress.percentage}%; --progress-hue: ${Math.round(checklistProgress.percentage * 1.2)}"></span>
           </div>
         </div>
       ` : ''}

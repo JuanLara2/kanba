@@ -206,8 +206,12 @@
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #10b981, #34d399);
-  transition: width 0.2s ease;
+  background: linear-gradient(
+    90deg,
+    hsl(var(--progress-hue, 120) 80% 44%),
+    hsl(calc(var(--progress-hue, 120) + 14) 72% 52%)
+  );
+  transition: width 0.25s ease, background 0.25s ease;
 }
 
 .ticket-checklist-editor {
