@@ -18,6 +18,12 @@
 }
 
 @media (max-width: 768px) {
+  .app-shell {
+    min-width: 0;
+    width: 100%;
+    overflow-x: hidden;
+  }
+
   .login-screen {
     grid-template-columns: 1fr;
   }
@@ -52,24 +58,152 @@
     align-items: stretch;
   }
 
+  .app-header {
+    gap: 0.9rem;
+    padding: 0.85rem 1rem;
+  }
+
   .header-left,
   .header-right {
     width: 100%;
-    justify-content: space-between;
-    flex-wrap: wrap;
+  }
+
+  .header-left {
+    gap: 0.7rem;
+  }
+
+  .app-title {
+    font-size: 1.15rem;
   }
 
   .header-right {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+
+  .header-right {
+    align-items: stretch;
+  }
+
+  .header-right > * {
+    min-width: 0;
+    justify-content: center;
+  }
+
+  .theme-picker {
+    justify-content: space-between;
+    padding: 0.45rem 0.55rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    background: var(--bg-app);
+  }
+
+  .theme-picker select {
+    min-width: 0;
+    padding: 0.35rem;
+  }
+
+  .user-session-pill {
+    min-width: 0;
+    justify-content: center;
+    padding: 0.45rem 0.55rem;
+  }
+
+  #sessionUserName {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .header-right .btn {
+    min-height: 2.75rem;
+    padding: 0.5rem;
+    font-size: 0.82rem;
+  }
+
+  .controls-toolbar {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.65rem;
+    padding: 0.75rem 1rem;
+  }
+
+  .search-box {
+    grid-column: 1 / -1;
+    min-width: 0;
+  }
+
+  .search-box input,
+  .control-group select,
+  .control-group input {
+    min-height: 2.75rem;
+    font-size: 0.88rem;
+  }
+
+  .control-group {
+    min-width: 0;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.3rem;
+  }
+
+  .control-group label {
+    font-size: 0.75rem;
+  }
+
+  .control-group:last-child {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .control-group:last-child label {
+    grid-column: 1 / -1;
   }
 
   .board-wrapper {
-    padding: 0.75rem;
+    min-width: 0;
+    padding: 0.75rem 0;
+  }
+
+  .view-tabs {
+    margin: 0 0 0.75rem 0.75rem;
+  }
+
+  #boardPanel,
+  #calendarPanel {
+    min-width: 0;
+  }
+
+  .kanban-grid {
+    display: grid;
+    grid-auto-columns: 84vw;
+    grid-auto-flow: column;
+    grid-template-columns: none;
+    gap: 0.75rem;
+    min-width: 0;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    padding: 0 0.75rem 0.85rem;
+    scroll-snap-type: x proximity;
+    scrollbar-width: thin;
+  }
+
+  .kanban-col {
+    min-width: 0;
+    min-height: 55vh;
+    scroll-snap-align: start;
+  }
+
+  .drop-zone {
+    min-height: 45vh;
   }
 
   .calendar-main {
     overflow-x: auto;
     padding: 0.75rem;
+    -webkit-overflow-scrolling: touch;
   }
 
   .calendar-toolbar {
@@ -77,8 +211,9 @@
     flex-direction: column;
   }
 
-  .kanban-grid {
-    grid-template-columns: repeat(2, minmax(220px, 1fr));
+  .calendar-navigation {
+    width: 100%;
+    justify-content: space-between;
   }
 
   .grid-2 {
@@ -98,20 +233,113 @@
 }
 
 @media (max-width: 560px) {
-  .kanban-grid {
-    grid-template-columns: 1fr;
+  .app-header {
+    padding: 0.75rem;
+  }
+
+  .header-right {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.4rem;
+  }
+
+  .logo-mark {
+    width: 36px;
+    height: 36px;
+  }
+
+  .app-subtitle {
+    font-size: 0.72rem;
   }
 
   .controls-toolbar {
     padding: 0.75rem;
   }
 
-  .control-group {
-    flex-direction: column;
-    align-items: stretch;
+  .control-group:last-child {
+    gap: 0.5rem;
   }
 
-  .theme-picker {
-    justify-content: space-between;
+  .view-tabs {
+    width: calc(100% - 1.5rem);
+  }
+
+  .view-tab {
+    flex: 1;
+    justify-content: center;
+    padding: 0.65rem 0.5rem;
+  }
+
+  .kanban-grid {
+    grid-auto-columns: 88vw;
+  }
+
+  .ticket-card {
+    padding: 0.75rem;
+  }
+
+  .card-footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .card-dates {
+    align-items: flex-start;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.75rem;
+  }
+
+  .modal-overlay {
+    place-items: end center;
+    padding: 0;
+  }
+
+  .modal-card {
+    width: 100%;
+    max-height: 92dvh;
+    border-radius: 18px 18px 0 0;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .modal-body {
+    gap: 0.85rem;
+    padding: 0.9rem 1rem;
+  }
+
+  .modal-actions {
+    flex-wrap: wrap;
+  }
+
+  .modal-actions .btn {
+    flex: 1 1 auto;
+  }
+
+  .calendar-day {
+    min-height: 112px;
+  }
+
+  .calendar-unscheduled-list {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 360px) {
+  .header-right .btn {
+    gap: 0.25rem;
+    font-size: 0.74rem;
+  }
+
+  .theme-picker > span,
+  .user-session-pill .role-badge {
+    display: none;
+  }
+
+  .controls-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .control-group:last-child,
+  .search-box {
+    grid-column: 1;
   }
 }
