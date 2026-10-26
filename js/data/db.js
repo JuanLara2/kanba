@@ -1,5 +1,5 @@
 const PROFILE_FIELDS = 'id,full_name,email,role,workspace_id,created_by_admin_id';
-const TICKET_FIELDS = 'id,title,description,status,priority,assigned_to,created_by,workspace_id,created_at,updated_at,due_date';
+const TICKET_FIELDS = 'id,title,description,status,priority,assigned_to,created_by,workspace_id,created_at,updated_at,due_date,checklist';
 const HISTORY_FIELDS = 'id,ticket_id,from_status,to_status,changed_at,changed_by';
 
 function mapProfile(row) {
@@ -26,6 +26,7 @@ function mapTicket(row, history = []) {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     dueDate: row.due_date,
+    checklist: row.checklist || [],
     statusHistory: history
       .filter((record) => record.ticket_id === row.id)
       .map((record) => ({
@@ -44,7 +45,8 @@ function toTicketRow(ticket) {
     status: ticket.status,
     priority: ticket.priority,
     assigned_to: ticket.assignedTo,
-    due_date: ticket.dueDate
+    due_date: ticket.dueDate,
+    checklist: ticket.checklist || []
   };
 }
 

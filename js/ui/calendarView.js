@@ -1,3 +1,5 @@
+import { getChecklistProgress } from '../services/ticketService.js';
+
 const WEEKDAY_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 
 export function localDateKey(value) {
@@ -166,6 +168,7 @@ export class CalendarView {
 
   ticketMarkup(ticket) {
     const canDrag = this.canReschedule;
+    const progress = getChecklistProgress(ticket.checklist);
     return `
       <button class="calendar-ticket${canDrag ? ' can-drag' : ''}" type="button"
         data-calendar-ticket data-ticket-id="${this.escapeHtml(ticket.id)}"
@@ -174,6 +177,7 @@ export class CalendarView {
         <span class="calendar-ticket-id">${this.escapeHtml(ticket.id)}</span>
         <span class="calendar-ticket-title">${this.escapeHtml(ticket.title)}</span>
         <span class="calendar-ticket-status">${this.escapeHtml(ticket.status.replace('_', ' '))}</span>
+        ${progress.total ? `<span class="calendar-ticket-progress">${progress.completed}/${progress.total} subtareas · ${progress.percentage}%</span>` : ''}
       </button>
     `;
   }

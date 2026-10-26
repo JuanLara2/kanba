@@ -1,5 +1,32 @@
 import { SLA_THRESHOLDS_HOURS, STATUS_DEFINITIONS, PRIORITY_ORDER } from '../config/constants.js';
 
+export function normalizeChecklist(items) {
+  if (!Array.isArray(items) || items.length > 100) {
+    throw new Error('La lista puede contener hasta 100 subtareas.');
+  }
+
+  return items.map((item) => {
+    const text = String(item?.text ?? '').trim();
+    if (!text || text.length > 200) {
+      throw new Error('Cada subtarea debe tener entre 1 y 200 caracteres.');
+    }
+    if (typeof item?.completed !== 'boolean') {
+      throw new Error('El estado de cada subtarea no es válido.');
+    }
+    return { text, completed: item.completed };
+  });
+}
+
+export function getChecklistProgress(items = []) {
+  const total = Array.isArray(items) ? items.length : 0;
+  const completed = Array.isArray(items) ? items.filter((item) => item.completed).length : 0;
+  return {
+    completed,
+    total,
+    percentage: total ? Math.round((completed / total) * 100) : 0
+  };
+}
+
 export class TicketService {
   constructor(dbAdapter, authService) {
     this.db = dbAdapter;
@@ -10,14 +37,15 @@ export class TicketService {
     return this.db.getAll('tickets');
   }
 
-  async createTicket({ title, description, priority = 'Media', initialStatus = 'new', assignedTo = null, dueDate = null }) {
+  async createTicket({ title, description, priority = 'Media', initialStatus = 'new', assignedTo = null, dueDate = null, checklist = [] }) {
     const user = await this.auth.getCurrentUser();
     if (!user) throw new Error('Sesión requerida para crear tickets.');
     if (user.role === 'Reporter' && initialStatus !== 'new') {
       throw new Error('Los reporteros solo pueden crear tickets en estado Nuevo.');
     }
-    if ((assignedTo || dueDate) && !this.auth.canAssignOrSetDue(user)) {
-      throw new Error('Tu rol no puede asignar responsables ni modificar plazos.');
+    const canManageChecklist = this.auth.canAssignOrSetDue(user);
+    if ((assignedTo || dueDate || (Array.isArray(checklist) && checklist.length > 0)) && !canManageChecklist) {
+      throw new Error('Tu rol no puede asignar responsables, modificar plazos ni crear subtareas.');
     }
 
     const validated = await this.validateTicketFields({
@@ -27,6 +55,7 @@ export class TicketService {
       initialStatus,
       assignedTo,
       dueDate,
+      checklist,
       workspaceId: user.workspaceId
     });
     const now = new Date().toISOString();
@@ -40,6 +69,7 @@ export class TicketService {
       createdAt: now,
       updatedAt: now,
       dueDate: validated.dueDate,
+      checklist: validated.checklist,
       statusHistory: []
     };
 
@@ -57,12 +87,13 @@ export class TicketService {
     return newTicket;
   }
 
-  async updateTicket({ id, title, description, priority, assignedTo, dueDate }) {
+  async updateTicket({ id, title, description, priority, assignedTo, dueDate, checklist }) {
     const user = await this.auth.getCurrentUser();
     const ticket = await this.db.getById('tickets', id);
     if (!ticket) throw new Error('El ticket no existe.');
 
     const canEditContent = this.auth.canEditTicket(user, ticket);
+    const canManageChecklist = this.auth.canEditTicket(user, ticket);
     const canManageAssignment = this.auth.canAssignOrSetDue(user);
     if (!canEditContent && !canManageAssignment) {
       throw new Error('Permisos insuficientes para editar este ticket.');
@@ -74,6 +105,7 @@ export class TicketService {
       priority: canEditContent ? priority : ticket.priority,
       assignedTo: canManageAssignment && assignedTo !== undefined ? assignedTo : ticket.assignedTo,
       dueDate: canManageAssignment && dueDate !== undefined ? dueDate : ticket.dueDate,
+      checklist: canManageChecklist && checklist !== undefined ? checklist : (ticket.checklist || []),
       initialStatus: ticket.status,
       workspaceId: user.workspaceId
     });
@@ -83,6 +115,7 @@ export class TicketService {
     ticket.priority = validated.priority;
     ticket.assignedTo = validated.assignedTo;
     ticket.dueDate = validated.dueDate;
+    ticket.checklist = validated.checklist;
     ticket.updatedAt = now;
 
     return this.db.put('tickets', ticket);
@@ -157,7 +190,7 @@ export class TicketService {
     return this.db.put('tickets', ticket);
   }
 
-  async validateTicketFields({ title, description, priority, initialStatus, assignedTo, dueDate, workspaceId }) {
+  async validateTicketFields({ title, description, priority, initialStatus, assignedTo, dueDate, checklist = [], workspaceId }) {
     const normalizedTitle = String(title ?? '').trim();
     const normalizedDescription = String(description ?? '').trim();
     if (normalizedTitle.length < 4) throw new Error('El título debe tener al menos 4 caracteres.');
@@ -188,7 +221,8 @@ export class TicketService {
       priority,
       initialStatus,
       assignedTo: assignedTo || null,
-      dueDate: normalizedDueDate
+      dueDate: normalizedDueDate,
+      checklist: normalizeChecklist(checklist)
     };
   }
 

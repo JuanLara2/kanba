@@ -18,7 +18,9 @@ create table if not exists public.tickets (
   created_by uuid not null default auth.uid() references public.profiles (id),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  due_date timestamptz
+  due_date timestamptz,
+  checklist jsonb not null default '[]'::jsonb
+    constraint tickets_checklist_is_array check (jsonb_typeof(checklist) = 'array')
 );
 
 create table if not exists public.ticket_status_history (
@@ -68,10 +70,17 @@ begin
     and new.title = old.title
     and new.description = old.description
     and new.status = old.status
-    and new.priority = old.priority then
+    and new.priority = old.priority
+    and new.checklist = old.checklist then
     null;
   else
     raise exception 'Insufficient permission to update this ticket';
+  end if;
+
+  if app_role = 'Agent'
+    and not (old.assigned_to = (select auth.uid()) or old.status = 'open')
+    and new.checklist is distinct from old.checklist then
+    raise exception 'Insufficient permission to update ticket checklist';
   end if;
 
   new.updated_at := now();
@@ -158,6 +167,7 @@ with check (
       and status = 'new'
       and assigned_to is null
       and due_date is null
+      and checklist = '[]'::jsonb
     )
   )
 );
@@ -183,7 +193,7 @@ using ((select auth.uid()) is not null);
 
 revoke all on public.profiles, public.tickets, public.ticket_status_history from public, anon, authenticated;
 grant select on public.profiles, public.tickets, public.ticket_status_history to authenticated;
-grant insert (title, description, status, priority, assigned_to, due_date) on public.tickets to authenticated;
-grant update (title, description, status, priority, assigned_to, due_date) on public.tickets to authenticated;
+grant insert (title, description, status, priority, assigned_to, due_date, checklist) on public.tickets to authenticated;
+grant update (title, description, status, priority, assigned_to, due_date, checklist) on public.tickets to authenticated;
 grant delete on public.tickets to authenticated;
 grant usage on sequence public.ticket_number_seq to authenticated;

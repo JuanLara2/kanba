@@ -12,6 +12,7 @@ export class ModalView {
     this.onTicketSubmit = onTicketSubmit;
     this.onLoginSubmit = onLoginSubmit;
     this.onUserSubmit = onUserSubmit;
+    this.checklistDraft = [];
     this.bindEvents();
   }
 
@@ -93,6 +94,7 @@ export class ModalView {
       document.getElementById('formAssignee').value = ticket.assignedTo || '';
       document.getElementById('formInitialStatus').value = ticket.status;
       document.getElementById('formDueDate').value = ticket.dueDate ? this.toLocalDateTime(ticket.dueDate) : '';
+      this.checklistDraft = (ticket.checklist || []).map((item) => ({ ...item }));
       statusRow.classList.add('hidden');
       this.renderHistory(ticket.statusHistory || []);
     } else {
@@ -100,10 +102,14 @@ export class ModalView {
       formTicketId.value = '';
       deleteBtn.classList.add('hidden');
       this.form.reset();
+      this.checklistDraft = [];
       statusRow.classList.remove('hidden');
       document.getElementById('ticketHistorySection').classList.add('hidden');
     }
 
+    this.canManageChecklist = Boolean(permissions.canManageChecklist);
+    document.getElementById('ticketChecklistSection').classList.toggle('hidden', !ticket && !this.canManageChecklist);
+    this.renderChecklist();
     document.getElementById('formTitle').disabled = !canEditContent;
     document.getElementById('formDescription').disabled = !canEditContent;
     document.getElementById('formPriority').disabled = !canEditContent;
@@ -122,10 +128,115 @@ export class ModalView {
     document.getElementById('formTicketId').value = '';
     document.getElementById('btnDeleteTicket').classList.add('hidden');
     document.getElementById('ticketHistorySection').classList.add('hidden');
+    this.checklistDraft = [];
+    this.canManageChecklist = false;
+    this.renderChecklist();
     this.form.querySelectorAll('input, textarea, select').forEach((field) => {
       field.disabled = false;
     });
     this.previousFocus?.focus();
+  }
+
+  getChecklist() {
+    return this.checklistDraft.map((item) => ({ ...item }));
+  }
+
+  addChecklistItem() {
+    if (!this.canManageChecklist || this.checklistDraft.length >= 100) return;
+    const input = document.getElementById('checklistNewItem');
+    const text = input.value.trim();
+    if (!text) {
+      input.focus();
+      return;
+    }
+
+    this.checklistDraft.push({ text, completed: false });
+    input.value = '';
+    this.renderChecklist();
+    input.focus();
+  }
+
+  removeChecklistItem(index) {
+    if (!this.canManageChecklist || !Number.isInteger(index)) return;
+    this.checklistDraft.splice(index, 1);
+    this.renderChecklist();
+  }
+
+  updateChecklistText(index, value) {
+    if (!this.canManageChecklist || !this.checklistDraft[index]) return;
+    this.checklistDraft[index].text = value;
+  }
+
+  setChecklistCompletion(index, completed) {
+    if (!this.canManageChecklist || !this.checklistDraft[index]) return;
+    this.checklistDraft[index].completed = completed;
+    const row = this.form.querySelector(`[data-checklist-complete="${index}"]`)?.closest('.checklist-item');
+    row?.classList.toggle('is-complete', completed);
+    this.renderChecklistProgress();
+  }
+
+  renderChecklist() {
+    const list = document.getElementById('checklistItems');
+    const progressTrack = document.getElementById('checklistProgressTrack');
+    if (!list || !progressTrack) return;
+
+    const total = this.checklistDraft.length;
+    this.renderChecklistProgress();
+
+    const fragment = document.createDocumentFragment();
+    if (total === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'checklist-empty';
+      empty.textContent = 'Todavía no hay subtareas.';
+      fragment.appendChild(empty);
+    }
+    this.checklistDraft.forEach((item, index) => {
+      const row = document.createElement('div');
+      row.className = `checklist-item${item.completed ? ' is-complete' : ''}`;
+
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.checked = Boolean(item.completed);
+      checkbox.disabled = !this.canManageChecklist;
+      checkbox.dataset.checklistComplete = String(index);
+      checkbox.setAttribute('aria-label', `Completar subtarea ${item.text}`);
+
+      const text = document.createElement('input');
+      text.type = 'text';
+      text.value = item.text;
+      text.maxLength = 200;
+      text.disabled = !this.canManageChecklist;
+      text.dataset.checklistText = String(index);
+      text.setAttribute('aria-label', `Texto de subtarea ${index + 1}`);
+
+      row.append(checkbox, text);
+      if (this.canManageChecklist) {
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'checklist-remove';
+        remove.dataset.removeChecklistItem = String(index);
+        remove.setAttribute('aria-label', `Eliminar subtarea ${item.text}`);
+        remove.textContent = '×';
+        row.appendChild(remove);
+      }
+      fragment.appendChild(row);
+    });
+    list.replaceChildren(fragment);
+  }
+
+  renderChecklistProgress() {
+    const total = this.checklistDraft.length;
+    const completed = this.checklistDraft.filter((item) => item.completed).length;
+    const percentage = total ? Math.round((completed / total) * 100) : 0;
+    document.getElementById('checklistProgressText').textContent = `${completed}/${total} · ${percentage}%`;
+    document.getElementById('checklistProgressFill').style.width = `${percentage}%`;
+    document.getElementById('checklistProgressTrack').setAttribute('aria-valuenow', String(percentage));
+    document.getElementById('checklistAddRow').classList.toggle('hidden', !this.canManageChecklist);
+    document.getElementById('checklistNewItem').disabled = !this.canManageChecklist || total >= 100;
+    document.getElementById('btnAddChecklistItem').disabled = !this.canManageChecklist || total >= 100;
+    document.getElementById('checklistHelp').textContent = this.canManageChecklist
+      ? 'Puedes agregar hasta 100 subtareas, de máximo 200 caracteres cada una. Los cambios se guardan con el ticket.'
+      : 'Solo los usuarios con permiso de edición pueden cambiar las subtareas.';
   }
 
   renderHistory(records) {

@@ -142,7 +142,10 @@ function bindStaticEvents() {
   });
   document.getElementById('btnNewTicket').addEventListener('click', async () => {
     const user = await auth.getCurrentUser();
-    modalView.openTicket(null, { canManageAssignment: auth.canAssignOrSetDue(user) });
+    modalView.openTicket(null, {
+      canManageAssignment: auth.canAssignOrSetDue(user),
+      canManageChecklist: auth.canAssignOrSetDue(user)
+    });
   });
   document.getElementById('btnManageUsers').addEventListener('click', async () => {
     const user = await auth.getCurrentUser();
@@ -156,6 +159,27 @@ function bindStaticEvents() {
   document.getElementById('usersModalCancelBtn').addEventListener('click', () => modalView.closeUsers());
   document.getElementById('modalCloseBtn').addEventListener('click', () => modalView.closeTicket());
   document.getElementById('btnCancelModal').addEventListener('click', () => modalView.closeTicket());
+  document.getElementById('checklistAddRow').addEventListener('click', (event) => {
+    if (event.target.closest('#btnAddChecklistItem')) modalView.addChecklistItem();
+  });
+  document.getElementById('checklistItems').addEventListener('click', (event) => {
+    const removeButton = event.target.closest('[data-remove-checklist-item]');
+    if (removeButton) modalView.removeChecklistItem(Number(removeButton.dataset.removeChecklistItem));
+  });
+  document.getElementById('checklistItems').addEventListener('input', (event) => {
+    const input = event.target.closest('[data-checklist-text]');
+    if (input) modalView.updateChecklistText(Number(input.dataset.checklistText), input.value);
+  });
+  document.getElementById('checklistItems').addEventListener('change', (event) => {
+    const checkbox = event.target.closest('[data-checklist-complete]');
+    if (checkbox) modalView.setChecklistCompletion(Number(checkbox.dataset.checklistComplete), checkbox.checked);
+  });
+  document.getElementById('checklistNewItem').addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      modalView.addChecklistItem();
+    }
+  });
   document.getElementById('btnDeleteTicket').addEventListener('click', async () => {
     const ticketId = document.getElementById('formTicketId').value;
     if (!ticketId) return;
@@ -202,6 +226,7 @@ async function openTicketForEditing(ticketId) {
   const user = await auth.getCurrentUser();
   modalView.openTicket(ticket, {
     canEdit: auth.canEditTicket(user, ticket),
+    canManageChecklist: auth.canEditTicket(user, ticket),
     canManageAssignment: auth.canAssignOrSetDue(user),
     canDelete: auth.canDelete(user)
   });
@@ -260,11 +285,20 @@ async function handleTicketSubmit(event) {
         description,
         priority,
         assignedTo,
-        dueDate
+        dueDate,
+        checklist: modalView.getChecklist()
       });
       showToast('Ticket actualizado correctamente');
     } else {
-      await ticketService.createTicket({ title, description, priority, initialStatus, assignedTo, dueDate });
+      await ticketService.createTicket({
+        title,
+        description,
+        priority,
+        initialStatus,
+        assignedTo,
+        dueDate,
+        checklist: modalView.getChecklist()
+      });
       showToast('Ticket creado correctamente');
     }
 

@@ -1,4 +1,5 @@
 import { STATUS_DEFINITIONS } from '../config/constants.js';
+import { getChecklistProgress } from '../services/ticketService.js';
 
 export class BoardView {
   constructor(boardContainer, ticketService, usersMap) {
@@ -54,7 +55,11 @@ export class BoardView {
     card.draggable = true;
     card.tabIndex = 0;
     card.setAttribute('role', 'button');
-    card.setAttribute('aria-label', `${ticket.id}: ${ticket.title}. Estado: ${colDef.name}. Pulsa Enter para ver detalles.`);
+    const checklistProgress = getChecklistProgress(ticket.checklist);
+    const checklistLabel = checklistProgress.total
+      ? ` Subtareas: ${checklistProgress.completed} de ${checklistProgress.total}, ${checklistProgress.percentage}% completado.`
+      : '';
+    card.setAttribute('aria-label', `${ticket.id}: ${ticket.title}. Estado: ${colDef.name}.${checklistLabel} Pulsa Enter para ver detalles.`);
     card.dataset.ticketId = ticket.id;
 
     const sla = this.ticketService.evaluateSLA(ticket.dueDate);
@@ -78,6 +83,17 @@ export class BoardView {
       </div>
       <h3 class="card-title">${this.escapeHtml(ticket.title)}</h3>
       <p class="card-desc">${this.escapeHtml(ticket.description)}</p>
+      ${checklistProgress.total ? `
+        <div class="card-checklist-progress" aria-label="Subtareas: ${checklistProgress.completed} de ${checklistProgress.total}, ${checklistProgress.percentage}% completado">
+          <div class="card-checklist-label">
+            <span>Subtareas</span>
+            <span>${checklistProgress.completed}/${checklistProgress.total} · ${checklistProgress.percentage}%</span>
+          </div>
+          <div class="checklist-progress-track">
+            <span class="checklist-progress-fill" style="width: ${checklistProgress.percentage}%"></span>
+          </div>
+        </div>
+      ` : ''}
       <div class="card-footer">
         <div class="card-assignee" title="Asignado a: ${this.escapeHtml(assignee.fullName)}">
           <span class="avatar-circle">${initial}</span>

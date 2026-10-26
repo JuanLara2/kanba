@@ -179,6 +179,33 @@
             <textarea id="formDescription" rows="4" required placeholder="Detalles del requerimiento..."></textarea>
           </div>
 
+          <section id="ticketChecklistSection" class="ticket-checklist-editor" aria-labelledby="checklistHeading">
+            <header class="checklist-editor-header">
+              <div>
+                <h4 id="checklistHeading">Lista de subtareas</h4>
+                <p>Divide el ticket en pasos y sigue su avance.</p>
+              </div>
+              <span id="checklistProgressText" class="checklist-progress-text">0/0 · 0%</span>
+            </header>
+            <div
+              id="checklistProgressTrack"
+              class="checklist-progress-track"
+              role="progressbar"
+              aria-label="Progreso de subtareas"
+              aria-valuemin="0"
+              aria-valuemax="100"
+              aria-valuenow="0"
+            >
+              <span id="checklistProgressFill" class="checklist-progress-fill"></span>
+            </div>
+            <div id="checklistItems" class="checklist-items"></div>
+            <div id="checklistAddRow" class="checklist-add-row">
+              <input id="checklistNewItem" type="text" maxlength="200" placeholder="Escribe una subtarea..." aria-label="Nueva subtarea" />
+              <button id="btnAddChecklistItem" type="button" class="btn btn-outline">Agregar</button>
+            </div>
+            <small id="checklistHelp" class="checklist-help">Puedes agregar hasta 100 subtareas, de máximo 200 caracteres cada una. Los cambios se guardan con el ticket.</small>
+          </section>
+
           <section id="ticketHistorySection" class="ticket-history hidden" aria-labelledby="ticketHistoryHeading">
             <h4 id="ticketHistoryHeading">Historial de estados</h4>
             <ol id="ticketHistoryList"></ol>

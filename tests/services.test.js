@@ -4,7 +4,7 @@ import { AuthService } from '../js/services/authService.js';
 import { SupabaseAdapter } from '../js/data/db.js';
 import { FilterSortService } from '../js/services/filterService.js';
 import { SupabaseClient } from '../js/data/supabaseClient.js';
-import { TicketService } from '../js/services/ticketService.js';
+import { getChecklistProgress, normalizeChecklist, TicketService } from '../js/services/ticketService.js';
 import { initializeThemeController, THEME_STORAGE_KEY } from '../js/ui/themeController.js';
 import { dueDateForCalendarDay, getMonthGridDates, localDateKey } from '../js/ui/calendarView.js';
 
@@ -249,6 +249,71 @@ test('ticket operations enforce roles and preserve state audit history', async (
   assert.equal(ticket.title, originalTitle);
 });
 
+test('ticket checklists validate subtasks, persist updates, and respect ticket edit permissions', async () => {
+  const { auth, users, ticketService } = createContext();
+  const admin = users.find((user) => user.role === 'Admin');
+  const agent = users.find((user) => user.role === 'Agent');
+  const reporter = users.find((user) => user.role === 'Reporter');
+  const checklist = [
+    { text: 'Analizar logs', completed: true },
+    { text: 'Probar en staging', completed: false }
+  ];
+
+  await auth.login(admin.email, 'AdminPassword123!');
+  const ticket = await ticketService.createTicket({
+    title: 'Tarea con subtareas',
+    description: 'Verificar progreso asociado al ticket.',
+    assignedTo: agent.id,
+    checklist
+  });
+  assert.deepEqual(ticket.checklist, checklist);
+  const lockedTicket = await ticketService.createTicket({
+    title: 'Ticket restringido',
+    description: 'El agente no puede cambiar sus subtareas.',
+    initialStatus: 'closed'
+  });
+
+  await auth.login(agent.email, 'AgentPassword123!');
+  const updatedChecklist = [
+    { text: 'Analizar logs', completed: true },
+    { text: 'Probar en staging', completed: true }
+  ];
+  await ticketService.updateTicket({
+    id: ticket.id,
+    title: ticket.title,
+    description: ticket.description,
+    priority: ticket.priority,
+    checklist: updatedChecklist
+  });
+  assert.deepEqual(ticket.checklist, updatedChecklist);
+  await ticketService.updateTicket({
+    id: lockedTicket.id,
+    title: 'Intento de edición no autorizado',
+    description: 'No debe modificar este ticket.',
+    priority: 'Urgente',
+    checklist: [{ text: 'No debe agregarse', completed: false }]
+  });
+  assert.deepEqual(lockedTicket.checklist, []);
+  assert.equal(lockedTicket.title, 'Ticket restringido');
+
+  await auth.login(reporter.email, 'ReporterPassword123!');
+  await assert.rejects(
+    () => ticketService.createTicket({
+      title: 'Ticket sin permiso',
+      description: 'No debe permitir subtareas al reportero.',
+      checklist: [{ text: 'No autorizada', completed: false }]
+    }),
+    /no puede asignar responsables/
+  );
+
+  assert.deepEqual(normalizeChecklist(checklist), checklist);
+  assert.throws(() => normalizeChecklist([{ text: '   ', completed: false }]), /entre 1 y 200 caracteres/);
+  assert.throws(() => normalizeChecklist([{ text: 'Subtarea', completed: 'false' }]), /estado de cada subtarea/);
+  assert.throws(() => normalizeChecklist(Array.from({ length: 101 }, () => ({ text: 'Paso', completed: false }))), /hasta 100/);
+  assert.deepEqual(getChecklistProgress(checklist), { completed: 1, total: 2, percentage: 50 });
+  assert.deepEqual(getChecklistProgress([]), { completed: 0, total: 0, percentage: 0 });
+});
+
 test('calendar rescheduling is restricted to team admins and agents and changes only the due date', async () => {
   const { auth, db, users, ticketService } = createContext();
   const admin = users.find((user) => user.role === 'Admin');
@@ -397,7 +462,8 @@ test('Supabase adapter maps ticket rows and requests the database audit history'
     workspace_id: 'workspace-id',
     created_at: '2026-10-20T09:00:00.000Z',
     updated_at: '2026-10-20T10:00:00.000Z',
-    due_date: null
+    due_date: null,
+    checklist: [{ text: 'Validar integración', completed: true }]
   };
   const client = {
     async requestRest(path, options) {
@@ -432,6 +498,7 @@ test('Supabase adapter maps ticket rows and requests the database audit history'
 
   assert.equal(ticket.assignedTo, 'agent-id');
   assert.equal(ticket.workspaceId, 'workspace-id');
+  assert.deepEqual(ticket.checklist, [{ text: 'Validar integración', completed: true }]);
   assert.deepEqual(ticket.statusHistory, [{
     from: 'new',
     to: 'open',
@@ -450,10 +517,12 @@ test('Supabase adapter maps ticket rows and requests the database audit history'
     priority: 'Media',
     assignedTo: null,
     createdBy: 'client-user-id',
-    dueDate: null
+    dueDate: null,
+    checklist: [{ text: 'Preparar pruebas', completed: false }]
   });
   assert.equal(calls[2].options.body.id, undefined);
   assert.equal(calls[2].options.body.created_by, undefined);
+  assert.deepEqual(calls[2].options.body.checklist, [{ text: 'Preparar pruebas', completed: false }]);
 
   const [profile] = await adapter.getAll('users');
   assert.equal(profile.workspaceId, 'workspace-id');
