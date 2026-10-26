@@ -11,7 +11,8 @@ function createContext() {
   const users = [
     { id: 'usr-admin-01', fullName: 'Carlos Administrador', email: 'admin@nexus.com', role: 'Admin', workspaceId: 'workspace-test', password: 'AdminPassword123!' },
     { id: 'usr-agent-01', fullName: 'Laura Agente', email: 'laura@nexus.com', role: 'Agent', workspaceId: 'workspace-test', password: 'AgentPassword123!' },
-    { id: 'usr-reporter-01', fullName: 'Pedro Reportero', email: 'pedro@nexus.com', role: 'Reporter', workspaceId: 'workspace-test', password: 'ReporterPassword123!' }
+    { id: 'usr-reporter-01', fullName: 'Pedro Reportero', email: 'pedro@nexus.com', role: 'Reporter', workspaceId: 'workspace-test', password: 'ReporterPassword123!' },
+    { id: 'usr-isolated-01', fullName: 'Otra persona', email: 'other@example.com', role: 'Agent', workspaceId: 'another-workspace', password: 'OtherPassword123!' }
   ];
   const tickets = [];
   const stores = { users, tickets };
@@ -38,7 +39,7 @@ function createContext() {
     },
     async createUser({ fullName, email, role }) {
       const id = `usr-created-${++createdUserId}`;
-      const user = { id, fullName, email, role, workspaceId: `workspace-${id}` };
+      const user = { id, fullName, email, role, workspaceId: 'workspace-test' };
       users.push(user);
       return user;
     }
@@ -278,7 +279,7 @@ test('only administrators delete tickets and invalid ticket fields are rejected'
   assert.equal(tickets.length, 0);
 });
 
-test('ticket assignment rejects users from a different workspace', async () => {
+test('admin-created members share assigned tickets while other workspaces stay isolated', async () => {
   const { auth, ticketService } = createContext();
   await auth.login('admin@nexus.com', 'AdminPassword123!');
   const createdAgent = await auth.registerUser({
@@ -288,11 +289,19 @@ test('ticket assignment rejects users from a different workspace', async () => {
     role: 'Agent'
   });
 
+  assert.equal(createdAgent.workspaceId, 'workspace-test');
+  const ticket = await ticketService.createTicket({
+    title: 'Ticket del equipo',
+    description: 'El agente del mismo equipo debe poder verlo.',
+    assignedTo: createdAgent.id
+  });
+  assert.equal(ticket.assignedTo, createdAgent.id);
+
   await assert.rejects(
     () => ticketService.createTicket({
-      title: 'Ticket aislado',
-      description: 'No debe compartir su responsable.',
-      assignedTo: createdAgent.id
+      title: 'Ticket externo',
+      description: 'No puede asignarse a otro equipo.',
+      assignedTo: 'usr-isolated-01'
     }),
     /responsable debe pertenecer a tu espacio/
   );

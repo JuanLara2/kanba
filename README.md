@@ -18,9 +18,9 @@ Aplicación de tickets con frontend Vanilla JavaScript y backend Supabase (Auth,
    ```
 
    El rol inicial solo se asigna desde el entorno de administración de Supabase. Después, la creación de cuentas y perfiles se hace mediante la función protegida.
-5. Ejecuta en SQL Editor [`supabase/migrations/20261026012000_per_user_workspaces.sql`](./supabase/migrations/20261026012000_per_user_workspaces.sql) para activar el aislamiento por cuenta.
+5. Ejecuta las migraciones de `supabase/migrations/` en orden para activar el aislamiento de equipos y permitir colaboración dentro del mismo equipo.
 
-Si el proyecto ya tiene `schema.sql` instalado y un perfil Admin creado, ejecuta únicamente la migración del paso 5; no vuelvas a ejecutar el esquema base.
+Si el proyecto ya tiene `schema.sql` y el perfil Admin configurados, ejecuta las migraciones pendientes en orden con `npx.cmd supabase db push --linked`; no vuelvas a ejecutar el esquema base. La primera migración aísla los espacios y la siguiente agrupa en el espacio del Admin a las cuentas que este creó.
 
 ## Configurar el frontend
 
@@ -45,7 +45,7 @@ supabase link --project-ref <project-ref>
 supabase functions deploy admin-create-user
 ```
 
-La función usa `SUPABASE_SERVICE_ROLE_KEY` solo en el entorno aislado de Supabase y verifica el JWT y el perfil Admin del solicitante. No se requiere copiar ni exponer esa clave en el navegador. Después de instalar la migración de espacios de trabajo, vuelve a desplegar la función para que cree un espacio privado por cada cuenta nueva.
+La función usa `SUPABASE_SERVICE_ROLE_KEY` solo en el entorno aislado de Supabase y verifica el JWT y el perfil Admin del solicitante. No se requiere copiar ni exponer esa clave en el navegador. Despliégala después de las migraciones; las nuevas cuentas creadas por un Admin se unirán al espacio de ese equipo.
 
 ## Publicar en GitHub Pages
 
@@ -61,7 +61,7 @@ La URL y la clave `publishable/anon` del frontend son visibles para los visitant
 
 - Las cuentas y los tickets ya no se crean desde datos semilla locales. El primer Admin se aprovisiona desde Supabase; los demás usuarios se crean desde **Administrar usuarios**.
 - Los cambios de estado se registran en `ticket_status_history` mediante un trigger de PostgreSQL. El frontend no puede escribir ni modificar directamente ese historial.
-- Cada cuenta tiene su propio espacio privado. Los tickets existentes se asignan al espacio de su creador; las asignaciones a usuarios de otros espacios se quitan, sin eliminar tickets ni su historial. Un Admin puede ver los perfiles de las cuentas que creó, pero no sus tickets.
+- Cada equipo tiene un espacio compartido: los Admins pueden asignar tickets a los Agent y Reporter creados para su equipo, y esos miembros ven los tickets del espacio según sus roles. Otros espacios siguen aislados por RLS. Los tickets existentes e historiales se conservan; las asignaciones que cruzaban espacios se quitaron durante la primera migración.
 - Las políticas RLS y el trigger del esquema son la autoridad para permisos; los controles de interfaz y las validaciones JavaScript solo mejoran la experiencia.
 - El tema visual se puede cambiar entre oscuro, claro y rosa desde el encabezado; la preferencia queda guardada en el navegador.
 - Las pruebas unitarias se ejecutan con `npm.cmd test`; las comprobaciones de sintaxis con `npm.cmd run check`.
