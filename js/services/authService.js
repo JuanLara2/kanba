@@ -38,10 +38,20 @@ export class AuthService {
       return null;
     }
 
-    const refreshed = await this.client.requestAuth('token?grant_type=refresh_token', {
-      method: 'POST',
-      body: { refresh_token: session.refresh_token }
-    });
+    let refreshed;
+    try {
+      refreshed = await this.client.requestAuth('token?grant_type=refresh_token', {
+        method: 'POST',
+        body: { refresh_token: session.refresh_token }
+      });
+    } catch (error) {
+      if (error.status === 400 || error.status === 401) {
+        this.clearSession();
+        return null;
+      }
+      throw error;
+    }
+
     session = this.normalizeSession(refreshed);
     this.saveSession(session);
     return session.access_token;

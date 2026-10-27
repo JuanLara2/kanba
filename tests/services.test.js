@@ -149,6 +149,24 @@ test('Supabase auth refreshes an expired access token before database requests',
   assert.ok(refreshedSession.expires_at > Date.now());
 });
 
+test('Supabase auth clears the session when its refresh token is no longer valid', async () => {
+  const { auth } = createContext();
+  await auth.login('admin@nexus.com', 'AdminPassword123!');
+
+  const session = JSON.parse(localStorage.getItem('nexusdesk-supabase-session'));
+  session.expires_at = 0;
+  localStorage.setItem('nexusdesk-supabase-session', JSON.stringify(session));
+  auth.client.requestAuth = async (path) => {
+    if (path !== 'token?grant_type=refresh_token') throw new Error(`Unexpected auth request: ${path}`);
+    const error = new Error('Invalid Refresh Token: Refresh Token Not Found');
+    error.status = 400;
+    throw error;
+  };
+
+  assert.equal(await auth.getAccessToken(), null);
+  assert.equal(localStorage.getItem('nexusdesk-supabase-session'), null);
+});
+
 test('only administrators can create users through the secure provisioning adapter', async () => {
   const { auth, users } = createContext();
 
