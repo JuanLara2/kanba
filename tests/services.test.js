@@ -7,6 +7,7 @@ import { SupabaseClient } from '../js/data/supabaseClient.js';
 import { getChecklistProgress, normalizeChecklist, TicketService } from '../js/services/ticketService.js';
 import { initializeThemeController, THEME_STORAGE_KEY } from '../js/ui/themeController.js';
 import { dueDateForCalendarDay, getMonthGridDates, localDateKey } from '../js/ui/calendarView.js';
+import { DragDropController } from '../js/ui/dragDrop.js';
 
 function createContext() {
   const users = [
@@ -125,6 +126,62 @@ test('theme selector restores, applies, and persists only supported themes', () 
 
   setTheme('unknown');
   assert.equal(documentRef.documentElement.dataset.theme, 'light');
+});
+
+test('drag and drop handlers safely resolve text-node event targets', async () => {
+  const handlers = new Map();
+  const boardEl = {
+    addEventListener(type, handler) {
+      handlers.set(type, handler);
+    }
+  };
+  const card = {
+    nodeType: 1,
+    dataset: { ticketId: 'TCK-1001' },
+    classList: {
+      add() {},
+      remove() {}
+    },
+    closest(selector) {
+      return selector === '.ticket-card' ? this : null;
+    }
+  };
+  const dropZone = {
+    nodeType: 1,
+    dataset: { status: 'open' },
+    closest(selector) {
+      return selector === '.drop-zone' ? this : null;
+    }
+  };
+  const changes = [];
+  new DragDropController({
+    boardEl,
+    onStatusChange: async (...args) => changes.push(args)
+  });
+
+  const textTarget = { nodeType: 3, parentElement: card };
+  const dataTransfer = {
+    effectAllowed: '',
+    dropEffect: '',
+    setData() {},
+    getData() {
+      return 'TCK-1001';
+    }
+  };
+
+  handlers.get('dragstart')({ target: textTarget, dataTransfer });
+  handlers.get('dragend')({ target: textTarget });
+  handlers.get('dragover')({ target: { nodeType: 3, parentElement: dropZone }, preventDefault() {}, dataTransfer });
+  await handlers.get('drop')({
+    target: { nodeType: 3, parentElement: dropZone },
+    preventDefault() {},
+    dataTransfer
+  });
+  handlers.get('click')({ target: textTarget });
+
+  assert.equal(dataTransfer.effectAllowed, 'move');
+  assert.equal(dataTransfer.dropEffect, 'move');
+  assert.deepEqual(changes, [['TCK-1001', 'open']]);
 });
 
 test('Supabase login authenticates each configured role and stores a managed session', async () => {
