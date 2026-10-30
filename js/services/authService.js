@@ -189,4 +189,10 @@ export class AuthService {
   canManageUsers(user) {
     return Boolean(user && user.role === 'Admin');
   }
+
+  canCommentOnTicket(user, ticket) {
+    if (!user || !ticket || ticket.workspaceId !== user.workspaceId) return false;
+    return user.role === 'Admin' || user.role === 'Agent'
+      || (user.role === 'Reporter' && ticket.createdBy === user.id);
+  }
 }

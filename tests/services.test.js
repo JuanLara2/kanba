@@ -5,6 +5,9 @@ import { SupabaseAdapter } from '../js/data/db.js';
 import { FilterSortService } from '../js/services/filterService.js';
 import { SupabaseClient } from '../js/data/supabaseClient.js';
 import { getChecklistProgress, normalizeChecklist, TicketService } from '../js/services/ticketService.js';
+import { formatSlaRemaining, getSlaState } from '../js/services/slaService.js';
+import { calculateTicketMetrics, metricsToCsv } from '../js/services/metricsService.js';
+import { RealtimeService } from '../js/services/realtimeService.js';
 import { initializeThemeController, THEME_STORAGE_KEY } from '../js/ui/themeController.js';
 import { dueDateForCalendarDay, getMonthGridDates, localDateKey } from '../js/ui/calendarView.js';
 import { DragDropController } from '../js/ui/dragDrop.js';
@@ -17,6 +20,10 @@ function createContext() {
     { id: 'usr-isolated-01', fullName: 'Otra persona', email: 'other@example.com', role: 'Agent', workspaceId: 'another-workspace', password: 'OtherPassword123!' }
   ];
   const tickets = [];
+  const comments = [];
+  const notifications = [];
+  const satisfaction = [];
+  const responseTemplates = [];
   const stores = { users, tickets };
   const sessions = new Map();
   let createdUserId = 0;
@@ -38,6 +45,62 @@ function createContext() {
       const store = stores[storeName];
       const index = store.findIndex((item) => item.id === id);
       if (index !== -1) store.splice(index, 1);
+    },
+    async getComments(ticketId) {
+      return comments.filter((comment) => comment.ticketId === ticketId);
+    },
+    async createComment(ticketId, body) {
+      const comment = {
+        id: comments.length + 1,
+        ticketId,
+        authorId: auth.currentUser.id,
+        body,
+        createdAt: new Date().toISOString()
+      };
+      comments.push(comment);
+      return comment;
+    },
+    async getNotifications(userId) {
+      return notifications.filter((notification) => notification.userId === userId);
+    },
+    async markNotificationRead(notificationId) {
+      const notification = notifications.find((item) => item.id === Number(notificationId));
+      if (!notification) throw new Error('No existe la notificación.');
+      notification.readAt = new Date().toISOString();
+      return notification;
+    },
+    async getSatisfaction(ticketId) {
+      return satisfaction.find((entry) => entry.ticketId === ticketId) || null;
+    },
+    async getAllSatisfaction() {
+      return satisfaction.slice();
+    },
+    async submitSatisfaction(ticketId, rating, comment) {
+      if (satisfaction.some((entry) => entry.ticketId === ticketId)) {
+        throw new Error('Ya se envió una valoración para este ticket.');
+      }
+      const entry = {
+        ticketId,
+        rating,
+        comment: comment || null,
+        submittedBy: auth.currentUser.id,
+        createdAt: new Date().toISOString()
+      };
+      satisfaction.push(entry);
+      return entry;
+    },
+    async getResponseTemplates() {
+      return responseTemplates.slice();
+    },
+    async saveResponseTemplate(template) {
+      const existing = responseTemplates.find((item) => item.id === template.id);
+      if (existing) Object.assign(existing, template);
+      else responseTemplates.push({ ...template, id: `template-${responseTemplates.length + 1}` });
+      return existing || responseTemplates.at(-1);
+    },
+    async deleteResponseTemplate(templateId) {
+      const index = responseTemplates.findIndex((item) => item.id === templateId);
+      if (index !== -1) responseTemplates.splice(index, 1);
     },
     async createUser({ fullName, email, role }) {
       const id = `usr-created-${++createdUserId}`;
@@ -538,6 +601,8 @@ test('Supabase adapter maps ticket rows and requests the database audit history'
     created_at: '2026-10-20T09:00:00.000Z',
     updated_at: '2026-10-20T10:00:00.000Z',
     due_date: null,
+    sla_due_at: '2026-10-22T09:00:00.000Z',
+    sla_warning_at: '2026-10-22T04:12:00.000Z',
     checklist: [{ text: 'Validar integración', completed: true }]
   };
   const client = {
@@ -573,6 +638,8 @@ test('Supabase adapter maps ticket rows and requests the database audit history'
 
   assert.equal(ticket.assignedTo, 'agent-id');
   assert.equal(ticket.workspaceId, 'workspace-id');
+  assert.equal(ticket.slaDueAt, ticketRow.sla_due_at);
+  assert.equal(ticket.slaWarningAt, ticketRow.sla_warning_at);
   assert.deepEqual(ticket.checklist, [{ text: 'Validar integración', completed: true }]);
   assert.deepEqual(ticket.statusHistory, [{
     from: 'new',
@@ -604,17 +671,17 @@ test('Supabase adapter maps ticket rows and requests the database audit history'
   assert.equal(profile.createdByAdminId, null);
 });
 
-test('SLA filters classify overdue, warning, and future deadlines using configured windows', () => {
+test('SLA filters classify overdue, warning, and future SLA deadlines', () => {
   const originalNow = Date.now;
   const fixedNow = Date.parse('2026-10-25T12:00:00.000Z');
   Date.now = () => fixedNow;
 
   try {
     const tickets = [
-      { id: 'overdue', dueDate: '2026-10-25T11:00:00.000Z' },
-      { id: 'warning', dueDate: '2026-10-26T00:00:00.000Z' },
-      { id: 'future', dueDate: '2026-10-27T12:00:00.000Z' },
-      { id: 'invalid', dueDate: 'not-a-date' }
+      { id: 'overdue', status: 'in_progress', slaDueAt: '2026-10-25T11:00:00.000Z' },
+      { id: 'warning', status: 'open', slaDueAt: '2026-10-26T00:00:00.000Z', slaWarningAt: '2026-10-25T11:00:00.000Z' },
+      { id: 'future', status: 'new', slaDueAt: '2026-10-27T12:00:00.000Z', slaWarningAt: '2026-10-26T12:00:00.000Z' },
+      { id: 'invalid', status: 'new', slaDueAt: 'not-a-date', slaWarningAt: 'not-a-date' }
     ];
     const usersMap = new Map();
 
@@ -624,4 +691,233 @@ test('SLA filters classify overdue, warning, and future deadlines using configur
   } finally {
     Date.now = originalNow;
   }
+});
+
+test('SLA evaluation follows warning time, deadline, and completion state', () => {
+  const now = Date.parse('2026-10-29T12:00:00.000Z');
+  assert.equal(getSlaState({
+    status: 'in_progress',
+    slaWarningAt: '2026-10-29T11:00:00.000Z',
+    slaDueAt: '2026-10-29T13:00:00.000Z'
+  }, now).state, 'warning');
+  assert.equal(getSlaState({
+    status: 'open',
+    slaWarningAt: '2026-10-29T11:00:00.000Z',
+    slaDueAt: '2026-10-29T11:59:00.000Z'
+  }, now).state, 'overdue');
+  assert.equal(getSlaState({
+    status: 'resolved',
+    slaWarningAt: '2026-10-28T00:00:00.000Z',
+    slaDueAt: '2026-10-29T11:00:00.000Z'
+  }, now).state, 'complete');
+  assert.equal(getSlaState({
+    status: 'new',
+    slaWarningAt: '2026-10-29T13:00:00.000Z',
+    slaDueAt: '2026-10-29T14:00:00.000Z'
+  }, now).state, 'normal');
+  assert.equal(formatSlaRemaining(90 * 60 * 1000), '1 h 30 min');
+});
+
+test('ticket categories are validated and saved', async () => {
+  const { auth, users, ticketService } = createContext();
+  await auth.login(users[0].email, 'AdminPassword123!');
+  const ticket = await ticketService.createTicket({
+    title: 'Pago de nómina',
+    description: 'Consulta de pago pendiente.',
+    category: 'Nómina y Pagos'
+  });
+  assert.equal(ticket.category, 'Nómina y Pagos');
+  await assert.rejects(() => ticketService.createTicket({
+    title: 'Categoría inventada',
+    description: 'No debe guardar categorías arbitrarias.',
+    category: 'Otra'
+  }), /categoría no es válida/);
+});
+
+test('only an authorized assignee can reopen a resolved ticket and its creator can rate it when closed', async () => {
+  const { auth, users, ticketService } = createContext();
+  const admin = users.find((user) => user.role === 'Admin');
+  const reporter = users.find((user) => user.role === 'Reporter');
+  const agent = users.find((user) => user.role === 'Agent');
+  await auth.login(reporter.email, 'ReporterPassword123!');
+  const ticket = await ticketService.createTicket({
+    title: 'Incidente resuelto',
+    description: 'Verificar reapertura y encuesta.'
+  });
+  await auth.login(admin.email, 'AdminPassword123!');
+  await ticketService.updateTicket({
+    id: ticket.id,
+    title: ticket.title,
+    description: ticket.description,
+    priority: ticket.priority,
+    category: ticket.category,
+    assignedTo: agent.id,
+    dueDate: null,
+    checklist: []
+  });
+  await ticketService.changeTicketStatus(ticket.id, 'resolved');
+  await auth.login(agent.email, 'AgentPassword123!');
+  await ticketService.reopenTicket(ticket.id);
+  assert.equal(ticket.status, 'open');
+  assert.equal(ticket.statusHistory.at(-1).to, 'open');
+  await ticketService.changeTicketStatus(ticket.id, 'resolved');
+  await ticketService.changeTicketStatus(ticket.id, 'closed');
+  await auth.login(reporter.email, 'ReporterPassword123!');
+  const rating = await ticketService.submitSatisfaction(ticket.id, 5, 'Atención excelente');
+  assert.equal(rating.rating, 5);
+  assert.equal((await ticketService.getSatisfaction(ticket.id)).comment, 'Atención excelente');
+  await assert.rejects(() => ticketService.submitSatisfaction(ticket.id, 6), /entre 1 y 5/);
+});
+
+test('metrics calculate date-bounded volume, SLA, satisfaction, and per-agent load', () => {
+  const users = new Map([
+    ['agent-1', { id: 'agent-1', fullName: 'Ana Agente', role: 'Agent' }]
+  ]);
+  const tickets = [
+    {
+      id: 'TCK-1',
+      assignedTo: 'agent-1',
+      status: 'resolved',
+      createdAt: '2026-10-01T10:00:00.000Z',
+      slaDueAt: '2026-10-02T10:00:00.000Z',
+      statusHistory: [{ to: 'resolved', changedAt: '2026-10-01T14:00:00.000Z' }]
+    },
+    {
+      id: 'TCK-2',
+      assignedTo: 'agent-1',
+      status: 'in_progress',
+      createdAt: '2026-10-03T10:00:00.000Z',
+      statusHistory: []
+    },
+    {
+      id: 'TCK-3',
+      assignedTo: null,
+      status: 'closed',
+      createdAt: '2026-09-01T10:00:00.000Z',
+      statusHistory: [{ to: 'closed', changedAt: '2026-09-02T10:00:00.000Z' }]
+    }
+  ];
+  const metrics = calculateTicketMetrics(tickets, users, '2026-10-01', '2026-10-31', [
+    { rating: 5, createdAt: '2026-10-05T10:00:00.000Z' },
+    { rating: 1, createdAt: '2026-09-05T10:00:00.000Z' }
+  ]);
+  assert.equal(metrics.createdCount, 2);
+  assert.equal(metrics.resolvedCount, 1);
+  assert.equal(metrics.openCount, 1);
+  assert.equal(metrics.slaCompliance, 100);
+  assert.equal(metrics.averageResolutionHours, 4);
+  assert.equal(metrics.averageSatisfaction, 5);
+  assert.deepEqual(metrics.byAgent, [{ name: 'Ana Agente', active: 1, resolved: 1 }]);
+  assert.match(metricsToCsv(metrics), /Ana Agente/);
+  assert.match(metricsToCsv({ ...metrics, byAgent: [{ name: '=2\+2', active: 0, resolved: 0 }] }), /"'=2/);
+  assert.throws(() => calculateTicketMetrics(tickets, users, '2026-11-01', '2026-10-01'), /rango de fechas/);
+});
+
+test('Realtime service subscribes workspace tables and forwards database changes', async () => {
+  class MockWebSocket {
+    static CONNECTING = 0;
+    static OPEN = 1;
+    static CLOSING = 2;
+    static CLOSED = 3;
+
+    constructor(url) {
+      this.url = url;
+      this.readyState = MockWebSocket.CONNECTING;
+      this.listeners = new Map();
+      this.sent = [];
+    }
+
+    addEventListener(type, handler) {
+      this.listeners.set(type, handler);
+    }
+
+    send(value) {
+      this.sent.push(JSON.parse(value));
+    }
+
+    close() {
+      this.readyState = MockWebSocket.CLOSED;
+      this.listeners.get('close')?.({});
+    }
+
+    emit(type, payload = {}) {
+      if (type === 'open') this.readyState = MockWebSocket.OPEN;
+      this.listeners.get(type)?.(payload);
+    }
+  }
+
+  const changes = [];
+  const service = new RealtimeService({
+    url: 'https://project.supabase.co',
+    anonKey: 'public-key',
+    isConfigured: true
+  }, {
+    WebSocketImpl: MockWebSocket,
+    onChange: (change) => changes.push(change)
+  });
+  await service.subscribe({
+    userId: 'user-1',
+    workspaceId: 'workspace-1',
+    getAccessToken: async () => 'jwt-token'
+  });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const socket = service.socket;
+  assert.match(socket.url, /^wss:/);
+  socket.emit('open');
+  const join = socket.sent[0];
+  assert.equal(join[3], 'phx_join');
+  assert.equal(join[2], 'realtime:workspace-workspace-1');
+  assert.deepEqual(join[4].config.postgres_changes.map((change) => change.table), [
+    'tickets',
+    'ticket_comments',
+    'notifications'
+  ]);
+  socket.emit('message', {
+    data: JSON.stringify([service.joinRef, '2', service.topic, 'postgres_changes', { data: { record: { id: 'TCK-1' } } }])
+  });
+  assert.deepEqual(changes, [{ data: { record: { id: 'TCK-1' } } }]);
+  service.stop();
+});
+
+test('ticket comments enforce role, workspace, and text length before persistence', async () => {
+  const { auth, db, users, ticketService } = createContext();
+  const reporter = users.find((user) => user.role === 'Reporter');
+  const agent = users.find((user) => user.role === 'Agent');
+  await auth.login(reporter.email, 'ReporterPassword123!');
+  const ticket = await ticketService.createTicket({
+    title: 'Comentario permitido',
+    description: 'El Reporter que creó el ticket puede conversar.'
+  });
+
+  const comment = await ticketService.addComment(ticket.id, '  Ya adjunté los detalles.  ');
+  assert.equal(comment.authorId, reporter.id);
+  assert.equal(comment.body, 'Ya adjunté los detalles.');
+  assert.equal((await ticketService.getComments(ticket.id)).length, 1);
+  await assert.rejects(() => ticketService.addComment(ticket.id, '  '), /entre 1 y 4000/);
+  await assert.rejects(() => ticketService.addComment(ticket.id, 'x'.repeat(4001)), /entre 1 y 4000/);
+
+  await auth.login(agent.email, 'AgentPassword123!');
+  assert.equal((await ticketService.addComment(ticket.id, 'Lo estamos revisando.')).authorId, agent.id);
+
+  await auth.login(users.find((user) => user.role === 'Admin').email, 'AdminPassword123!');
+  const adminTicket = await ticketService.createTicket({
+    title: 'Otro ticket del espacio',
+    description: 'El Reporter no debe comentar en tickets de otras personas.'
+  });
+  await auth.login(reporter.email, 'ReporterPassword123!');
+  await assert.rejects(
+    () => ticketService.addComment(adminTicket.id, 'No autorizado'),
+    /permiso para comentar/
+  );
+
+  const outsideTicket = {
+    ...ticket,
+    id: 'TCK-9998',
+    workspaceId: 'another-workspace'
+  };
+  await db.put('tickets', outsideTicket);
+  await assert.rejects(
+    () => ticketService.addComment(outsideTicket.id, 'No autorizado'),
+    /permiso para comentar/
+  );
 });

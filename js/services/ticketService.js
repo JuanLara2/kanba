@@ -1,4 +1,5 @@
-import { SLA_THRESHOLDS_HOURS, STATUS_DEFINITIONS, PRIORITY_ORDER } from '../config/constants.js';
+import { STATUS_DEFINITIONS, PRIORITY_ORDER, TICKET_CATEGORIES } from '../config/constants.js';
+import { getSlaState } from './slaService.js';
 
 export function normalizeChecklist(items) {
   if (!Array.isArray(items) || items.length > 100) {
@@ -37,7 +38,7 @@ export class TicketService {
     return this.db.getAll('tickets');
   }
 
-  async createTicket({ title, description, priority = 'Media', initialStatus = 'new', assignedTo = null, dueDate = null, checklist = [] }) {
+  async createTicket({ title, description, priority = 'Media', category = 'Consulta', initialStatus = 'new', assignedTo = null, dueDate = null, checklist = [] }) {
     const user = await this.auth.getCurrentUser();
     if (!user) throw new Error('Sesión requerida para crear tickets.');
     if (user.role === 'Reporter' && initialStatus !== 'new') {
@@ -52,6 +53,7 @@ export class TicketService {
       title,
       description,
       priority,
+      category,
       initialStatus,
       assignedTo,
       dueDate,
@@ -64,8 +66,10 @@ export class TicketService {
       description: validated.description,
       status: validated.initialStatus,
       priority: validated.priority,
+      category: validated.category,
       assignedTo: validated.assignedTo,
       createdBy: user.id,
+      workspaceId: user.workspaceId,
       createdAt: now,
       updatedAt: now,
       dueDate: validated.dueDate,
@@ -87,7 +91,7 @@ export class TicketService {
     return newTicket;
   }
 
-  async updateTicket({ id, title, description, priority, assignedTo, dueDate, checklist }) {
+  async updateTicket({ id, title, description, priority, category, assignedTo, dueDate, checklist }) {
     const user = await this.auth.getCurrentUser();
     const ticket = await this.db.getById('tickets', id);
     if (!ticket) throw new Error('El ticket no existe.');
@@ -103,6 +107,7 @@ export class TicketService {
       title: canEditContent ? title : ticket.title,
       description: canEditContent ? description : ticket.description,
       priority: canEditContent ? priority : ticket.priority,
+      category: canEditContent && category !== undefined ? category : ticket.category,
       assignedTo: canManageAssignment && assignedTo !== undefined ? assignedTo : ticket.assignedTo,
       dueDate: canManageAssignment && dueDate !== undefined ? dueDate : ticket.dueDate,
       checklist: canManageChecklist && checklist !== undefined ? checklist : (ticket.checklist || []),
@@ -113,6 +118,7 @@ export class TicketService {
     ticket.title = validated.title;
     ticket.description = validated.description;
     ticket.priority = validated.priority;
+    ticket.category = validated.category;
     ticket.assignedTo = validated.assignedTo;
     ticket.dueDate = validated.dueDate;
     ticket.checklist = validated.checklist;
@@ -190,12 +196,124 @@ export class TicketService {
     return this.db.put('tickets', ticket);
   }
 
-  async validateTicketFields({ title, description, priority, initialStatus, assignedTo, dueDate, checklist = [], workspaceId }) {
+  async reopenTicket(ticketId) {
+    const user = await this.auth.getCurrentUser();
+    const ticket = await this.db.getById('tickets', ticketId);
+    if (!ticket) throw new Error('El ticket no existe.');
+    if (ticket.status !== 'resolved') throw new Error('Solo se pueden reabrir tickets resueltos.');
+    if (!this.auth.canChangeStatus(user, ticket)) {
+      throw new Error('Solo Admin o el agente asignado pueden reabrir este ticket.');
+    }
+    return this.changeTicketStatus(ticketId, 'open');
+  }
+
+  async getComments(ticketId) {
+    if (typeof this.db.getComments !== 'function') {
+      throw new Error('La consulta de comentarios no está disponible.');
+    }
+    const user = await this.auth.getCurrentUser();
+    const ticket = await this.db.getById('tickets', ticketId);
+    if (!this.auth.canCommentOnTicket(user, ticket)) {
+      throw new Error('No tienes permiso para consultar los comentarios de este ticket.');
+    }
+    return this.db.getComments(ticketId);
+  }
+
+  async addComment(ticketId, body) {
+    const user = await this.auth.getCurrentUser();
+    const ticket = await this.db.getById('tickets', ticketId);
+    if (!this.auth.canCommentOnTicket(user, ticket)) {
+      throw new Error('No tienes permiso para comentar este ticket.');
+    }
+
+    const normalizedBody = String(body ?? '').trim();
+    if (!normalizedBody || normalizedBody.length > 4000) {
+      throw new Error('El comentario debe tener entre 1 y 4000 caracteres.');
+    }
+    if (typeof this.db.createComment !== 'function') {
+      throw new Error('La creación de comentarios no está disponible.');
+    }
+    return this.db.createComment(ticketId, normalizedBody);
+  }
+
+  async getNotifications(userId) {
+    if (typeof this.db.getNotifications !== 'function') {
+      throw new Error('La consulta de notificaciones no está disponible.');
+    }
+    return this.db.getNotifications(userId);
+  }
+
+  async markNotificationRead(notificationId) {
+    if (typeof this.db.markNotificationRead !== 'function') {
+      throw new Error('La actualización de notificaciones no está disponible.');
+    }
+    return this.db.markNotificationRead(notificationId);
+  }
+
+  async getResponseTemplates() {
+    if (typeof this.db.getResponseTemplates !== 'function') {
+      throw new Error('La consulta de plantillas no está disponible.');
+    }
+    return this.db.getResponseTemplates();
+  }
+
+  async saveResponseTemplate({ id, title, body }) {
+    const user = await this.auth.getCurrentUser();
+    if (!this.auth.canManageUsers(user)) throw new Error('Solo Admin puede administrar plantillas.');
+    const normalizedTitle = String(title ?? '').trim();
+    const normalizedBody = String(body ?? '').trim();
+    if (normalizedTitle.length < 2 || normalizedTitle.length > 100) {
+      throw new Error('El nombre de la plantilla debe tener entre 2 y 100 caracteres.');
+    }
+    if (!normalizedBody || normalizedBody.length > 4000) {
+      throw new Error('El texto de la plantilla debe tener entre 1 y 4000 caracteres.');
+    }
+    if (typeof this.db.saveResponseTemplate !== 'function') {
+      throw new Error('El guardado de plantillas no está disponible.');
+    }
+    return this.db.saveResponseTemplate({ id, title: normalizedTitle, body: normalizedBody });
+  }
+
+  async deleteResponseTemplate(templateId) {
+    const user = await this.auth.getCurrentUser();
+    if (!this.auth.canManageUsers(user)) throw new Error('Solo Admin puede administrar plantillas.');
+    if (typeof this.db.deleteResponseTemplate !== 'function') {
+      throw new Error('La eliminación de plantillas no está disponible.');
+    }
+    return this.db.deleteResponseTemplate(templateId);
+  }
+
+  async getSatisfaction(ticketId) {
+    if (typeof this.db.getSatisfaction !== 'function') {
+      throw new Error('La consulta de satisfacción no está disponible.');
+    }
+    return this.db.getSatisfaction(ticketId);
+  }
+
+  async submitSatisfaction(ticketId, rating, comment = '') {
+    const user = await this.auth.getCurrentUser();
+    const ticket = await this.db.getById('tickets', ticketId);
+    if (!ticket || ticket.status !== 'closed' || ticket.createdBy !== user?.id) {
+      throw new Error('Solo quien creó un ticket cerrado puede responder la encuesta.');
+    }
+    if (!Number.isInteger(Number(rating)) || Number(rating) < 1 || Number(rating) > 5) {
+      throw new Error('La calificación debe estar entre 1 y 5 estrellas.');
+    }
+    const normalizedComment = String(comment ?? '').trim();
+    if (normalizedComment.length > 1000) throw new Error('El comentario puede tener hasta 1000 caracteres.');
+    if (typeof this.db.submitSatisfaction !== 'function') {
+      throw new Error('El envío de la encuesta no está disponible.');
+    }
+    return this.db.submitSatisfaction(ticketId, Number(rating), normalizedComment);
+  }
+
+  async validateTicketFields({ title, description, priority, category = 'Consulta', initialStatus, assignedTo, dueDate, checklist = [], workspaceId }) {
     const normalizedTitle = String(title ?? '').trim();
     const normalizedDescription = String(description ?? '').trim();
     if (normalizedTitle.length < 4) throw new Error('El título debe tener al menos 4 caracteres.');
     if (!normalizedDescription) throw new Error('La descripción es obligatoria.');
     if (!PRIORITY_ORDER.includes(priority)) throw new Error('La prioridad no es válida.');
+    if (!TICKET_CATEGORIES.includes(category)) throw new Error('La categoría no es válida.');
     if (!Object.prototype.hasOwnProperty.call(STATUS_DEFINITIONS, initialStatus)) throw new Error('El estado no es válido.');
 
     let normalizedDueDate = null;
@@ -219,6 +337,7 @@ export class TicketService {
       title: normalizedTitle,
       description: normalizedDescription,
       priority,
+      category,
       initialStatus,
       assignedTo: assignedTo || null,
       dueDate: normalizedDueDate,
@@ -226,22 +345,7 @@ export class TicketService {
     };
   }
 
-  evaluateSLA(dueDateIso) {
-    if (!dueDateIso) return { state: 'none', label: '' };
-
-    const now = Date.now();
-    const due = new Date(dueDateIso).getTime();
-    if (!Number.isFinite(due)) return { state: 'invalid', label: 'Fecha no válida' };
-    const diffHours = (due - now) / (1000 * 60 * 60);
-
-    if (diffHours < SLA_THRESHOLDS_HOURS.OVERDUE) {
-      return { state: 'overdue', label: 'Vencido', hours: diffHours };
-    }
-
-    if (diffHours <= SLA_THRESHOLDS_HOURS.WARNING) {
-      return { state: 'warning', label: 'Por Vencer', hours: diffHours };
-    }
-
-    return { state: 'normal', label: 'En Plazo', hours: diffHours };
+  evaluateSLA(ticket, now = Date.now()) {
+    return getSlaState(ticket, now);
   }
 }

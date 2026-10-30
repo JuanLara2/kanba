@@ -9,6 +9,8 @@ import { DragDropController } from './ui/dragDrop.js';
 import { CalendarView, dueDateForCalendarDay } from './ui/calendarView.js';
 import { initializeThemeController } from './ui/themeController.js';
 import { SLA_REFRESH_INTERVAL_MS } from './config/constants.js';
+import { calculateTicketMetrics, metricsToCsv } from './services/metricsService.js';
+import { RealtimeService } from './services/realtimeService.js';
 
 const client = new SupabaseClient();
 let auth;
@@ -27,6 +29,7 @@ const filters = {
   assignedTo: document.getElementById('filterAssignee'),
   status: document.getElementById('filterStatus'),
   priority: document.getElementById('filterPriority'),
+  category: document.getElementById('filterCategory'),
   dueFilter: document.getElementById('filterSla'),
   sortField: document.getElementById('sortField'),
   sortDirection: document.getElementById('sortDirection')
@@ -35,10 +38,19 @@ const filters = {
 let allTickets = [];
 let usersMap = new Map();
 let activeUser = null;
+let notifications = [];
+let satisfactionEntries = [];
+let notificationErrorShown = false;
+let responseTemplates = [];
+let realtimeRefreshTimeout;
 let boardView;
 let calendarView;
 let modalView;
 let dragDropController;
+const realtimeService = new RealtimeService(client, {
+  onChange: handleRealtimeChange,
+  onStatus: renderRealtimeStatus
+});
 
 async function bootstrap() {
   initializeThemeController();
@@ -67,6 +79,48 @@ async function bootstrap() {
       } catch (error) {
         showToast(error.message || 'No tienes permisos para mover este ticket');
       }
+
+      function applySelectedTemplate() {
+        const template = responseTemplates.find((item) => item.id === document.getElementById('responseTemplateSelect').value);
+        if (!template) {
+          showToast('Selecciona una plantilla primero.');
+          return;
+        }
+        const input = document.getElementById('ticketCommentInput');
+        input.value = input.value ? `${input.value}\n\n${template.body}` : template.body;
+        input.focus();
+      }
+
+      async function saveResponseTemplate() {
+        const select = document.getElementById('responseTemplateSelect');
+        const selectedId = select.value || undefined;
+        try {
+          await ticketService.saveResponseTemplate({
+            id: selectedId,
+            title: document.getElementById('templateTitle').value,
+            body: document.getElementById('templateBody').value
+          });
+          await loadResponseTemplates();
+          modalView.setResponseTemplates(responseTemplates, true);
+          showToast('Plantilla guardada para el equipo.');
+        } catch (error) {
+          showToast(error.message || 'No se pudo guardar la plantilla.');
+        }
+      }
+
+      async function deleteResponseTemplate() {
+        const templateId = document.getElementById('responseTemplateSelect').value;
+        if (!templateId) return;
+        try {
+          await ticketService.deleteResponseTemplate(templateId);
+          await loadResponseTemplates();
+          modalView.clearResponseTemplateEditor();
+          modalView.setResponseTemplates(responseTemplates, true);
+          showToast('Plantilla eliminada.');
+        } catch (error) {
+          showToast(error.message || 'No se pudo eliminar la plantilla.');
+        }
+      }
     },
     onEditRequest: openTicketForEditing
   });
@@ -81,9 +135,20 @@ async function bootstrap() {
   await syncAuthState();
   renderBoard();
   window.setInterval(() => {
+    if (activeUser) updateSlaOverview();
     if (activeUser && modalEl.classList.contains('hidden') && !boardEl.contains(document.activeElement)) {
       renderBoard();
     }
+
+    function initializeMetricsDates() {
+      const now = new Date();
+      const start = new Date(now.getFullYear(), now.getMonth(), 1);
+      const formatDate = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+      document.getElementById('metricsStart').value ||= formatDate(start);
+      document.getElementById('metricsEnd').value ||= formatDate(now);
+      renderMetrics();
+    }
+    if (activeUser) refreshNotificationList();
   }, SLA_REFRESH_INTERVAL_MS);
 }
 
@@ -125,6 +190,7 @@ async function loadTickets() {
 function bindStaticEvents() {
   document.getElementById('boardTab').addEventListener('click', () => setActiveView('board'));
   document.getElementById('calendarTab').addEventListener('click', () => setActiveView('calendar'));
+  document.getElementById('metricsTab').addEventListener('click', () => setActiveView('metrics'));
   document.querySelector('.view-tabs').addEventListener('keydown', (event) => {
     if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
     const tabs = [...document.querySelectorAll('.view-tabs [role="tab"]')];
@@ -137,7 +203,8 @@ function bindStaticEvents() {
         ? tabs.length - 1
         : (currentIndex + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
     const nextView = tabs[nextIndex].id === 'calendarTab' ? 'calendar' : 'board';
-    setActiveView(nextView);
+    const resolvedView = tabs[nextIndex].id === 'metricsTab' ? 'metrics' : nextView;
+    setActiveView(resolvedView);
     tabs[nextIndex].focus();
   });
   document.getElementById('btnNewTicket').addEventListener('click', async () => {
@@ -157,7 +224,27 @@ function bindStaticEvents() {
   });
   document.getElementById('usersModalCloseBtn').addEventListener('click', () => modalView.closeUsers());
   document.getElementById('usersModalCancelBtn').addEventListener('click', () => modalView.closeUsers());
-  document.getElementById('modalCloseBtn').addEventListener('click', () => modalView.closeTicket());
+  document.getElementById('btnNotifications').addEventListener('click', () => {
+    const panel = document.getElementById('notificationsPanel');
+    const isOpen = panel.classList.toggle('hidden') === false;
+    document.getElementById('btnNotifications').setAttribute('aria-expanded', String(isOpen));
+    if (isOpen) refreshNotificationList();
+  });
+  document.getElementById('metricsStart').addEventListener('change', renderMetrics);
+  document.getElementById('metricsEnd').addEventListener('change', renderMetrics);
+  document.getElementById('btnExportMetrics').addEventListener('click', exportMetrics);
+  document.getElementById('btnReopenTicket').addEventListener('click', handleTicketReopen);
+  document.getElementById('satisfactionCloseBtn').addEventListener('click', closeSatisfactionModal);
+  document.getElementById('satisfactionCancelBtn').addEventListener('click', closeSatisfactionModal);
+  document.getElementById('satisfactionForm').addEventListener('submit', handleSatisfactionSubmit);
+  document.getElementById('responseTemplateSelect').addEventListener('change', (event) => {
+    modalView.selectResponseTemplate(event.target.value);
+  });
+  document.getElementById('btnApplyTemplate').addEventListener('click', applySelectedTemplate);
+  document.getElementById('btnSaveTemplate').addEventListener('click', saveResponseTemplate);
+  document.getElementById('btnDeleteTemplate').addEventListener('click', deleteResponseTemplate);
+  document.getElementById('notificationList').addEventListener('click', handleNotificationClick);
+  document.getElementById('btnPostComment').addEventListener('click', handleCommentSubmit);
   document.getElementById('btnCancelModal').addEventListener('click', () => modalView.closeTicket());
   document.getElementById('checklistAddRow').addEventListener('click', (event) => {
     if (event.target.closest('#btnAddChecklistItem')) modalView.addChecklistItem();
@@ -228,8 +315,30 @@ async function openTicketForEditing(ticketId) {
     canEdit: auth.canEditTicket(user, ticket),
     canManageChecklist: auth.canEditTicket(user, ticket),
     canManageAssignment: auth.canAssignOrSetDue(user),
-    canDelete: auth.canDelete(user)
+    canDelete: auth.canDelete(user),
+    canComment: auth.canCommentOnTicket(user, ticket)
   });
+  const canComment = auth.canCommentOnTicket(user, ticket);
+  const canManageTemplates = auth.canManageUsers(user);
+  document.getElementById('templateControls').classList.toggle('hidden', !canComment);
+  modalView.setResponseTemplates(responseTemplates, canManageTemplates);
+  document.getElementById('btnReopenTicket').classList.toggle('hidden', ticket.status !== 'resolved' || !auth.canChangeStatus(user, ticket));
+  if (auth.canCommentOnTicket(user, ticket)) await loadTicketComments(ticketId);
+  if (ticket.status === 'closed' && ticket.createdBy === user?.id && user?.role === 'Reporter') {
+    const satisfaction = await ticketService.getSatisfaction(ticketId);
+    if (!satisfaction) openSatisfactionModal(ticketId);
+  }
+}
+
+async function loadTicketComments(ticketId) {
+  modalView.setCommentsLoading();
+  try {
+    const comments = await ticketService.getComments(ticketId);
+    if (modalView.currentTicketId === ticketId) modalView.renderComments(comments);
+  } catch (error) {
+    modalView.showCommentsError(error.message || 'No se pudieron cargar los comentarios.');
+    showToast(error.message || 'No se pudieron cargar los comentarios.');
+  }
 }
 
 async function handleCalendarDateChange(ticketId, dateKey) {
@@ -252,14 +361,19 @@ async function handleCalendarDateChange(ticketId, dateKey) {
 
 function setActiveView(view) {
   const showCalendar = view === 'calendar';
-  document.getElementById('boardPanel').classList.toggle('hidden', showCalendar);
+  const showMetrics = view === 'metrics';
+  document.getElementById('boardPanel').classList.toggle('hidden', showCalendar || showMetrics);
   document.getElementById('calendarPanel').classList.toggle('hidden', !showCalendar);
-  document.getElementById('boardTab').classList.toggle('is-active', !showCalendar);
+  document.getElementById('metricsPanel').classList.toggle('hidden', !showMetrics);
+  document.getElementById('boardTab').classList.toggle('is-active', !showCalendar && !showMetrics);
   document.getElementById('calendarTab').classList.toggle('is-active', showCalendar);
-  document.getElementById('boardTab').setAttribute('aria-selected', String(!showCalendar));
+  document.getElementById('metricsTab').classList.toggle('is-active', showMetrics);
+  document.getElementById('boardTab').setAttribute('aria-selected', String(!showCalendar && !showMetrics));
   document.getElementById('calendarTab').setAttribute('aria-selected', String(showCalendar));
-  document.getElementById('boardTab').tabIndex = showCalendar ? -1 : 0;
+  document.getElementById('metricsTab').setAttribute('aria-selected', String(showMetrics));
+  document.getElementById('boardTab').tabIndex = showCalendar || showMetrics ? -1 : 0;
   document.getElementById('calendarTab').tabIndex = showCalendar ? 0 : -1;
+  document.getElementById('metricsTab').tabIndex = showMetrics ? 0 : -1;
 }
 
 async function handleTicketSubmit(event) {
@@ -284,6 +398,7 @@ async function handleTicketSubmit(event) {
         title,
         description,
         priority,
+        category: document.getElementById('formCategory').value,
         assignedTo,
         dueDate,
         checklist: modalView.getChecklist()
@@ -294,6 +409,7 @@ async function handleTicketSubmit(event) {
         title,
         description,
         priority,
+        category: document.getElementById('formCategory').value,
         initialStatus,
         assignedTo,
         dueDate,
@@ -308,6 +424,78 @@ async function handleTicketSubmit(event) {
   } catch (error) {
     showToast(error.message || 'No se pudo guardar el ticket');
   }
+}
+
+async function handleCommentSubmit() {
+  const ticketId = modalView.currentTicketId;
+  const input = document.getElementById('ticketCommentInput');
+  const button = document.getElementById('btnPostComment');
+  if (!ticketId) return;
+
+  button.disabled = true;
+  try {
+    await ticketService.addComment(ticketId, input.value);
+    input.value = '';
+    await loadTicketComments(ticketId);
+    await refreshNotificationList();
+    initializeMetricsDates();
+    showToast('Comentario publicado correctamente.');
+  } catch (error) {
+    showToast(error.message || 'No se pudo publicar el comentario.');
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function refreshNotificationList() {
+  if (!activeUser) return;
+  try {
+    notifications = await ticketService.getNotifications(activeUser.id);
+    notificationErrorShown = false;
+    renderNotifications();
+  } catch (error) {
+    if (!notificationErrorShown) showToast(error.message || 'No se pudieron cargar las notificaciones.');
+    notificationErrorShown = true;
+  }
+}
+
+function renderNotifications() {
+  const badge = document.getElementById('notificationBadge');
+  const list = document.getElementById('notificationList');
+  const unreadCount = notifications.filter((notification) => !notification.readAt).length;
+  badge.textContent = unreadCount > 99 ? '99+' : String(unreadCount);
+  badge.setAttribute('aria-label', `${unreadCount} notificaciones sin leer`);
+  badge.classList.toggle('hidden', unreadCount === 0);
+  document.getElementById('notificationSummary').textContent = unreadCount
+    ? `${unreadCount} sin leer`
+    : 'Todo al día';
+
+  const fragment = document.createDocumentFragment();
+  if (!notifications.length) {
+    const empty = document.createElement('li');
+    empty.className = 'notification-empty';
+    empty.textContent = 'No tienes notificaciones.';
+    fragment.appendChild(empty);
+  } else {
+    notifications.forEach((notification) => {
+      const item = document.createElement('li');
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = `notification-item${notification.readAt ? '' : ' is-unread'}`;
+      button.dataset.notificationId = String(notification.id);
+      button.dataset.ticketId = notification.ticketId;
+      const message = document.createElement('span');
+      message.className = 'notification-message';
+      message.textContent = notification.message;
+      const date = document.createElement('time');
+      const createdAt = new Date(notification.createdAt);
+      date.textContent = Number.isNaN(createdAt.getTime()) ? '' : createdAt.toLocaleString();
+      button.append(message, date);
+      item.appendChild(button);
+      fragment.appendChild(item);
+    });
+  }
+  list.replaceChildren(fragment);
 }
 
 async function handleLoginSubmit(event) {
@@ -365,6 +553,7 @@ function renderBoard() {
     assignedTo: filters.assignedTo.value,
     status: filters.status.value,
     priority: filters.priority.value,
+    category: filters.category.value,
     dueFilter: filters.dueFilter.value,
     sortField: filters.sortField.value,
     sortDirection: filters.sortDirection.value
@@ -372,17 +561,83 @@ function renderBoard() {
 
   const visibleTickets = FilterSortService.apply(allTickets, criteria, usersMap);
   boardView.render(visibleTickets);
+  updateSlaOverview();
   if (calendarView) {
     calendarView.render(visibleTickets, auth.canAssignOrSetDue(activeUser));
   }
+  renderMetrics();
 }
 
-function showToast(message) {
+function renderMetrics() {
+  const start = document.getElementById('metricsStart');
+  const end = document.getElementById('metricsEnd');
+  if (!start || !end || !start.value || !end.value) return;
+  let metrics;
+  try {
+    metrics = calculateTicketMetrics(allTickets, usersMap, start.value, end.value, satisfactionEntries);
+  } catch (error) {
+    document.getElementById('agentMetricsBody').replaceChildren();
+    const message = error.message || 'El rango de fechas del informe no es válido.';
+    document.getElementById('metricsError').textContent = message;
+    document.getElementById('metricsError').classList.remove('hidden');
+    return null;
+  }
+  document.getElementById('metricsError').classList.add('hidden');
+  document.getElementById('metricCreated').textContent = String(metrics.createdCount);
+  document.getElementById('metricResolved').textContent = String(metrics.resolvedCount);
+  document.getElementById('metricOpen').textContent = String(metrics.openCount);
+  document.getElementById('metricSla').textContent = `${metrics.slaCompliance}%`;
+  document.getElementById('metricResolution').textContent = `${metrics.averageResolutionHours} h`;
+  document.getElementById('metricSatisfaction').textContent = metrics.averageSatisfaction === null
+    ? 'Sin datos'
+    : `${metrics.averageSatisfaction} / 5`;
+  const body = document.getElementById('agentMetricsBody');
+  const rows = metrics.byAgent.map((agent) => {
+    const row = document.createElement('tr');
+    const name = document.createElement('td');
+    const active = document.createElement('td');
+    const resolved = document.createElement('td');
+    name.textContent = agent.name;
+    active.textContent = String(agent.active);
+    resolved.textContent = String(agent.resolved);
+    row.append(name, active, resolved);
+    return row;
+  });
+  body.replaceChildren(...rows);
+  return metrics;
+}
+
+function exportMetrics() {
+  try {
+    const metrics = renderMetrics();
+    if (!metrics) return;
+    const csv = metricsToCsv(metrics);
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `vortex-metricas-${document.getElementById('metricsStart').value}-${document.getElementById('metricsEnd').value}.csv`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (error) {
+    showToast(error.message || 'No se pudo exportar el informe.');
+  }
+}
+
+function updateSlaOverview() {
+  const activeTickets = allTickets.filter((ticket) => !['resolved', 'closed'].includes(ticket.status));
+  const warningCount = activeTickets.filter((ticket) => ticketService.evaluateSLA(ticket).state === 'warning').length;
+  const overdueCount = activeTickets.filter((ticket) => ticketService.evaluateSLA(ticket).state === 'overdue').length;
+  document.getElementById('slaActiveCount').textContent = String(activeTickets.length);
+  document.getElementById('slaWarningCount').textContent = String(warningCount);
+  document.getElementById('slaOverdueCount').textContent = String(overdueCount);
+}
+
+function showToast(message, duration = 2200) {
   const toast = document.getElementById('toastNotification');
   toast.textContent = message;
   toast.classList.remove('hidden');
   clearTimeout(showToast.timeoutId);
-  showToast.timeoutId = setTimeout(() => toast.classList.add('hidden'), 2200);
+  showToast.timeoutId = setTimeout(() => toast.classList.add('hidden'), duration);
 }
 
 async function syncAuthState() {
@@ -391,8 +646,14 @@ async function syncAuthState() {
   const btnManageUsers = document.getElementById('btnManageUsers');
 
   if (currentUser) {
-    await Promise.all([loadUsers(currentUser), loadTickets()]);
+    await Promise.all([loadUsers(currentUser), loadTickets(), loadResponseTemplates(), loadSatisfactionEntries()]);
     activeUser = currentUser;
+    await realtimeService.subscribe({
+      userId: currentUser.id,
+      workspaceId: currentUser.workspaceId,
+      getAccessToken: () => auth.getAccessToken()
+    });
+    await refreshNotificationList();
     modalView.hideLogin();
     btnNewTicket.disabled = false;
     btnNewTicket.style.opacity = '1';
@@ -400,6 +661,7 @@ async function syncAuthState() {
     document.getElementById('sessionUserName').textContent = currentUser.fullName;
     document.getElementById('sessionUserRole').textContent = currentUser.role;
   } else {
+    realtimeService.stop();
     activeUser = null;
     modalView.showLogin();
     btnNewTicket.disabled = true;
@@ -409,15 +671,135 @@ async function syncAuthState() {
     document.getElementById('sessionUserRole').textContent = 'Sin sesión';
     usersMap.clear();
     allTickets = [];
+    notifications = [];
+    responseTemplates = [];
+    satisfactionEntries = [];
+    renderNotifications();
+    document.getElementById('notificationBadge').classList.add('hidden');
+    document.getElementById('notificationsPanel').classList.add('hidden');
+    document.getElementById('btnNotifications').setAttribute('aria-expanded', 'false');
     boardEl.innerHTML = '';
     if (calendarView) calendarView.render([], false);
     populateAssigneeSelect([]);
   }
 }
 
+async function loadResponseTemplates() {
+  responseTemplates = await ticketService.getResponseTemplates();
+}
+
+async function loadSatisfactionEntries() {
+  satisfactionEntries = await db.getAllSatisfaction();
+}
+
+function handleRealtimeChange() {
+  clearTimeout(realtimeRefreshTimeout);
+  realtimeRefreshTimeout = setTimeout(async () => {
+    if (!activeUser) return;
+    try {
+      await Promise.all([
+        loadTickets(),
+        refreshNotificationList(),
+        loadResponseTemplates(),
+        loadSatisfactionEntries()
+      ]);
+      renderBoard();
+      if (modalView.currentTicketId && !modalEl.classList.contains('hidden')) {
+        await loadTicketComments(modalView.currentTicketId);
+      }
+    } catch (error) {
+      showToast(error.message || 'No se pudieron sincronizar los cambios.');
+    }
+  }, 180);
+}
+
+function renderRealtimeStatus(status, error) {
+  const statusEl = document.getElementById('realtimeStatus');
+  if (!statusEl) return;
+  const labels = {
+    connecting: 'Conectando…',
+    connected: 'En vivo',
+    disconnected: 'Reconectando…',
+    unavailable: 'Sin conexión en vivo',
+    error: 'Error de sincronización'
+  };
+  statusEl.textContent = labels[status] || 'Sin conexión en vivo';
+  statusEl.className = `realtime-status is-${status}`;
+  statusEl.title = error?.message || '';
+}
+
+async function handleTicketReopen() {
+  const ticketId = modalView.currentTicketId;
+  if (!ticketId) return;
+  try {
+    await ticketService.reopenTicket(ticketId);
+    await loadTickets();
+    modalView.closeTicket();
+    renderBoard();
+    showToast('Ticket reabierto y movido a Abierto.');
+  } catch (error) {
+    showToast(error.message || 'No se pudo reabrir el ticket.');
+  }
+}
+
+function openSatisfactionModal(ticketId) {
+  document.getElementById('satisfactionTicketId').value = ticketId;
+  document.getElementById('satisfactionForm').reset();
+  document.getElementById('satisfactionModal').classList.remove('hidden');
+}
+
+function closeSatisfactionModal() {
+  document.getElementById('satisfactionModal').classList.add('hidden');
+}
+
+async function handleSatisfactionSubmit(event) {
+  event.preventDefault();
+  const ticketId = document.getElementById('satisfactionTicketId').value;
+  const rating = document.querySelector('input[name="satisfactionRating"]:checked')?.value;
+  try {
+    await ticketService.submitSatisfaction(
+      ticketId,
+      Number(rating),
+      document.getElementById('satisfactionComment').value
+    );
+    closeSatisfactionModal();
+    await Promise.all([refreshNotificationList(), loadSatisfactionEntries()]);
+    renderMetrics();
+    showToast('Gracias por compartir tu opinión.');
+  } catch (error) {
+    showToast(error.message || 'No se pudo guardar tu opinión.');
+  }
+}
+
+async function handleNotificationClick(event) {
+  const button = event.target.closest('[data-notification-id]');
+  if (!button) return;
+  const notification = notifications.find((item) => item.id === Number(button.dataset.notificationId));
+
+  try {
+    await ticketService.markNotificationRead(button.dataset.notificationId);
+    notifications = notifications.map((item) => item.id === Number(button.dataset.notificationId)
+      ? { ...item, readAt: new Date().toISOString() }
+      : item);
+    renderNotifications();
+    document.getElementById('notificationsPanel').classList.add('hidden');
+    document.getElementById('btnNotifications').setAttribute('aria-expanded', 'false');
+    if (notification?.kind === 'satisfaction_request') {
+      openSatisfactionModal(notification.ticketId);
+      return;
+    }
+    await openTicketForEditing(button.dataset.ticketId);
+  } catch (error) {
+    showToast(error.message || 'No se pudo abrir la notificación.');
+  }
+}
+
 bootstrap().catch((error) => {
   console.error(error);
-  showToast('Error al iniciar la aplicación');
+  const message = /tickets\.(sla_due_at|sla_warning_at|category)|column .*sla_(due|warning)_at does not exist|category.*tickets|response_templates|ticket_satisfaction/i.test(error.message || '')
+    ? 'Falta aplicar una migración pendiente en Supabase. Desde kanban-ticket-management, ejecuta: npx.cmd supabase db push --linked'
+    : error.message || 'Error al iniciar la aplicación';
+  showToast(message, 10_000);
 });
 
 export { db, auth, ticketService };

@@ -22,6 +22,7 @@
       </div>
 
       <div class="header-right">
+        <span id="realtimeStatus" class="realtime-status" role="status">Conectando…</span>
         <label class="theme-picker" for="themeSelect">
           <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18h1.2a2.3 2.3 0 0 0 1.7-3.8 1.2 1.2 0 0 1 .9-2h1.7A3.5 3.5 0 0 0 21 11.7 8.8 8.8 0 0 0 12 3Z"/><path d="M7.5 11.5h.01M10 7.5h.01M14 7.5h.01M16.5 11h.01"/></svg>
           <span>Tema</span>
@@ -36,6 +37,19 @@
           <span id="sessionUserRole" class="role-badge">...</span>
         </div>
         <button id="btnNewTicket" class="btn btn-primary"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Crear ticket</button>
+        <div class="notification-menu">
+          <button id="btnNotifications" class="btn btn-outline" type="button" aria-expanded="false" aria-controls="notificationsPanel">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg>
+            Avisos <span id="notificationBadge" class="notification-badge hidden" aria-label="Notificaciones sin leer">0</span>
+          </button>
+          <section id="notificationsPanel" class="notification-panel hidden" aria-labelledby="notificationsHeading">
+            <header class="notification-panel-header">
+              <h2 id="notificationsHeading">Notificaciones</h2>
+              <span id="notificationSummary" class="notification-summary">Sin avisos</span>
+            </header>
+            <ul id="notificationList" class="notification-list"></ul>
+          </section>
+        </div>
         <button id="btnManageUsers" class="btn btn-outline hidden"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M10 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM20 8v6M23 11h-6"/></svg>Administrar usuarios</button>
         <button id="btnLogout" class="btn btn-outline"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 17l5-5-5-5M15 12H3M21 19V5a2 2 0 0 0-2-2h-6"/></svg>Salir</button>
       </div>
@@ -79,6 +93,20 @@
       </div>
 
       <div class="control-group">
+        <label for="filterCategory">Categoría:</label>
+        <select id="filterCategory">
+          <option value="ALL">Todas</option>
+          <option>Soporte técnico</option>
+          <option>Accesos</option>
+          <option>Incidente</option>
+          <option>Solicitud de servicio</option>
+          <option>Consulta</option>
+          <option>Mejora</option>
+          <option>Nómina y Pagos</option>
+        </select>
+      </div>
+
+      <div class="control-group">
         <label for="filterSla"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Plazo / SLA:</label>
         <select id="filterSla">
           <option value="ALL">Cualquier plazo</option>
@@ -103,6 +131,21 @@
     </nav>
 
     <main class="board-wrapper">
+      <section id="slaOverview" class="sla-overview" aria-label="Resumen de acuerdos de nivel de servicio">
+        <article class="sla-metric">
+          <span class="sla-metric-label">Tickets activos</span>
+          <strong id="slaActiveCount">0</strong>
+        </article>
+        <article class="sla-metric sla-metric-warning">
+          <span class="sla-metric-label">Próximos a vencer</span>
+          <strong id="slaWarningCount">0</strong>
+        </article>
+        <article class="sla-metric sla-metric-overdue">
+          <span class="sla-metric-label">SLA vencidos</span>
+          <strong id="slaOverdueCount">0</strong>
+        </article>
+        <p class="sla-schedule-note">L–V, 08:00–17:00 · America/Bogota (Urgente: 24/7)</p>
+      </section>
       <nav class="view-tabs" role="tablist" aria-label="Vistas de tickets">
         <button id="boardTab" class="view-tab is-active" type="button" role="tab" tabindex="0" aria-selected="true" aria-controls="boardPanel">
           <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="5" height="16" rx="1"/><rect x="10" y="4" width="5" height="11" rx="1"/><rect x="17" y="4" width="4" height="13" rx="1"/></svg>
@@ -112,12 +155,46 @@
           <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18M8 14h2M14 14h2M8 17h2"/></svg>
           Calendario
         </button>
+        <button id="metricsTab" class="view-tab" type="button" role="tab" tabindex="-1" aria-selected="false" aria-controls="metricsPanel">
+          Métricas
+        </button>
       </nav>
       <section id="boardPanel" role="tabpanel" aria-labelledby="boardTab">
         <div id="kanbanBoard" class="kanban-grid" role="region" aria-label="Tablero Kanban"></div>
       </section>
       <section id="calendarPanel" class="hidden" role="tabpanel" aria-labelledby="calendarTab">
         <div id="ticketCalendar"></div>
+      </section>
+      <section id="metricsPanel" class="hidden metrics-panel" role="tabpanel" aria-labelledby="metricsTab">
+        <header class="metrics-header">
+          <div>
+            <h2>Rendimiento del equipo</h2>
+            <p>Indicadores calculados con el historial de tickets del espacio.</p>
+          </div>
+          <div class="metrics-controls">
+            <label>Desde <input id="metricsStart" type="date" /></label>
+            <label>Hasta <input id="metricsEnd" type="date" /></label>
+            <button id="btnExportMetrics" class="btn btn-outline" type="button">Exportar CSV</button>
+          </div>
+        </header>
+        <p id="metricsError" class="metrics-error hidden" role="alert"></p>
+        <div class="metrics-cards">
+          <article class="metrics-card"><span>Tickets creados</span><strong id="metricCreated">0</strong></article>
+          <article class="metrics-card"><span>Tickets resueltos</span><strong id="metricResolved">0</strong></article>
+          <article class="metrics-card"><span>Abiertos actualmente</span><strong id="metricOpen">0</strong></article>
+          <article class="metrics-card"><span>Cumplimiento SLA</span><strong id="metricSla">0%</strong></article>
+          <article class="metrics-card"><span>Resolución promedio</span><strong id="metricResolution">0 h</strong></article>
+          <article class="metrics-card"><span>Satisfacción promedio</span><strong id="metricSatisfaction">Sin datos</strong></article>
+        </div>
+        <section class="agent-metrics" aria-labelledby="agentMetricsHeading">
+          <h3 id="agentMetricsHeading">Tickets resueltos por agente</h3>
+          <div class="metrics-table-wrap">
+            <table>
+              <thead><tr><th>Agente</th><th>Activos asignados</th><th>Resueltos</th></tr></thead>
+              <tbody id="agentMetricsBody"></tbody>
+            </table>
+          </div>
+        </section>
       </section>
     </main>
     </div>
@@ -126,7 +203,7 @@
       <div class="modal-card">
         <header class="modal-header">
           <h3 id="modalHeading">Crear nueva solicitud</h3>
-          <button id="modalCloseBtn" class="close-x" aria-label="Cerrar">&times;</button>
+          <button id="modalCloseBtn" class="close-x" type="button" aria-label="Cerrar">&times;</button>
         </header>
 
         <form id="ticketForm" class="modal-body">
@@ -137,7 +214,7 @@
             <input type="text" id="formTitle" required minlength="4" placeholder="Ej: Error en procesamiento de pagos" />
           </div>
 
-          <div class="form-row grid-2">
+          <div class="form-row grid-3">
             <div id="formStatusField">
               <label for="formInitialStatus">Estado inicial</label>
               <select id="formInitialStatus" aria-describedby="formStatusHelp">
@@ -157,6 +234,18 @@
                 <option value="Media" selected>Media</option>
                 <option value="Alta">Alta</option>
                 <option value="Urgente">Urgente</option>
+              </select>
+            </div>
+            <div>
+              <label for="formCategory">Categoría</label>
+              <select id="formCategory" required>
+                <option>Soporte técnico</option>
+                <option>Accesos</option>
+                <option>Incidente</option>
+                <option>Solicitud de servicio</option>
+                <option selected>Consulta</option>
+                <option>Mejora</option>
+                <option>Nómina y Pagos</option>
               </select>
             </div>
           </div>
@@ -211,10 +300,76 @@
             <ol id="ticketHistoryList"></ol>
           </section>
 
+          <section id="ticketCommentsSection" class="ticket-comments" aria-labelledby="ticketCommentsHeading">
+            <header class="comments-header">
+              <div>
+                <h4 id="ticketCommentsHeading">Conversación del ticket</h4>
+                <p id="ticketCommentsHelp" class="comments-help">Comentarios visibles para el equipo y quien creó el ticket.</p>
+              </div>
+            </header>
+            <ol id="ticketCommentsList" class="ticket-comments-list"></ol>
+            <div id="templateControls" class="template-controls">
+              <label for="responseTemplateSelect">Usar respuesta guardada</label>
+              <div class="template-apply-row">
+                <select id="responseTemplateSelect"><option value="">Selecciona una plantilla</option></select>
+                <button id="btnApplyTemplate" type="button" class="btn btn-outline">Insertar</button>
+              </div>
+              <div id="templateAdminEditor" class="template-admin-editor hidden">
+                <h5>Administrar plantillas del equipo</h5>
+                <input id="templateTitle" type="text" maxlength="100" placeholder="Nombre de la plantilla" aria-label="Nombre de la plantilla" />
+                <textarea id="templateBody" rows="3" maxlength="4000" placeholder="Texto de respuesta" aria-label="Texto de respuesta"></textarea>
+                <div class="template-admin-actions">
+                  <button id="btnSaveTemplate" type="button" class="btn btn-outline">Guardar plantilla</button>
+                  <button id="btnDeleteTemplate" type="button" class="btn btn-danger hidden">Eliminar seleccionada</button>
+                </div>
+              </div>
+            </div>
+            <div id="ticketCommentComposer" class="comment-composer">
+              <label for="ticketCommentInput">Escribe un comentario</label>
+              <textarea id="ticketCommentInput" rows="3" maxlength="4000" placeholder="Comparte una actualización o pregunta..."></textarea>
+              <div class="comment-composer-footer">
+                <small>Máximo 4000 caracteres</small>
+                <button id="btnPostComment" type="button" class="btn btn-primary">Publicar comentario</button>
+              </div>
+            </div>
+          </section>
+
           <footer class="modal-actions">
+            <button type="button" id="btnReopenTicket" class="btn btn-outline hidden">Reabrir ticket</button>
             <button type="button" id="btnDeleteTicket" class="btn btn-danger hidden">Eliminar ticket</button>
             <button type="button" id="btnCancelModal" class="btn btn-outline">Cancelar</button>
             <button type="submit" class="btn btn-primary">Guardar solicitud</button>
+          </footer>
+        </form>
+      </div>
+    </div>
+
+    <div id="satisfactionModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="satisfactionHeading">
+      <div class="modal-card satisfaction-card">
+        <header class="modal-header">
+          <h3 id="satisfactionHeading">¿Cómo fue la atención?</h3>
+          <button id="satisfactionCloseBtn" class="close-x" type="button" aria-label="Cerrar">&times;</button>
+        </header>
+        <form id="satisfactionForm" class="modal-body">
+          <input id="satisfactionTicketId" type="hidden" />
+          <p>Tu opinión nos ayuda a mejorar el servicio recibido.</p>
+          <fieldset class="rating-fieldset">
+            <legend>Calificación de 1 a 5 estrellas</legend>
+            <div id="satisfactionRating" class="rating-options">
+              <label><input type="radio" name="satisfactionRating" value="1" required /><span>1 ★</span></label>
+              <label><input type="radio" name="satisfactionRating" value="2" /><span>2 ★</span></label>
+              <label><input type="radio" name="satisfactionRating" value="3" /><span>3 ★</span></label>
+              <label><input type="radio" name="satisfactionRating" value="4" /><span>4 ★</span></label>
+              <label><input type="radio" name="satisfactionRating" value="5" /><span>5 ★</span></label>
+            </div>
+          </fieldset>
+          <div class="form-row">
+            <label for="satisfactionComment">Comentario opcional</label>
+            <textarea id="satisfactionComment" rows="3" maxlength="1000"></textarea>
+          </div>
+          <footer class="modal-actions">
+            <button type="button" id="satisfactionCancelBtn" class="btn btn-outline">Más tarde</button>
+            <button type="submit" class="btn btn-primary">Enviar opinión</button>
           </footer>
         </form>
       </div>

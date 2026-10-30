@@ -7,11 +7,16 @@ export const STATUS_DEFINITIONS = {
   blocked: { id: 'blocked', name: 'Bloqueado', colorHex: '#ef4444', badgeClass: 'text-blocked', borderClass: 'status-blocked' }
 };
 
-export const SLA_THRESHOLDS_HOURS = {
-  WARNING: 24,
-  OVERDUE: 0
-};
-
 export const SLA_REFRESH_INTERVAL_MS = 60 * 1000;
 
 export const PRIORITY_ORDER = ['Baja', 'Media', 'Alta', 'Urgente'];
+
+export const TICKET_CATEGORIES = [
+  'Soporte técnico',
+  'Accesos',
+  'Incidente',
+  'Solicitud de servicio',
+  'Consulta',
+  'Mejora',
+  'Nómina y Pagos'
+];

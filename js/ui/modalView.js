@@ -17,6 +17,12 @@ export class ModalView {
   }
 
   bindEvents() {
+    this.modalEl.addEventListener('click', (event) => {
+      if (!event.target.closest?.('#modalCloseBtn')) return;
+      event.preventDefault();
+      this.closeTicket();
+    }, true);
+
     this.form.addEventListener('submit', (event) => {
       if (this.onTicketSubmit) {
         this.onTicketSubmit(event);
@@ -83,6 +89,7 @@ export class ModalView {
     const statusRow = document.getElementById('formStatusField');
     const canEditContent = !ticket || Boolean(permissions.canEdit);
     const canSave = !ticket || canEditContent || Boolean(permissions.canManageAssignment);
+    this.currentTicketId = ticket?.id || null;
 
     if (ticket) {
       heading.textContent = 'Editar solicitud';
@@ -91,20 +98,27 @@ export class ModalView {
       document.getElementById('formTitle').value = ticket.title;
       document.getElementById('formDescription').value = ticket.description;
       document.getElementById('formPriority').value = ticket.priority;
+      document.getElementById('formCategory').value = ticket.category || 'Consulta';
       document.getElementById('formAssignee').value = ticket.assignedTo || '';
       document.getElementById('formInitialStatus').value = ticket.status;
       document.getElementById('formDueDate').value = ticket.dueDate ? this.toLocalDateTime(ticket.dueDate) : '';
       this.checklistDraft = (ticket.checklist || []).map((item) => ({ ...item }));
       statusRow.classList.add('hidden');
       this.renderHistory(ticket.statusHistory || []);
+      document.getElementById('ticketCommentsSection').classList.toggle('hidden', !permissions.canComment);
+      document.getElementById('ticketCommentComposer').classList.toggle('hidden', !permissions.canComment);
+      document.getElementById('ticketCommentInput').value = '';
+      this.renderComments([]);
     } else {
       heading.textContent = 'Crear nueva solicitud';
       formTicketId.value = '';
       deleteBtn.classList.add('hidden');
       this.form.reset();
+      document.getElementById('formCategory').value = 'Consulta';
       this.checklistDraft = [];
       statusRow.classList.remove('hidden');
       document.getElementById('ticketHistorySection').classList.add('hidden');
+      document.getElementById('ticketCommentsSection').classList.add('hidden');
     }
 
     this.canManageChecklist = Boolean(permissions.canManageChecklist);
@@ -113,6 +127,7 @@ export class ModalView {
     document.getElementById('formTitle').disabled = !canEditContent;
     document.getElementById('formDescription').disabled = !canEditContent;
     document.getElementById('formPriority').disabled = !canEditContent;
+    document.getElementById('formCategory').disabled = !canEditContent;
     document.getElementById('formInitialStatus').disabled = Boolean(ticket) || !permissions.canManageAssignment;
     document.getElementById('formAssignee').disabled = !permissions.canManageAssignment;
     document.getElementById('formDueDate').disabled = !permissions.canManageAssignment;
@@ -127,13 +142,20 @@ export class ModalView {
     document.getElementById('modalHeading').textContent = 'Crear nueva solicitud';
     document.getElementById('formTicketId').value = '';
     document.getElementById('btnDeleteTicket').classList.add('hidden');
+    document.getElementById('btnReopenTicket').classList.add('hidden');
     document.getElementById('ticketHistorySection').classList.add('hidden');
+    document.getElementById('ticketCommentsSection').classList.add('hidden');
+    document.getElementById('ticketCommentComposer').classList.remove('hidden');
+    document.getElementById('ticketCommentInput').value = '';
+    this.currentTicketId = null;
     this.checklistDraft = [];
     this.canManageChecklist = false;
     this.renderChecklist();
     this.form.querySelectorAll('input, textarea, select').forEach((field) => {
       field.disabled = false;
     });
+    document.getElementById('templateControls').classList.add('hidden');
+    this.clearResponseTemplateEditor();
     this.previousFocus?.focus();
   }
 
@@ -265,6 +287,80 @@ export class ModalView {
     }
 
     section.classList.remove('hidden');
+  }
+
+  setCommentsLoading() {
+    const list = document.getElementById('ticketCommentsList');
+    const item = document.createElement('li');
+    item.className = 'comments-empty';
+    item.textContent = 'Cargando comentarios...';
+    list.replaceChildren(item);
+  }
+
+  renderComments(records) {
+    const list = document.getElementById('ticketCommentsList');
+    const fragment = document.createDocumentFragment();
+    if (!Array.isArray(records) || records.length === 0) {
+      const item = document.createElement('li');
+      item.className = 'comments-empty';
+      item.textContent = 'Todavía no hay comentarios.';
+      fragment.appendChild(item);
+    } else {
+      records.forEach((record) => {
+        const item = document.createElement('li');
+        item.className = 'ticket-comment';
+        const header = document.createElement('div');
+        header.className = 'ticket-comment-meta';
+        const author = document.createElement('strong');
+        author.textContent = this.usersMap.get(record.authorId)?.fullName || 'Usuario';
+        const date = document.createElement('time');
+        const createdAt = new Date(record.createdAt);
+        date.dateTime = record.createdAt;
+        date.textContent = Number.isNaN(createdAt.getTime()) ? 'Fecha desconocida' : createdAt.toLocaleString();
+        const body = document.createElement('p');
+        body.textContent = record.body;
+        header.append(author, date);
+        item.append(header, body);
+        fragment.appendChild(item);
+      });
+    }
+    list.replaceChildren(fragment);
+  }
+
+  showCommentsError(message) {
+    const list = document.getElementById('ticketCommentsList');
+    const item = document.createElement('li');
+    item.className = 'comments-empty';
+    item.textContent = message;
+    list.replaceChildren(item);
+  }
+
+  setResponseTemplates(templates, canManage) {
+    this.responseTemplates = templates;
+    this.canManageTemplates = canManage;
+    const select = document.getElementById('responseTemplateSelect');
+    const selectedId = select.value;
+    select.replaceChildren(new Option('Selecciona una plantilla', ''));
+    templates.forEach((template) => select.add(new Option(template.title, template.id)));
+    if (templates.some((template) => template.id === selectedId)) select.value = selectedId;
+    document.getElementById('templateControls').classList.toggle('hidden', templates.length === 0 && !canManage);
+    document.getElementById('templateAdminEditor').classList.toggle('hidden', !canManage);
+    if (!selectedId) document.getElementById('btnDeleteTemplate').classList.add('hidden');
+  }
+
+  selectResponseTemplate(templateId) {
+    const template = this.responseTemplates?.find((item) => item.id === templateId);
+    if (!template || !this.canManageTemplates) return;
+    document.getElementById('templateTitle').value = template.title;
+    document.getElementById('templateBody').value = template.body;
+    document.getElementById('btnDeleteTemplate').classList.remove('hidden');
+  }
+
+  clearResponseTemplateEditor() {
+    document.getElementById('responseTemplateSelect').value = '';
+    document.getElementById('templateTitle').value = '';
+    document.getElementById('templateBody').value = '';
+    document.getElementById('btnDeleteTemplate').classList.add('hidden');
   }
 
   openUsers(users) {

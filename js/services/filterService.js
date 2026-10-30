@@ -1,4 +1,4 @@
-import { SLA_THRESHOLDS_HOURS } from '../config/constants.js';
+import { getSlaState } from './slaService.js';
 
 export class FilterSortService {
   static apply(tickets, criteria, usersMap) {
@@ -7,14 +7,13 @@ export class FilterSortService {
       assignedTo = 'ALL',
       status = 'ALL',
       priority = 'ALL',
+      category = 'ALL',
       dueFilter = 'ALL',
       sortField = 'createdAt',
       sortDirection = 'desc'
     } = criteria;
 
     const query = search.trim().toLowerCase();
-    const now = Date.now();
-
     return tickets
       .filter((ticket) => {
         if (query) {
@@ -33,17 +32,13 @@ export class FilterSortService {
         if (status !== 'ALL' && ticket.status !== status) return false;
         if (assignedTo !== 'ALL' && ticket.assignedTo !== assignedTo) return false;
         if (priority !== 'ALL' && ticket.priority !== priority) return false;
+        if (category !== 'ALL' && ticket.category !== category) return false;
 
         if (dueFilter !== 'ALL') {
-          if (!ticket.dueDate) return false;
-          const dueAt = new Date(ticket.dueDate).getTime();
-          if (!Number.isFinite(dueAt)) return false;
-          const diffHours = (dueAt - now) / (1000 * 60 * 60);
-
-          if (dueFilter === 'overdue' && diffHours >= SLA_THRESHOLDS_HOURS.OVERDUE) return false;
-          if (dueFilter === 'warning'
-            && (diffHours < SLA_THRESHOLDS_HOURS.OVERDUE || diffHours > SLA_THRESHOLDS_HOURS.WARNING)) return false;
-          if (dueFilter === 'future' && diffHours <= SLA_THRESHOLDS_HOURS.WARNING) return false;
+          const slaState = getSlaState(ticket).state;
+          if (dueFilter === 'overdue' && slaState !== 'overdue') return false;
+          if (dueFilter === 'warning' && slaState !== 'warning') return false;
+          if (dueFilter === 'future' && slaState !== 'normal') return false;
         }
 
         return true;

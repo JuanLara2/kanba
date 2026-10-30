@@ -1,6 +1,8 @@
 const PROFILE_FIELDS = 'id,full_name,email,role,workspace_id,created_by_admin_id';
-const TICKET_FIELDS = 'id,title,description,status,priority,assigned_to,created_by,workspace_id,created_at,updated_at,due_date,checklist';
+const TICKET_FIELDS = 'id,title,description,status,priority,category,assigned_to,created_by,workspace_id,created_at,updated_at,due_date,sla_due_at,sla_warning_at,checklist';
 const HISTORY_FIELDS = 'id,ticket_id,from_status,to_status,changed_at,changed_by';
+const COMMENT_FIELDS = 'id,ticket_id,author_id,body,created_at';
+const NOTIFICATION_FIELDS = 'id,user_id,ticket_id,kind,message,created_at,read_at';
 
 function mapProfile(row) {
   return {
@@ -20,12 +22,15 @@ function mapTicket(row, history = []) {
     description: row.description,
     status: row.status,
     priority: row.priority,
+    category: row.category,
     assignedTo: row.assigned_to,
     createdBy: row.created_by,
     workspaceId: row.workspace_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     dueDate: row.due_date,
+    slaDueAt: row.sla_due_at,
+    slaWarningAt: row.sla_warning_at,
     checklist: row.checklist || [],
     statusHistory: history
       .filter((record) => record.ticket_id === row.id)
@@ -44,9 +49,32 @@ function toTicketRow(ticket) {
     description: ticket.description,
     status: ticket.status,
     priority: ticket.priority,
+    category: ticket.category,
     assigned_to: ticket.assignedTo,
     due_date: ticket.dueDate,
     checklist: ticket.checklist || []
+  };
+}
+
+function mapComment(row) {
+  return {
+    id: row.id,
+    ticketId: row.ticket_id,
+    authorId: row.author_id,
+    body: row.body,
+    createdAt: row.created_at
+  };
+}
+
+function mapNotification(row) {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    ticketId: row.ticket_id,
+    kind: row.kind,
+    message: row.message,
+    createdAt: row.created_at,
+    readAt: row.read_at
   };
 }
 
@@ -151,5 +179,140 @@ export class SupabaseAdapter {
       accessToken,
       body: user
     });
+  }
+
+  async getComments(ticketId) {
+    const accessToken = await this.accessToken();
+    const rows = await this.client.requestRest(
+      `ticket_comments?select=${COMMENT_FIELDS}&ticket_id=eq.${encodeURIComponent(ticketId)}&order=created_at.asc`,
+      { accessToken }
+    );
+    return rows.map(mapComment);
+  }
+
+  async createComment(ticketId, body) {
+    const accessToken = await this.accessToken();
+    const rows = await this.client.requestRest('ticket_comments', {
+      method: 'POST',
+      accessToken,
+      prefer: 'return=representation',
+      body: { ticket_id: ticketId, body }
+    });
+    if (!rows?.[0]) throw new Error('Supabase no devolvió el comentario creado.');
+    return mapComment(rows[0]);
+  }
+
+  async getNotifications(userId) {
+    const accessToken = await this.accessToken();
+    const rows = await this.client.requestRest(
+      `notifications?select=${NOTIFICATION_FIELDS}&user_id=eq.${encodeURIComponent(userId)}&order=created_at.desc&limit=50`,
+      { accessToken }
+    );
+    return rows.map(mapNotification);
+  }
+
+  async markNotificationRead(notificationId) {
+    const accessToken = await this.accessToken();
+    const rows = await this.client.requestRest(`notifications?id=eq.${encodeURIComponent(notificationId)}`, {
+      method: 'PATCH',
+      accessToken,
+      prefer: 'return=representation',
+      body: { read_at: new Date().toISOString() }
+    });
+    if (!rows?.[0]) throw new Error('No se pudo actualizar la notificación.');
+    return mapNotification(rows[0]);
+  }
+
+  async getResponseTemplates() {
+    const accessToken = await this.accessToken();
+    const rows = await this.client.requestRest(
+      'response_templates?select=id,title,body,created_at,updated_at&order=title.asc',
+      { accessToken }
+    );
+    return rows.map((row) => ({
+      id: row.id,
+      title: row.title,
+      body: row.body,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    }));
+  }
+
+  async saveResponseTemplate(template) {
+    const accessToken = await this.accessToken();
+    const path = template.id
+      ? `response_templates?id=eq.${encodeURIComponent(template.id)}`
+      : 'response_templates';
+    const rows = await this.client.requestRest(path, {
+      method: template.id ? 'PATCH' : 'POST',
+      accessToken,
+      prefer: 'return=representation',
+      body: { title: template.title, body: template.body }
+    });
+    if (!rows?.[0]) throw new Error('No se pudo guardar la plantilla.');
+    return {
+      id: rows[0].id,
+      title: rows[0].title,
+      body: rows[0].body,
+      createdAt: rows[0].created_at,
+      updatedAt: rows[0].updated_at
+    };
+  }
+
+  async deleteResponseTemplate(templateId) {
+    const accessToken = await this.accessToken();
+    await this.client.requestRest(`response_templates?id=eq.${encodeURIComponent(templateId)}`, {
+      method: 'DELETE',
+      accessToken
+    });
+  }
+
+  async submitSatisfaction(ticketId, rating, comment) {
+    const accessToken = await this.accessToken();
+    const rows = await this.client.requestRest('ticket_satisfaction', {
+      method: 'POST',
+      accessToken,
+      prefer: 'return=representation',
+      body: { ticket_id: ticketId, rating, comment: comment || null }
+    });
+    if (!rows?.[0]) throw new Error('No se pudo guardar la encuesta.');
+    return {
+      ticketId: rows[0].ticket_id,
+      rating: rows[0].rating,
+      comment: rows[0].comment,
+      submittedBy: rows[0].submitted_by,
+      createdAt: rows[0].created_at
+    };
+  }
+
+  async getSatisfaction(ticketId) {
+    const accessToken = await this.accessToken();
+    const rows = await this.client.requestRest(
+      `ticket_satisfaction?select=ticket_id,rating,comment,submitted_by,created_at&ticket_id=eq.${encodeURIComponent(ticketId)}`,
+      { accessToken }
+    );
+    if (!rows.length) return null;
+    return {
+      ticketId: rows[0].ticket_id,
+      rating: rows[0].rating,
+      comment: rows[0].comment,
+      submittedBy: rows[0].submitted_by,
+      createdAt: rows[0].created_at
+    };
+  }
+
+  async getAllSatisfaction() {
+    const accessToken = await this.accessToken();
+    const rows = await this.client.requestRest(
+      'ticket_satisfaction?select=ticket_id,rating,comment,submitted_by,created_at&order=created_at.desc',
+      { accessToken }
+    );
+    return rows.map((row) => ({
+      ticketId: row.ticket_id,
+      rating: row.rating,
+      comment: row.comment,
+      submittedBy: row.submitted_by,
+      createdAt: row.created_at
+    }));
   }
 }

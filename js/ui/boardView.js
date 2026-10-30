@@ -1,5 +1,6 @@
 import { STATUS_DEFINITIONS } from '../config/constants.js';
 import { getChecklistProgress } from '../services/ticketService.js';
+import { formatSlaRemaining } from '../services/slaService.js';
 
 export class BoardView {
   constructor(boardContainer, ticketService, usersMap) {
@@ -62,7 +63,7 @@ export class BoardView {
     card.setAttribute('aria-label', `${ticket.id}: ${ticket.title}. Estado: ${colDef.name}.${checklistLabel} Pulsa Enter para ver detalles.`);
     card.dataset.ticketId = ticket.id;
 
-    const sla = this.ticketService.evaluateSLA(ticket.dueDate);
+    const sla = this.ticketService.evaluateSLA(ticket);
     const assignee = this.usersMap.get(ticket.assignedTo) || { fullName: 'Sin asignar' };
     const initial = assignee.fullName.charAt(0).toUpperCase();
 
@@ -77,8 +78,10 @@ export class BoardView {
         <span class="card-id">${ticket.id}</span>
         <div class="badges-row">
           <span class="priority-pill priority-${ticket.priority.toLowerCase()}">${ticket.priority}</span>
-          ${sla.state === 'overdue' ? '<span class="sla-pill overdue">⚠️ Vencido</span>' : ''}
-          ${sla.state === 'warning' ? '<span class="sla-pill warning">⏳ Próximo</span>' : ''}
+          <span class="category-pill">${this.escapeHtml(ticket.category || 'Consulta')}</span>
+          ${sla.state === 'overdue' ? '<span class="sla-pill overdue">⚠️ SLA vencido</span>' : ''}
+          ${sla.state === 'warning' ? `<span class="sla-pill warning">⏳ SLA ${formatSlaRemaining(sla.remainingMs)}</span>` : ''}
+          ${sla.state === 'normal' ? `<span class="sla-pill normal">SLA ${formatSlaRemaining(sla.remainingMs)}</span>` : ''}
         </div>
       </div>
       <h3 class="card-title">${this.escapeHtml(ticket.title)}</h3>
