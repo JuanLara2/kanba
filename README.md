@@ -61,6 +61,8 @@ La URL y la clave `publishable/anon` del frontend son visibles para los visitant
 
 La interfaz se adapta a teléfonos y tabletas: el encabezado y los filtros se reorganizan para pantallas estrechas, las columnas del tablero Kanban se recorren horizontalmente y el calendario permite desplazarse para consultar sus días. Los formularios y detalles de tickets se presentan como paneles adaptados a la pantalla, manteniendo el desplazamiento dentro del diálogo cuando su contenido es más alto que el dispositivo.
 
+El sitio incluye un manifiesto con iconos de 192 × 192 y 512 × 512 px para Android, además de un icono Apple Touch de 180 × 180 px para iOS. En el teléfono, abre el sitio y usa **Añadir a pantalla de inicio** desde el menú del navegador.
+
 ## Notas
 
 - Las cuentas y los tickets ya no se crean desde datos semilla locales. El primer Admin se aprovisiona desde Supabase; los demás usuarios se crean desde **Administrar usuarios**.
