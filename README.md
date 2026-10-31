@@ -52,8 +52,9 @@ La función usa `SUPABASE_SERVICE_ROLE_KEY` solo en el entorno aislado de Supaba
 El workflow [deploy-pages.yml](./.github/workflows/deploy-pages.yml) ejecuta las pruebas y publica los archivos estáticos al hacer push a `main`.
 
 1. En el repositorio GitHub, abre **Settings → Pages** y selecciona **GitHub Actions** como fuente del despliegue.
-2. Publica el proyecto en la rama `main`. El workflow construye el sitio estático y despliega Vortex Task en `https://juanlara2.github.io/kanba/`.
-3. En Supabase, abre **Authentication → URL Configuration** y agrega `https://juanlara2.github.io/kanba/` a **Redirect URLs**.
+2. En **Settings → Pages → Custom domain**, escribe `juanlaraportafolio.website`, guarda y espera a que GitHub verifique el DNS y habilite HTTPS. El workflow incluye el archivo `CNAME` en cada despliegue para conservar el dominio.
+3. En Hostinger, los cuatro registros A del dominio raíz deben apuntar a `185.199.108.153`, `185.199.109.153`, `185.199.110.153` y `185.199.111.153`. Esos registros ya responden con las direcciones de GitHub Pages; no los dupliques si ya están configurados.
+4. En Supabase, abre **Authentication → URL Configuration**, establece `https://juanlaraportafolio.website` como **Site URL** y agrégalo a **Redirect URLs**. Conserva la URL de GitHub Pages en la lista mientras verificas el dominio nuevo.
 
 La URL y la clave `publishable/anon` del frontend son visibles para los visitantes del sitio; la seguridad depende de RLS. La clave `service_role` nunca debe publicarse. Esta versión está conectada al proyecto Supabase configurado para la app: quienes tengan cuentas válidas compartirán sus datos y cambios. No compartas el sitio con testers externos si no quieres que accedan a los datos de ese proyecto.
 

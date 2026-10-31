@@ -39,6 +39,7 @@ jobs:
         run: |
           mkdir dist
           cp index.html dist/
+          cp CNAME dist/
           cp manifest.json dist/
           cp -R styles js img dist/
 
