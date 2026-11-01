@@ -3,12 +3,12 @@ import { SupabaseAdapter } from './data/db.js';
 import { AuthService } from './services/authService.js?v=password-recovery-v1';
 import { TicketService } from './services/ticketService.js';
 import { FilterSortService } from './services/filterService.js';
-import { BoardView } from './ui/boardView.js';
+import { BoardView } from './ui/boardView.js?v=mobile-workflow-v1';
 import { ModalView } from './ui/modalView.js';
-import { DragDropController } from './ui/dragDrop.js';
+import { DragDropController } from './ui/dragDrop.js?v=mobile-workflow-v1';
 import { CalendarView, dueDateForCalendarDay } from './ui/calendarView.js';
 import { initializeThemeController } from './ui/themeController.js';
-import { SLA_REFRESH_INTERVAL_MS } from './config/constants.js';
+import { SLA_REFRESH_INTERVAL_MS, STATUS_DEFINITIONS } from './config/constants.js';
 import { calculateTicketMetrics, metricsToCsv } from './services/metricsService.js';
 import { RealtimeService } from './services/realtimeService.js?v=realtime-protocol-v2';
 import { createSplashScreen } from './ui/splashScreen.js';
@@ -54,6 +54,7 @@ let modalView;
 let dragDropController;
 let passwordRecoveryAccessToken = null;
 let passwordRecoveryLinkExpired = false;
+let mobileStatusTicketId = null;
 const realtimeService = new RealtimeService(client, {
   onChange: handleRealtimeChange,
   onStatus: renderRealtimeStatus
@@ -411,11 +412,137 @@ function bindStaticEvents() {
 
   boardEl.addEventListener('keydown', (event) => {
     if (event.key !== 'Enter' && event.key !== ' ') return;
+    if (event.target.closest('button, a, input, select, textarea')) return;
     const card = event.target.closest('.ticket-card');
     if (!card) return;
     event.preventDefault();
     dragDropController.onEditRequest(card.dataset.ticketId);
   });
+
+  document.getElementById('mobileStatusTabs').addEventListener('click', (event) => {
+    const tab = event.target.closest('.mobile-status-tab');
+    if (tab) boardView.setActiveStatus(tab.dataset.status);
+  });
+  document.getElementById('btnOpenMobileFilters').addEventListener('click', openMobileFilters);
+  document.getElementById('btnCloseMobileFilters').addEventListener('click', closeMobileFilters);
+  document.getElementById('mobileFiltersBackdrop').addEventListener('click', closeMobileFilters);
+  document.getElementById('btnApplyMobileFilters').addEventListener('click', closeMobileFilters);
+  document.getElementById('btnClearMobileFilters').addEventListener('click', clearFilters);
+  document.getElementById('ticketStatusBackdrop').addEventListener('click', closeMobileStatusSheet);
+  document.getElementById('btnCloseTicketStatus').addEventListener('click', closeMobileStatusSheet);
+  document.getElementById('ticketStatusOptions').addEventListener('click', handleMobileStatusSelection);
+  boardEl.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-ticket-status-menu]');
+    if (button) openMobileStatusSheet(button.dataset.ticketStatusMenu, button);
+  });
+  [document.getElementById('mobileFiltersSheet'), document.getElementById('ticketStatusSheet')].forEach((sheet) => {
+    sheet.addEventListener('keydown', handleBottomSheetKeydown);
+  });
+}
+
+function openMobileFilters() {
+  const layer = document.getElementById('mobileFiltersLayer');
+  layer.classList.remove('hidden');
+  document.getElementById('mobileFiltersSheet').setAttribute('role', 'dialog');
+  document.getElementById('mobileFiltersSheet').setAttribute('aria-modal', 'true');
+  document.getElementById('btnOpenMobileFilters').setAttribute('aria-expanded', 'true');
+  layer.querySelector('select, input').focus();
+}
+
+function closeMobileFilters() {
+  document.getElementById('mobileFiltersLayer').classList.add('hidden');
+  document.getElementById('mobileFiltersSheet').removeAttribute('role');
+  document.getElementById('mobileFiltersSheet').removeAttribute('aria-modal');
+  document.getElementById('btnOpenMobileFilters').setAttribute('aria-expanded', 'false');
+  document.getElementById('btnOpenMobileFilters').focus();
+}
+
+function clearFilters() {
+  filters.search.value = '';
+  filters.assignedTo.value = 'ALL';
+  filters.status.value = 'ALL';
+  filters.priority.value = 'ALL';
+  filters.category.value = 'ALL';
+  filters.dueFilter.value = 'ALL';
+  filters.sortField.value = 'createdAt';
+  filters.sortDirection.value = 'desc';
+  renderBoard();
+}
+
+function openMobileStatusSheet(ticketId, trigger) {
+  const ticket = allTickets.find((item) => item.id === ticketId);
+  if (!ticket || !auth.canChangeStatus(activeUser, ticket)) return;
+
+  mobileStatusTicketId = ticketId;
+  document.getElementById('ticketStatusTicketId').textContent = ticket.id;
+  const options = Object.values(STATUS_DEFINITIONS).map(({ id, name, colorHex }) => {
+    const button = document.createElement('button');
+    button.className = 'ticket-status-option';
+    button.type = 'button';
+    button.dataset.status = id;
+    button.style.setProperty('--status-color', colorHex);
+    button.setAttribute('aria-pressed', String(ticket.status === id));
+    button.disabled = ticket.status === id;
+    button.textContent = name;
+    return button;
+  });
+  const container = document.getElementById('ticketStatusOptions');
+  container.replaceChildren(...options);
+  document.getElementById('ticketStatusLayer').classList.remove('hidden');
+  container.querySelector('button:not(:disabled)')?.focus();
+  if (trigger) trigger.setAttribute('aria-expanded', 'true');
+}
+
+function closeMobileStatusSheet() {
+  document.getElementById('ticketStatusLayer').classList.add('hidden');
+  [...boardEl.querySelectorAll('[data-ticket-status-menu]')]
+    .find((button) => button.dataset.ticketStatusMenu === mobileStatusTicketId)
+    ?.setAttribute('aria-expanded', 'false');
+  mobileStatusTicketId = null;
+  document.querySelector('#mobileStatusTabs .mobile-status-tab[aria-pressed="true"]')?.focus();
+}
+
+async function handleMobileStatusSelection(event) {
+  const option = event.target.closest('.ticket-status-option');
+  if (!option || !mobileStatusTicketId) return;
+  const ticketId = mobileStatusTicketId;
+  const nextStatus = option.dataset.status;
+  const options = [...document.querySelectorAll('.ticket-status-option')];
+  options.forEach((button) => { button.disabled = true; });
+  try {
+    await ticketService.changeTicketStatus(ticketId, nextStatus);
+    closeMobileStatusSheet();
+    await loadTickets();
+    renderBoard();
+    showToast('Estado actualizado');
+    document.querySelector('#mobileStatusTabs .mobile-status-tab[aria-pressed="true"]')?.focus();
+  } catch (error) {
+    const currentStatus = allTickets.find((ticket) => ticket.id === ticketId)?.status;
+    options.forEach((button) => { button.disabled = button.dataset.status === currentStatus; });
+    showToast(error.message || 'No se pudo actualizar el estado del ticket.');
+  }
+}
+
+function handleBottomSheetKeydown(event) {
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    if (event.currentTarget.id === 'mobileFiltersSheet') closeMobileFilters();
+    else closeMobileStatusSheet();
+    return;
+  }
+  if (event.key !== 'Tab') return;
+  const focusable = [...event.currentTarget.querySelectorAll('button:not(:disabled), input:not(:disabled), select:not(:disabled)')]
+    .filter((element) => !element.closest('.hidden'));
+  if (!focusable.length) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
 }
 
 async function openTicketForEditing(ticketId) {
@@ -671,7 +798,7 @@ function renderBoard() {
   };
 
   const visibleTickets = FilterSortService.apply(allTickets, criteria, usersMap);
-  boardView.render(visibleTickets);
+  boardView.render(visibleTickets, (ticket) => auth.canChangeStatus(activeUser, ticket));
   updateSlaOverview();
   if (calendarView) {
     calendarView.render(visibleTickets, auth.canAssignOrSetDue(activeUser));

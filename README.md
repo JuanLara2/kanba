@@ -66,7 +66,7 @@ La URL y la clave `publishable/anon` del frontend son visibles para los visitant
 
 ## Experiencia móvil
 
-La interfaz se adapta a teléfonos y tabletas: el encabezado y los filtros se reorganizan para pantallas estrechas, las columnas del tablero Kanban se recorren horizontalmente y el calendario permite desplazarse para consultar sus días. Los formularios y detalles de tickets se presentan como paneles adaptados a la pantalla, manteniendo el desplazamiento dentro del diálogo cuando su contenido es más alto que el dispositivo.
+La interfaz móvil incorpora un botón flotante para crear tickets, navegación inferior entre Tablero, Calendario y Métricas, y un selector horizontal de estados que muestra el total de tickets y presenta una sola columna a la vez. Cada tarjeta ofrece un menú táctil para cambiar de estado según los permisos del usuario; los filtros avanzados se agrupan en una hoja inferior. El calendario permite desplazarse para consultar sus días y los formularios se adaptan al alto de la pantalla.
 
 El sitio incluye un manifiesto con iconos de 192 × 192 y 512 × 512 px para Android, además de un icono Apple Touch de 180 × 180 px para iOS. En el teléfono, abre el sitio y usa **Añadir a pantalla de inicio** desde el menú del navegador.
 

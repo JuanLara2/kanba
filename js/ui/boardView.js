@@ -7,10 +7,18 @@ export class BoardView {
     this.board = boardContainer;
     this.ticketService = ticketService;
     this.usersMap = usersMap;
+    this.statusTabs = document.getElementById('mobileStatusTabs');
+    this.activeStatus = 'new';
   }
 
-  render(tickets) {
+  render(tickets, canChangeStatus = () => false) {
     const fragment = document.createDocumentFragment();
+    const statusCounts = new Map();
+    Object.values(STATUS_DEFINITIONS).forEach(({ id }) => {
+      statusCounts.set(id, tickets.filter((ticket) => ticket.status === id).length);
+    });
+    this.renderStatusTabs(statusCounts);
+    this.board.dataset.activeStatus = this.activeStatus;
 
     Object.values(STATUS_DEFINITIONS).forEach((colDef) => {
       const colTickets = tickets.filter((ticket) => ticket.status === colDef.id);
@@ -39,7 +47,9 @@ export class BoardView {
         dropZone.appendChild(emptyState);
       } else {
         colTickets.forEach((ticket) => {
-          cardsFragment.appendChild(this.buildCard(ticket, colDef));
+          const card = this.buildCard(ticket, colDef);
+          if (canChangeStatus(ticket)) card.appendChild(this.buildStatusMenuButton(ticket));
+          cardsFragment.appendChild(card);
         });
         dropZone.appendChild(cardsFragment);
       }
@@ -50,12 +60,48 @@ export class BoardView {
     this.board.replaceChildren(fragment);
   }
 
+  renderStatusTabs(statusCounts) {
+    if (!this.statusTabs) return;
+    const fragment = document.createDocumentFragment();
+    Object.values(STATUS_DEFINITIONS).forEach(({ id, name, colorHex }) => {
+      const button = document.createElement('button');
+      button.className = 'mobile-status-tab';
+      button.type = 'button';
+      button.dataset.status = id;
+      button.setAttribute('aria-pressed', String(this.activeStatus === id));
+      button.style.setProperty('--status-color', colorHex);
+      button.innerHTML = `<span>${name}</span><span class="mobile-status-count">${statusCounts.get(id) || 0}</span>`;
+      fragment.appendChild(button);
+    });
+    this.statusTabs.replaceChildren(fragment);
+  }
+
+  setActiveStatus(status) {
+    if (!Object.prototype.hasOwnProperty.call(STATUS_DEFINITIONS, status)) return;
+    this.activeStatus = status;
+    this.board.dataset.activeStatus = status;
+    this.statusTabs?.querySelectorAll('.mobile-status-tab').forEach((button) => {
+      button.setAttribute('aria-pressed', String(button.dataset.status === status));
+    });
+  }
+
+  buildStatusMenuButton(ticket) {
+    const button = document.createElement('button');
+    button.className = 'card-status-menu';
+    button.type = 'button';
+    button.dataset.ticketStatusMenu = ticket.id;
+    button.setAttribute('aria-label', `Cambiar estado de ${ticket.id}`);
+    button.setAttribute('aria-expanded', 'false');
+    button.innerHTML = '<span aria-hidden="true">⋮</span>';
+    return button;
+  }
+
   buildCard(ticket, colDef) {
     const card = document.createElement('article');
     card.className = `ticket-card ${colDef.borderClass}`;
     card.draggable = true;
     card.tabIndex = 0;
-    card.setAttribute('role', 'button');
+    card.setAttribute('role', 'group');
     const checklistProgress = getChecklistProgress(ticket.checklist);
     const checklistLabel = checklistProgress.total
       ? ` Subtareas: ${checklistProgress.completed} de ${checklistProgress.total}, ${checklistProgress.percentage}% completado.`

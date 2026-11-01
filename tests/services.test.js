@@ -247,6 +247,40 @@ test('drag and drop handlers safely resolve text-node event targets', async () =
   assert.deepEqual(changes, [['TCK-1001', 'open']]);
 });
 
+test('ticket status controls do not trigger the card detail click handler', () => {
+  const handlers = new Map();
+  const card = {
+    nodeType: 1,
+    dataset: { ticketId: 'TCK-1001' },
+    closest(selector) {
+      return selector === '.ticket-card' ? this : null;
+    }
+  };
+  const button = {
+    nodeType: 1,
+    closest(selector) {
+      if (selector === '.ticket-card') return card;
+      if (selector.includes('button')) return this;
+      return null;
+    }
+  };
+  const boardEl = {
+    addEventListener(type, handler) {
+      handlers.set(type, handler);
+    }
+  };
+  const openedTickets = [];
+  new DragDropController({
+    boardEl,
+    onEditRequest: (ticketId) => openedTickets.push(ticketId)
+  });
+
+  handlers.get('click')({ target: button });
+  handlers.get('click')({ target: card });
+
+  assert.deepEqual(openedTickets, ['TCK-1001']);
+});
+
 test('Supabase login authenticates each configured role and stores a managed session', async () => {
   const { auth } = createContext();
 

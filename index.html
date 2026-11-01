@@ -11,7 +11,7 @@
     <link rel="stylesheet" href="styles/base.css" />
     <link rel="stylesheet" href="styles/layout.css?v=password-recovery-v1" />
     <link rel="stylesheet" href="styles/components.css" />
-    <link rel="stylesheet" href="styles/responsive.css?v=mobile-login-0e14ac4" />
+    <link rel="stylesheet" href="styles/responsive.css?v=mobile-workflow-v1" />
     <link rel="stylesheet" href="styles/splash.css" />
   </head>
   <body>
@@ -65,7 +65,7 @@
           <span id="sessionUserName">Cargando...</span>
           <span id="sessionUserRole" class="role-badge">...</span>
         </div>
-        <button id="btnNewTicket" class="btn btn-primary"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Crear ticket</button>
+        <button id="btnNewTicket" class="btn btn-primary" type="button" aria-label="Crear ticket"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Crear ticket</button>
         <div class="notification-menu">
           <button id="btnNotifications" class="btn btn-outline" type="button" aria-expanded="false" aria-controls="notificationsPanel">
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg>
@@ -90,6 +90,18 @@
         <svg class="icon search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
         <input type="text" id="filterSearch" placeholder="Buscar por palabra clave, ID o asignado..." />
       </div>
+      <button id="btnOpenMobileFilters" class="btn btn-outline mobile-filter-trigger" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="mobileFiltersSheet">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M7 12h10m-7 6h4"/></svg>
+        Filtros
+      </button>
+      <div id="mobileFiltersLayer" class="mobile-filters-layer hidden">
+        <button id="mobileFiltersBackdrop" class="mobile-filters-backdrop" type="button" aria-label="Cerrar filtros"></button>
+        <section id="mobileFiltersSheet" class="mobile-filters-sheet" aria-labelledby="mobileFiltersHeading">
+          <header class="mobile-sheet-header">
+            <h2 id="mobileFiltersHeading">Filtros</h2>
+            <button id="btnCloseMobileFilters" class="close-x" type="button" aria-label="Cerrar filtros">&times;</button>
+          </header>
+          <div class="mobile-filter-controls">
 
       <div class="control-group">
         <label for="filterAssignee"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M10 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM20 8v6M23 11h-6"/></svg>Asignado:</label>
@@ -158,6 +170,13 @@
           <option value="asc">Ascendente</option>
         </select>
       </div>
+          </div>
+          <footer class="mobile-filter-actions">
+            <button id="btnClearMobileFilters" class="btn btn-outline" type="button">Limpiar</button>
+            <button id="btnApplyMobileFilters" class="btn btn-primary" type="button">Ver resultados</button>
+          </footer>
+        </section>
+      </div>
     </nav>
 
     <main class="board-wrapper">
@@ -186,10 +205,12 @@
           Calendario
         </button>
         <button id="metricsTab" class="view-tab" type="button" role="tab" tabindex="-1" aria-selected="false" aria-controls="metricsPanel">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V5m0 14h16M8 16v-5m4 5V7m4 9v-3m4 3V9"/></svg>
           Métricas
         </button>
       </nav>
       <section id="boardPanel" role="tabpanel" aria-labelledby="boardTab">
+        <nav id="mobileStatusTabs" class="mobile-status-tabs" aria-label="Filtrar por estado"></nav>
         <div id="kanbanBoard" class="kanban-grid" role="region" aria-label="Tablero Kanban"></div>
       </section>
       <section id="calendarPanel" class="hidden" role="tabpanel" aria-labelledby="calendarTab">
@@ -227,6 +248,19 @@
         </section>
       </section>
     </main>
+    <div id="ticketStatusLayer" class="mobile-filters-layer hidden">
+      <button id="ticketStatusBackdrop" class="mobile-filters-backdrop" type="button" aria-label="Cerrar estados"></button>
+      <section id="ticketStatusSheet" class="mobile-filters-sheet status-sheet" role="dialog" aria-modal="true" aria-labelledby="ticketStatusHeading">
+        <header class="mobile-sheet-header">
+          <div>
+            <p class="mobile-sheet-eyebrow" id="ticketStatusTicketId"></p>
+            <h2 id="ticketStatusHeading">Cambiar estado</h2>
+          </div>
+          <button id="btnCloseTicketStatus" class="close-x" type="button" aria-label="Cerrar estados">&times;</button>
+        </header>
+        <div id="ticketStatusOptions" class="ticket-status-options"></div>
+      </section>
+    </div>
     </div>
 
     <div id="ticketModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modalHeading">
@@ -528,6 +562,6 @@
       </section>
     </main>
 
-    <script type="module" src="js/app.js?v=realtime-protocol-v2"></script>
+    <script type="module" src="js/app.js?v=mobile-workflow-v1"></script>
   </body>
 </html>

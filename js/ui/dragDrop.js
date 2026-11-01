@@ -47,7 +47,7 @@ export class DragDropController {
 
     this.boardEl.addEventListener('click', (event) => {
       const card = closestElement(event.target, '.ticket-card');
-      if (!card) return;
+      if (!card || closestElement(event.target, 'button, a, input, select, textarea')) return;
       if (this.onEditRequest) {
         this.onEditRequest(card.dataset.ticketId);
       }
