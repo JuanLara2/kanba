@@ -11,7 +11,9 @@ import { initializeThemeController } from './ui/themeController.js';
 import { SLA_REFRESH_INTERVAL_MS } from './config/constants.js';
 import { calculateTicketMetrics, metricsToCsv } from './services/metricsService.js';
 import { RealtimeService } from './services/realtimeService.js';
+import { createSplashScreen } from './ui/splashScreen.js';
 
+const splashScreen = createSplashScreen();
 const client = new SupabaseClient();
 let auth;
 const db = new SupabaseAdapter(client, () => auth.getAccessToken());
@@ -53,6 +55,7 @@ const realtimeService = new RealtimeService(client, {
 });
 
 async function bootstrap() {
+  splashScreen.setProgress(20, 'Preparando espacio de trabajo...');
   initializeThemeController();
   boardView = new BoardView(boardEl, ticketService, usersMap);
   modalView = new ModalView({
@@ -132,8 +135,11 @@ async function bootstrap() {
   });
 
   bindStaticEvents();
+  splashScreen.setProgress(55, 'Sincronizando tareas...');
   await syncAuthState();
+  splashScreen.setProgress(90, 'Preparando tablero...');
   renderBoard();
+  splashScreen.hide();
   window.setInterval(() => {
     if (activeUser) updateSlaOverview();
     if (activeUser && modalEl.classList.contains('hidden') && !boardEl.contains(document.activeElement)) {
@@ -796,6 +802,7 @@ async function handleNotificationClick(event) {
 
 bootstrap().catch((error) => {
   console.error(error);
+  splashScreen.hide({ ready: false });
   const message = /tickets\.(sla_due_at|sla_warning_at|category)|column .*sla_(due|warning)_at does not exist|category.*tickets|response_templates|ticket_satisfaction/i.test(error.message || '')
     ? 'Falta aplicar una migración pendiente en Supabase. Desde kanban-ticket-management, ejecuta: npx.cmd supabase db push --linked'
     : error.message || 'Error al iniciar la aplicación';

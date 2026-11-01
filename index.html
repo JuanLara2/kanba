@@ -12,8 +12,34 @@
     <link rel="stylesheet" href="styles/layout.css" />
     <link rel="stylesheet" href="styles/components.css" />
     <link rel="stylesheet" href="styles/responsive.css" />
+    <link rel="stylesheet" href="styles/splash.css" />
   </head>
   <body>
+    <div id="splashScreen" class="splash-screen" role="status" aria-live="polite" aria-label="Iniciando Vortex Task">
+      <div class="splash-brand">
+        <canvas id="splashVortex" class="splash-vortex" width="440" height="440" aria-hidden="true"></canvas>
+        <div class="splash-wordmark" aria-hidden="true">
+          <span class="splash-title splash-title-vortex">Vortex</span>
+          <span class="splash-title splash-title-task">Task</span>
+          <span class="splash-subtitle">Agile Kanban Engine</span>
+        </div>
+      </div>
+      <div class="splash-progress">
+        <div
+          id="splashProgressTrack"
+          class="splash-progress-track"
+          role="progressbar"
+          aria-label="Progreso de inicio"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          aria-valuenow="5"
+        >
+          <div id="splashProgressFill" class="splash-progress-fill"></div>
+        </div>
+        <span id="splashStatus" class="splash-status">Iniciando motor...</span>
+      </div>
+    </div>
+
     <div id="appShell" class="app-shell hidden">
     <header class="app-header">
       <div class="header-left">
