@@ -3,9 +3,9 @@ import { SupabaseAdapter } from './data/db.js';
 import { AuthService } from './services/authService.js?v=password-recovery-v1';
 import { TicketService } from './services/ticketService.js';
 import { FilterSortService } from './services/filterService.js';
-import { BoardView } from './ui/boardView.js?v=mobile-workflow-v1';
-import { ModalView } from './ui/modalView.js';
-import { DragDropController } from './ui/dragDrop.js?v=mobile-workflow-v1';
+import { BoardView } from './ui/boardView.js?v=mobile-native-v1';
+import { ModalView } from './ui/modalView.js?v=mobile-native-v1';
+import { DragDropController } from './ui/dragDrop.js?v=mobile-native-v1';
 import { CalendarView, dueDateForCalendarDay } from './ui/calendarView.js';
 import { initializeThemeController } from './ui/themeController.js';
 import { SLA_REFRESH_INTERVAL_MS, STATUS_DEFINITIONS } from './config/constants.js';
@@ -55,6 +55,15 @@ let dragDropController;
 let passwordRecoveryAccessToken = null;
 let passwordRecoveryLinkExpired = false;
 let mobileStatusTicketId = null;
+let mobileOverlayStack = [];
+let suppressMobileOverlayHistory = false;
+let mobileTouchStart = null;
+let mobileBoardTouchStart = null;
+let suppressBoardClick = false;
+let lastScrollY = 0;
+let recentMobileSearches = [];
+let mobileRefreshInProgress = false;
+let appShortcutHandled = false;
 const realtimeService = new RealtimeService(client, {
   onChange: handleRealtimeChange,
   onStatus: renderRealtimeStatus
@@ -75,7 +84,9 @@ async function bootstrap() {
     usersMap,
     onTicketSubmit: handleTicketSubmit,
     onLoginSubmit: handleLoginSubmit,
-    onUserSubmit: handleUserSubmit
+    onUserSubmit: handleUserSubmit,
+    onOverlayOpen: trackMobileOverlayOpen,
+    onOverlayClose: trackMobileOverlayClose
   });
 
   dragDropController = new DragDropController({
@@ -85,6 +96,7 @@ async function bootstrap() {
         await ticketService.changeTicketStatus(ticketId, nextStatus);
         await loadTickets();
         renderBoard();
+        renderMobileSearchResults();
         showToast('Estado actualizado');
       } catch (error) {
         showToast(error.message || 'No tienes permisos para mover este ticket');
@@ -102,6 +114,8 @@ async function bootstrap() {
   bindStaticEvents();
   splashScreen.setProgress(55, 'Sincronizando tareas...');
   await syncAuthState();
+  renderMobileFilterChips();
+  handleAppShortcut();
   if (passwordRecoveryAccessToken) {
     loginForm.classList.add('hidden');
     passwordRecoveryForm.classList.remove('hidden');
@@ -119,6 +133,13 @@ async function bootstrap() {
     }
     if (activeUser) refreshNotificationList();
   }, SLA_REFRESH_INTERVAL_MS);
+}
+
+function updateMobileHeaderHeight() {
+  const header = document.querySelector('.app-header');
+  if (header && isMobileViewport()) {
+    document.getElementById('appShell').style.setProperty('--mobile-header-height', `${header.offsetHeight}px`);
+  }
 }
 
 function initializeMetricsDates() {
@@ -268,7 +289,9 @@ async function handlePasswordRecoverySubmit(event) {
 }
 
 function closeChangePasswordModal() {
+  const wasOpen = !changePasswordModal.classList.contains('hidden');
   changePasswordModal.classList.add('hidden');
+  if (wasOpen) trackMobileOverlayClose('password');
   changePasswordForm.reset();
 }
 
@@ -295,14 +318,15 @@ function bindStaticEvents() {
   passwordRecoveryForm.addEventListener('submit', handlePasswordRecoverySubmit);
   document.getElementById('btnChangePassword').addEventListener('click', () => {
     changePasswordModal.classList.remove('hidden');
+    trackMobileOverlayOpen('password');
     document.getElementById('newAccountPassword').focus();
   });
   document.getElementById('changePasswordCloseBtn').addEventListener('click', closeChangePasswordModal);
   document.getElementById('changePasswordCancelBtn').addEventListener('click', closeChangePasswordModal);
   changePasswordForm.addEventListener('submit', handleChangePasswordSubmit);
-  document.getElementById('boardTab').addEventListener('click', () => setActiveView('board'));
-  document.getElementById('calendarTab').addEventListener('click', () => setActiveView('calendar'));
-  document.getElementById('metricsTab').addEventListener('click', () => setActiveView('metrics'));
+  document.getElementById('boardTab').addEventListener('click', () => navigateBottomTab('board'));
+  document.getElementById('calendarTab').addEventListener('click', () => navigateBottomTab('calendar'));
+  document.getElementById('metricsTab').addEventListener('click', () => navigateBottomTab('metrics'));
   document.querySelector('.view-tabs').addEventListener('keydown', (event) => {
     if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
     const tabs = [...document.querySelectorAll('.view-tabs [role="tab"]')];
@@ -319,13 +343,7 @@ function bindStaticEvents() {
     setActiveView(resolvedView);
     tabs[nextIndex].focus();
   });
-  document.getElementById('btnNewTicket').addEventListener('click', async () => {
-    const user = await auth.getCurrentUser();
-    modalView.openTicket(null, {
-      canManageAssignment: auth.canAssignOrSetDue(user),
-      canManageChecklist: auth.canAssignOrSetDue(user)
-    });
-  });
+  document.getElementById('btnNewTicket').addEventListener('click', openNewTicketModal);
   document.getElementById('btnManageUsers').addEventListener('click', async () => {
     const user = await auth.getCurrentUser();
     if (!auth.canManageUsers(user)) {
@@ -340,6 +358,8 @@ function bindStaticEvents() {
     const panel = document.getElementById('notificationsPanel');
     const isOpen = panel.classList.toggle('hidden') === false;
     document.getElementById('btnNotifications').setAttribute('aria-expanded', String(isOpen));
+    if (isOpen) trackMobileOverlayOpen('notifications');
+    else trackMobileOverlayClose('notifications');
     if (isOpen) refreshNotificationList();
   });
   document.getElementById('metricsStart').addEventListener('change', renderMetrics);
@@ -407,7 +427,10 @@ function bindStaticEvents() {
 
   Object.values(filters).forEach((input) => {
     input.addEventListener('input', renderBoard);
-    input.addEventListener('change', renderBoard);
+    input.addEventListener('change', () => {
+      if (input === filters.status && input.value !== 'ALL') boardView.setActiveStatus(input.value);
+      renderBoard();
+    });
   });
 
   boardEl.addEventListener('keydown', (event) => {
@@ -421,13 +444,29 @@ function bindStaticEvents() {
 
   document.getElementById('mobileStatusTabs').addEventListener('click', (event) => {
     const tab = event.target.closest('.mobile-status-tab');
-    if (tab) boardView.setActiveStatus(tab.dataset.status);
+    if (!tab) return;
+    filters.status.value = 'ALL';
+    boardView.setActiveStatus(tab.dataset.status);
+    renderBoard();
   });
   document.getElementById('btnOpenMobileFilters').addEventListener('click', openMobileFilters);
   document.getElementById('btnCloseMobileFilters').addEventListener('click', closeMobileFilters);
   document.getElementById('mobileFiltersBackdrop').addEventListener('click', closeMobileFilters);
   document.getElementById('btnApplyMobileFilters').addEventListener('click', closeMobileFilters);
   document.getElementById('btnClearMobileFilters').addEventListener('click', clearFilters);
+  filters.search.addEventListener('click', openMobileSearch);
+  document.getElementById('btnCloseMobileSearch').addEventListener('click', closeMobileSearch);
+  document.getElementById('mobileSearchForm').addEventListener('submit', handleMobileSearchSubmit);
+  document.getElementById('mobileSearchInput').addEventListener('input', (event) => {
+    filters.search.value = event.target.value;
+    renderBoard();
+    renderMobileSearchResults();
+  });
+  document.getElementById('mobileSearchLayer').addEventListener('click', handleMobileQuickFilter);
+  document.getElementById('mobileSearchResults').addEventListener('click', handleMobileSearchResult);
+  document.getElementById('mobileRecentSearches').addEventListener('click', handleRecentSearchClick);
+  document.getElementById('mobileSearchLayer').addEventListener('keydown', handleBottomSheetKeydown);
+  document.getElementById('mobileActiveFilters').addEventListener('click', removeMobileFilterChip);
   document.getElementById('ticketStatusBackdrop').addEventListener('click', closeMobileStatusSheet);
   document.getElementById('btnCloseTicketStatus').addEventListener('click', closeMobileStatusSheet);
   document.getElementById('ticketStatusOptions').addEventListener('click', handleMobileStatusSelection);
@@ -438,10 +477,242 @@ function bindStaticEvents() {
   [document.getElementById('mobileFiltersSheet'), document.getElementById('ticketStatusSheet')].forEach((sheet) => {
     sheet.addEventListener('keydown', handleBottomSheetKeydown);
   });
+  boardEl.addEventListener('click', (event) => {
+    if (!suppressBoardClick) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    suppressBoardClick = false;
+  }, true);
+  boardEl.addEventListener('touchstart', handleMobileBoardTouchStart, { passive: true });
+  boardEl.addEventListener('touchend', handleMobileBoardTouchEnd, { passive: false });
+  window.addEventListener('touchstart', handleMobilePullStart, { passive: true });
+  window.addEventListener('touchend', handleMobilePullEnd, { passive: false });
+  window.addEventListener('scroll', handleMobileScroll, { passive: true });
+  window.addEventListener('resize', updateMobileHeaderHeight, { passive: true });
+  window.addEventListener('popstate', handleMobilePopState);
+  window.addEventListener('keydown', handleGlobalEscape, true);
+  window.addEventListener('pageshow', handleAppShortcut);
+  lastScrollY = window.scrollY;
+}
+
+function navigateBottomTab(view) {
+  const activeTab = document.querySelector('.view-tab.is-active');
+  if (activeTab?.id === `${view}Tab`) {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    hapticFeedback();
+    return;
+  }
+  setActiveView(view);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  hapticFeedback();
+}
+
+async function openNewTicketModal() {
+  const user = await auth.getCurrentUser();
+  modalView.openTicket(null, {
+    canManageAssignment: auth.canAssignOrSetDue(user),
+    canManageChecklist: auth.canAssignOrSetDue(user)
+  });
+}
+
+function handleAppShortcut() {
+  if (appShortcutHandled || !activeUser) return;
+  const action = new URLSearchParams(window.location.search).get('action');
+  if (!['create-ticket', 'urgent-tickets'].includes(action)) return;
+  appShortcutHandled = true;
+  window.history.replaceState(window.history.state, '', `${window.location.pathname}${window.location.hash}`);
+  if (action === 'create-ticket') {
+    openNewTicketModal();
+    return;
+  }
+  filters.priority.value = 'Urgente';
+  filters.status.value = 'ALL';
+  setActiveView('board');
+  renderBoard();
+  selectFirstVisibleStatus();
+  showToast('Mostrando tickets de prioridad urgente.');
+}
+
+function selectFirstVisibleStatus() {
+  const criteria = {
+    search: filters.search.value,
+    assignedTo: filters.assignedTo.value,
+    status: 'ALL',
+    priority: filters.priority.value,
+    category: filters.category.value,
+    dueFilter: filters.dueFilter.value,
+    sortField: filters.sortField.value,
+    sortDirection: filters.sortDirection.value
+  };
+  const visibleTickets = FilterSortService.apply(allTickets, criteria, usersMap);
+  const nextStatus = Object.keys(STATUS_DEFINITIONS).find((status) => visibleTickets.some((ticket) => ticket.status === status));
+  if (nextStatus) boardView.setActiveStatus(nextStatus);
+}
+
+function hapticFeedback() {
+  if (typeof navigator.vibrate === 'function') navigator.vibrate(15);
+}
+
+function isMobileViewport() {
+  return window.matchMedia('(max-width: 768px)').matches;
+}
+
+function trackMobileOverlayOpen(id) {
+  if (!isMobileViewport() || mobileOverlayStack.at(-1) === id) return;
+  window.history.pushState({ ...(window.history.state || {}), mobileOverlay: id }, '');
+  mobileOverlayStack.push(id);
+}
+
+function trackMobileOverlayClose(id) {
+  if (!isMobileViewport()) return;
+  if (suppressMobileOverlayHistory) {
+    if (mobileOverlayStack.at(-1) === id) mobileOverlayStack.pop();
+    return;
+  }
+  if (mobileOverlayStack.at(-1) === id && window.history.state?.mobileOverlay === id) {
+    window.history.back();
+  } else {
+    mobileOverlayStack = mobileOverlayStack.filter((overlayId) => overlayId !== id);
+  }
+}
+
+function closeMobileOverlay(id) {
+  const closers = {
+    ticket: () => modalView.closeTicket(),
+    users: () => modalView.closeUsers(),
+    password: closeChangePasswordModal,
+    satisfaction: closeSatisfactionModal,
+    filters: closeMobileFilters,
+    status: closeMobileStatusSheet,
+    search: closeMobileSearch,
+    notifications: () => {
+      document.getElementById('notificationsPanel').classList.add('hidden');
+      document.getElementById('btnNotifications').setAttribute('aria-expanded', 'false');
+      trackMobileOverlayClose('notifications');
+    }
+  };
+  closers[id]?.();
+}
+
+function handleMobilePopState(event) {
+  if (!isMobileViewport()) return;
+  const currentOverlay = mobileOverlayStack.at(-1);
+  if (!currentOverlay || event.state?.mobileOverlay === currentOverlay) return;
+  suppressMobileOverlayHistory = true;
+  closeMobileOverlay(currentOverlay);
+  suppressMobileOverlayHistory = false;
+}
+
+function handleGlobalEscape(event) {
+  if (!isMobileViewport() || event.key !== 'Escape') return;
+  const overlayId = mobileOverlayStack.at(-1);
+  if (!overlayId) return;
+  event.preventDefault();
+  event.stopPropagation();
+  closeMobileOverlay(overlayId);
+}
+
+function handleMobileBoardTouchStart(event) {
+  if (!isMobileViewport() || event.touches.length !== 1) return;
+  mobileBoardTouchStart = {
+    x: event.touches[0].clientX,
+    y: event.touches[0].clientY,
+    target: event.target
+  };
+}
+
+function handleMobileBoardTouchEnd(event) {
+  if (!mobileBoardTouchStart || !isMobileViewport() || event.changedTouches.length !== 1) {
+    mobileBoardTouchStart = null;
+    return;
+  }
+  const deltaX = event.changedTouches[0].clientX - mobileBoardTouchStart.x;
+  const deltaY = event.changedTouches[0].clientY - mobileBoardTouchStart.y;
+  const startedOnControl = mobileBoardTouchStart.target.closest?.('button, a, input, select, textarea');
+  mobileBoardTouchStart = null;
+  if (startedOnControl || Math.abs(deltaX) < 60 || Math.abs(deltaX) < Math.abs(deltaY) * 1.3) return;
+
+  const statusIds = Object.keys(STATUS_DEFINITIONS);
+  const currentIndex = statusIds.indexOf(boardView.activeStatus);
+  const nextStatus = statusIds[currentIndex + (deltaX < 0 ? 1 : -1)];
+  if (!nextStatus) return;
+  event.preventDefault();
+  suppressBoardClick = true;
+  window.setTimeout(() => { suppressBoardClick = false; }, 400);
+  boardView.setActiveStatus(nextStatus);
+  document.querySelector(`.mobile-status-tab[data-status="${nextStatus}"]`)?.scrollIntoView({
+    behavior: 'smooth',
+    block: 'nearest',
+    inline: 'center'
+  });
+  hapticFeedback();
+}
+
+function handleMobilePullStart(event) {
+  if (!isMobileViewport() || event.touches.length !== 1 || window.scrollY > 2 || mobileRefreshInProgress) return;
+  if (document.getElementById('boardPanel').classList.contains('hidden')
+    || !event.target.closest?.('#boardPanel, #mobileStatusTabs')
+    || mobileOverlayStack.length
+    || !activeUser) return;
+  mobileTouchStart = { y: event.touches[0].clientY };
+}
+
+async function handleMobilePullEnd(event) {
+  if (!mobileTouchStart || event.changedTouches.length !== 1) {
+    mobileTouchStart = null;
+    return;
+  }
+  const distance = event.changedTouches[0].clientY - mobileTouchStart.y;
+  mobileTouchStart = null;
+  if (distance < 75 || window.scrollY > 2 || mobileRefreshInProgress) return;
+  event.preventDefault();
+  await refreshMobileBoard();
+}
+
+async function refreshMobileBoard() {
+  if (mobileRefreshInProgress || !activeUser) return;
+  mobileRefreshInProgress = true;
+  const status = document.getElementById('mobileRefreshStatus');
+  status.textContent = 'Actualizando tickets…';
+  status.classList.add('is-refreshing');
+  try {
+    await Promise.all([
+      loadTickets(),
+      refreshNotificationList(),
+      loadResponseTemplates(),
+      loadSatisfactionEntries()
+    ]);
+    renderBoard();
+    status.textContent = 'Tickets actualizados';
+    hapticFeedback();
+  } catch (error) {
+    showToast(error.message || 'No se pudieron actualizar los tickets.');
+    status.textContent = 'No se pudo actualizar';
+  } finally {
+    mobileRefreshInProgress = false;
+    status.classList.remove('is-refreshing');
+    window.setTimeout(() => { status.textContent = ''; }, 1800);
+  }
+}
+
+function handleMobileScroll() {
+  if (!isMobileViewport()) return;
+  const currentY = window.scrollY;
+  const delta = currentY - lastScrollY;
+  const appShell = document.getElementById('appShell');
+  if (currentY < 48) {
+    appShell.classList.remove('is-chrome-hidden');
+  } else if (delta > 8) {
+    appShell.classList.add('is-chrome-hidden');
+  } else if (delta < -5) {
+    appShell.classList.remove('is-chrome-hidden');
+  }
+  lastScrollY = currentY;
 }
 
 function openMobileFilters() {
   const layer = document.getElementById('mobileFiltersLayer');
+  trackMobileOverlayOpen('filters');
   layer.classList.remove('hidden');
   document.getElementById('mobileFiltersSheet').setAttribute('role', 'dialog');
   document.getElementById('mobileFiltersSheet').setAttribute('aria-modal', 'true');
@@ -454,6 +725,7 @@ function closeMobileFilters() {
   document.getElementById('mobileFiltersSheet').removeAttribute('role');
   document.getElementById('mobileFiltersSheet').removeAttribute('aria-modal');
   document.getElementById('btnOpenMobileFilters').setAttribute('aria-expanded', 'false');
+  trackMobileOverlayClose('filters');
   document.getElementById('btnOpenMobileFilters').focus();
 }
 
@@ -469,11 +741,176 @@ function clearFilters() {
   renderBoard();
 }
 
+function openMobileSearch() {
+  if (!isMobileViewport()) return;
+  renderRecentMobileSearches();
+  const layer = document.getElementById('mobileSearchLayer');
+  layer.classList.remove('hidden');
+  layer.setAttribute('role', 'dialog');
+  layer.setAttribute('aria-modal', 'true');
+  trackMobileOverlayOpen('search');
+  const input = document.getElementById('mobileSearchInput');
+  input.value = filters.search.value;
+  renderMobileSearchResults();
+  input.focus();
+}
+
+function closeMobileSearch() {
+  const layer = document.getElementById('mobileSearchLayer');
+  layer.classList.add('hidden');
+  layer.removeAttribute('role');
+  layer.removeAttribute('aria-modal');
+  trackMobileOverlayClose('search');
+  filters.search.focus();
+}
+
+function handleMobileSearchSubmit(event) {
+  event.preventDefault();
+  const query = document.getElementById('mobileSearchInput').value.trim();
+  filters.search.value = query;
+  if (query) {
+    recentMobileSearches = [query, ...recentMobileSearches.filter((item) => item.toLowerCase() !== query.toLowerCase())].slice(0, 5);
+  }
+  renderBoard();
+  closeMobileSearch();
+}
+
+function renderRecentMobileSearches() {
+  const section = document.getElementById('mobileRecentSearchSection');
+  const list = document.getElementById('mobileRecentSearches');
+  section.classList.toggle('hidden', recentMobileSearches.length === 0);
+  list.replaceChildren(...recentMobileSearches.map((query) => {
+    const item = document.createElement('li');
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.dataset.recentSearch = query;
+    button.textContent = query;
+    item.appendChild(button);
+    return item;
+  }));
+}
+
+function renderMobileSearchResults() {
+  const query = document.getElementById('mobileSearchInput').value.trim();
+  const section = document.getElementById('mobileSearchResultsSection');
+  const list = document.getElementById('mobileSearchResults');
+  if (!query || !activeUser) {
+    section.classList.add('hidden');
+    list.replaceChildren();
+    return;
+  }
+  const results = FilterSortService.apply(allTickets, {
+    search: query,
+    sortField: filters.sortField.value,
+    sortDirection: filters.sortDirection.value
+  }, usersMap).slice(0, 8);
+  section.classList.remove('hidden');
+  if (!results.length) {
+    const empty = document.createElement('li');
+    empty.className = 'mobile-search-empty';
+    empty.textContent = 'No se encontraron tickets.';
+    list.replaceChildren(empty);
+    return;
+  }
+  list.replaceChildren(...results.map((ticket) => {
+    const item = document.createElement('li');
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.dataset.mobileResultId = ticket.id;
+    const title = document.createElement('strong');
+    title.textContent = ticket.title;
+    const details = document.createElement('span');
+    details.textContent = `${ticket.id} · ${STATUS_DEFINITIONS[ticket.status]?.name || ticket.status}`;
+    button.append(title, details);
+    item.appendChild(button);
+    return item;
+  }));
+}
+
+async function handleMobileSearchResult(event) {
+  const button = event.target.closest('[data-mobile-result-id]');
+  if (!button) return;
+  const ticketId = button.dataset.mobileResultId;
+  closeMobileSearch();
+  await openTicketForEditing(ticketId);
+}
+
+function handleRecentSearchClick(event) {
+  const button = event.target.closest('[data-recent-search]');
+  if (!button) return;
+  document.getElementById('mobileSearchInput').value = button.dataset.recentSearch;
+  filters.search.value = button.dataset.recentSearch;
+  renderBoard();
+  closeMobileSearch();
+}
+
+function handleMobileQuickFilter(event) {
+  const button = event.target.closest('[data-mobile-quick-filter]');
+  if (!button) return;
+  if (button.dataset.mobileQuickFilter === 'overdue') {
+    filters.dueFilter.value = 'overdue';
+    filters.status.value = 'ALL';
+  } else {
+    filters.priority.value = 'Urgente';
+  }
+  setActiveView('board');
+  renderBoard();
+  selectFirstVisibleStatus();
+  hapticFeedback();
+  closeMobileSearch();
+}
+
+function renderMobileFilterChips() {
+  const container = document.getElementById('mobileActiveFilters');
+  if (!container) return;
+  const labels = [
+    ['search', filters.search.value.trim() ? `Buscar: ${filters.search.value.trim()}` : ''],
+    ['assignedTo', filters.assignedTo.selectedOptions[0]?.textContent || '', filters.assignedTo.value !== 'ALL'],
+    ['status', filters.status.selectedOptions[0]?.textContent || '', filters.status.value !== 'ALL'],
+    ['priority', filters.priority.selectedOptions[0]?.textContent || '', filters.priority.value !== 'ALL'],
+    ['category', filters.category.value !== 'ALL' ? filters.category.value : '', filters.category.value !== 'ALL'],
+    ['dueFilter', filters.dueFilter.selectedOptions[0]?.textContent || '', filters.dueFilter.value !== 'ALL']
+  ].filter(([key, label, active]) => label && (key === 'search' ? Boolean(filters.search.value.trim()) : active));
+  container.replaceChildren(...labels.map(([key, label]) => {
+    const chip = document.createElement('button');
+    chip.className = 'mobile-filter-chip';
+    chip.type = 'button';
+    chip.dataset.filterKey = key;
+    chip.setAttribute('aria-label', `Quitar filtro ${label}`);
+    chip.innerHTML = `${escapeHtml(label)} <span aria-hidden="true">&times;</span>`;
+    return chip;
+  }));
+  container.classList.toggle('is-empty', labels.length === 0);
+}
+
+function removeMobileFilterChip(event) {
+  const chip = event.target.closest('[data-filter-key]');
+  if (!chip) return;
+  const key = chip.dataset.filterKey;
+  if (key === 'search') filters.search.value = '';
+  else if (key === 'assignedTo') filters.assignedTo.value = 'ALL';
+  else if (key === 'category') filters.category.value = 'ALL';
+  else if (key === 'dueFilter') filters.dueFilter.value = 'ALL';
+  else if (key === 'status') filters.status.value = 'ALL';
+  else if (key === 'priority') filters.priority.value = 'ALL';
+  renderBoard();
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 function openMobileStatusSheet(ticketId, trigger) {
   const ticket = allTickets.find((item) => item.id === ticketId);
   if (!ticket || !auth.canChangeStatus(activeUser, ticket)) return;
 
   mobileStatusTicketId = ticketId;
+  trackMobileOverlayOpen('status');
   document.getElementById('ticketStatusTicketId').textContent = ticket.id;
   const options = Object.values(STATUS_DEFINITIONS).map(({ id, name, colorHex }) => {
     const button = document.createElement('button');
@@ -498,6 +935,7 @@ function closeMobileStatusSheet() {
   [...boardEl.querySelectorAll('[data-ticket-status-menu]')]
     .find((button) => button.dataset.ticketStatusMenu === mobileStatusTicketId)
     ?.setAttribute('aria-expanded', 'false');
+  trackMobileOverlayClose('status');
   mobileStatusTicketId = null;
   document.querySelector('#mobileStatusTabs .mobile-status-tab[aria-pressed="true"]')?.focus();
 }
@@ -511,6 +949,7 @@ async function handleMobileStatusSelection(event) {
   options.forEach((button) => { button.disabled = true; });
   try {
     await ticketService.changeTicketStatus(ticketId, nextStatus);
+    hapticFeedback();
     closeMobileStatusSheet();
     await loadTickets();
     renderBoard();
@@ -527,6 +966,7 @@ function handleBottomSheetKeydown(event) {
   if (event.key === 'Escape') {
     event.preventDefault();
     if (event.currentTarget.id === 'mobileFiltersSheet') closeMobileFilters();
+    else if (event.currentTarget.id === 'mobileSearchLayer') closeMobileSearch();
     else closeMobileStatusSheet();
     return;
   }
@@ -746,6 +1186,7 @@ async function handleLoginSubmit(event) {
     if (user) {
       await syncAuthState();
       renderBoard();
+      handleAppShortcut();
       showToast(`Bienvenido ${user.fullName}`);
     }
   } catch (error) {
@@ -783,6 +1224,7 @@ function renderBoard() {
   if (!activeUser) {
     boardEl.innerHTML = '';
     if (calendarView) calendarView.render([], false);
+    renderMobileFilterChips();
     return;
   }
 
@@ -797,8 +1239,20 @@ function renderBoard() {
     sortDirection: filters.sortDirection.value
   };
 
+  const statusCountTickets = isMobileViewport()
+    ? FilterSortService.apply(allTickets, { ...criteria, status: 'ALL' }, usersMap)
+    : null;
   const visibleTickets = FilterSortService.apply(allTickets, criteria, usersMap);
-  boardView.render(visibleTickets, (ticket) => auth.canChangeStatus(activeUser, ticket));
+  boardView.render(
+    visibleTickets,
+    (ticket) => auth.canChangeStatus(activeUser, ticket),
+    statusCountTickets || visibleTickets
+  );
+  renderMobileFilterChips();
+  const mobileSearchInput = document.getElementById('mobileSearchInput');
+  if (mobileSearchInput && document.activeElement !== mobileSearchInput) {
+    mobileSearchInput.value = filters.search.value;
+  }
   updateSlaOverview();
   if (calendarView) {
     calendarView.render(visibleTickets, auth.canAssignOrSetDue(activeUser));
@@ -893,6 +1347,7 @@ async function syncAuthState() {
     });
     await refreshNotificationList();
     modalView.hideLogin();
+    window.requestAnimationFrame(updateMobileHeaderHeight);
     btnNewTicket.disabled = false;
     btnNewTicket.style.opacity = '1';
     btnManageUsers.classList.toggle('hidden', !auth.canManageUsers(currentUser));
@@ -984,10 +1439,13 @@ function openSatisfactionModal(ticketId) {
   document.getElementById('satisfactionTicketId').value = ticketId;
   document.getElementById('satisfactionForm').reset();
   document.getElementById('satisfactionModal').classList.remove('hidden');
+  trackMobileOverlayOpen('satisfaction');
 }
 
 function closeSatisfactionModal() {
+  const wasOpen = !document.getElementById('satisfactionModal').classList.contains('hidden');
   document.getElementById('satisfactionModal').classList.add('hidden');
+  if (wasOpen) trackMobileOverlayClose('satisfaction');
 }
 
 async function handleSatisfactionSubmit(event) {

@@ -1,7 +1,7 @@
 import { STATUS_DEFINITIONS } from '../config/constants.js';
 
 export class ModalView {
-  constructor({ modalEl, form, loginModal, loginForm, usersModal, usersForm, usersMap, onTicketSubmit, onLoginSubmit, onUserSubmit }) {
+  constructor({ modalEl, form, loginModal, loginForm, usersModal, usersForm, usersMap, onTicketSubmit, onLoginSubmit, onUserSubmit, onOverlayOpen, onOverlayClose }) {
     this.modalEl = modalEl;
     this.form = form;
     this.loginModal = loginModal;
@@ -12,6 +12,8 @@ export class ModalView {
     this.onTicketSubmit = onTicketSubmit;
     this.onLoginSubmit = onLoginSubmit;
     this.onUserSubmit = onUserSubmit;
+    this.onOverlayOpen = onOverlayOpen;
+    this.onOverlayClose = onOverlayClose;
     this.checklistDraft = [];
     this.bindEvents();
   }
@@ -133,11 +135,14 @@ export class ModalView {
     document.getElementById('formDueDate').disabled = !permissions.canManageAssignment;
     saveBtn.classList.toggle('hidden', !canSave);
     this.modalEl.classList.remove('hidden');
+    this.onOverlayOpen?.('ticket');
     this.modalEl.querySelector('input:not([type="hidden"]):not(:disabled), button:not(:disabled)')?.focus();
   }
 
   closeTicket() {
+    const wasOpen = !this.modalEl.classList.contains('hidden');
     this.modalEl.classList.add('hidden');
+    if (wasOpen) this.onOverlayClose?.('ticket');
     this.form.reset();
     document.getElementById('modalHeading').textContent = 'Crear nueva solicitud';
     document.getElementById('formTicketId').value = '';
@@ -389,11 +394,14 @@ export class ModalView {
 
     this.usersForm.reset();
     this.usersModal.classList.remove('hidden');
+    this.onOverlayOpen?.('users');
     document.getElementById('userFullName').focus();
   }
 
   closeUsers() {
+    const wasOpen = !this.usersModal.classList.contains('hidden');
     this.usersModal.classList.add('hidden');
+    if (wasOpen) this.onOverlayClose?.('users');
     this.usersForm.reset();
     this.previousFocus?.focus();
   }

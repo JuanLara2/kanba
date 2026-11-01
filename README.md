@@ -66,7 +66,9 @@ La URL y la clave `publishable/anon` del frontend son visibles para los visitant
 
 ## Experiencia móvil
 
-La interfaz móvil incorpora un botón flotante para crear tickets, navegación inferior entre Tablero, Calendario y Métricas, y un selector horizontal de estados que muestra el total de tickets y presenta una sola columna a la vez. Cada tarjeta ofrece un menú táctil para cambiar de estado según los permisos del usuario; los filtros avanzados se agrupan en una hoja inferior. El calendario permite desplazarse para consultar sus días y los formularios se adaptan al alto de la pantalla.
+La interfaz móvil incorpora un botón flotante para crear tickets, navegación inferior entre Tablero, Calendario y Métricas, y un selector horizontal de estados que muestra el total de tickets y presenta una sola columna a la vez. Se puede deslizar horizontalmente sobre el tablero para cambiar de estado/columna, tirar hacia abajo al inicio para sincronizar, y desplazarse para ocultar o recuperar la cabecera. La búsqueda ocupa una pantalla enfocada con filtros rápidos e historial de la sesión; los filtros activos se muestran como chips. El botón Atrás del dispositivo cierra primero los paneles abiertos y tocar la pestaña activa vuelve al inicio. Las tarjetas ofrecen un menú táctil para cambiar de estado según los permisos del usuario, y los filtros avanzados se agrupan en una hoja inferior.
+
+El manifiesto PWA declara accesos directos para crear un ticket o ver los urgentes; la disponibilidad de estos accesos depende del navegador y del sistema operativo. Las acciones táctiles compatibles dan una vibración breve cuando el dispositivo permite háptica. El calendario permite desplazarse para consultar sus días y los formularios se adaptan al alto de la pantalla.
 
 El sitio incluye un manifiesto con iconos de 192 × 192 y 512 × 512 px para Android, además de un icono Apple Touch de 180 × 180 px para iOS. En el teléfono, abre el sitio y usa **Añadir a pantalla de inicio** desde el menú del navegador.
 

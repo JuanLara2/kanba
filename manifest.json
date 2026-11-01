@@ -20,5 +20,33 @@
       "type": "image/png",
       "purpose": "any"
     }
+  ],
+  "shortcuts": [
+    {
+      "name": "Crear ticket",
+      "short_name": "Crear ticket",
+      "description": "Abrir el formulario para crear un ticket",
+      "url": "./?action=create-ticket",
+      "icons": [
+        {
+          "src": "img/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Tickets urgentes",
+      "short_name": "Urgentes",
+      "description": "Ver tickets de prioridad urgente",
+      "url": "./?action=urgent-tickets",
+      "icons": [
+        {
+          "src": "img/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    }
   ]
 }

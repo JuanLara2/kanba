@@ -11,11 +11,11 @@ export class BoardView {
     this.activeStatus = 'new';
   }
 
-  render(tickets, canChangeStatus = () => false) {
+  render(tickets, canChangeStatus = () => false, statusCountTickets = tickets) {
     const fragment = document.createDocumentFragment();
     const statusCounts = new Map();
     Object.values(STATUS_DEFINITIONS).forEach(({ id }) => {
-      statusCounts.set(id, tickets.filter((ticket) => ticket.status === id).length);
+      statusCounts.set(id, statusCountTickets.filter((ticket) => ticket.status === id).length);
     });
     this.renderStatusTabs(statusCounts);
     this.board.dataset.activeStatus = this.activeStatus;
