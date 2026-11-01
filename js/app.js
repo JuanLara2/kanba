@@ -3,12 +3,12 @@ import { SupabaseAdapter } from './data/db.js';
 import { AuthService } from './services/authService.js?v=password-recovery-v1';
 import { TicketService } from './services/ticketService.js';
 import { FilterSortService } from './services/filterService.js';
-import { BoardView } from './ui/boardView.js?v=mobile-native-v1';
+import { BoardView } from './ui/boardView.js?v=mobile-native-v2';
 import { ModalView } from './ui/modalView.js?v=mobile-native-v1';
 import { DragDropController } from './ui/dragDrop.js?v=mobile-native-v1';
 import { CalendarView, dueDateForCalendarDay } from './ui/calendarView.js';
 import { initializeThemeController } from './ui/themeController.js';
-import { SLA_REFRESH_INTERVAL_MS, STATUS_DEFINITIONS } from './config/constants.js';
+import { PRIORITY_ORDER, SLA_REFRESH_INTERVAL_MS, STATUS_DEFINITIONS } from './config/constants.js';
 import { calculateTicketMetrics, metricsToCsv } from './services/metricsService.js';
 import { RealtimeService } from './services/realtimeService.js?v=realtime-protocol-v2';
 import { createSplashScreen } from './ui/splashScreen.js';
@@ -55,10 +55,15 @@ let dragDropController;
 let passwordRecoveryAccessToken = null;
 let passwordRecoveryLinkExpired = false;
 let mobileStatusTicketId = null;
+let mobileActionTicketId = null;
 let mobileOverlayStack = [];
 let suppressMobileOverlayHistory = false;
 let mobileTouchStart = null;
 let mobileBoardTouchStart = null;
+let mobileCardTouchStart = null;
+let mobileSelectionMode = false;
+let selectedMobileTicketIds = new Set();
+let boardClickSuppressTimeout;
 let suppressBoardClick = false;
 let lastScrollY = 0;
 let recentMobileSearches = [];
@@ -369,6 +374,21 @@ function bindStaticEvents() {
   document.getElementById('satisfactionCloseBtn').addEventListener('click', closeSatisfactionModal);
   document.getElementById('satisfactionCancelBtn').addEventListener('click', closeSatisfactionModal);
   document.getElementById('satisfactionForm').addEventListener('submit', handleSatisfactionSubmit);
+  document.getElementById('btnStartBatchSelection').addEventListener('click', () => startMobileSelection());
+  document.getElementById('btnExitBatchSelection').addEventListener('click', exitMobileSelection);
+  document.getElementById('btnMobileBatchMove').addEventListener('click', () => {
+    applyMobileBatchStatus(document.getElementById('mobileBatchStatus').value);
+  });
+  document.getElementById('btnMobileBatchClose').addEventListener('click', () => applyMobileBatchStatus('closed'));
+  document.getElementById('btnMobileBatchAssign').addEventListener('click', applyMobileBatchAssignee);
+  document.getElementById('mobileBatchStatus').addEventListener('change', renderMobileBatchToolbar);
+  document.getElementById('mobileBatchAssignee').addEventListener('change', renderMobileBatchToolbar);
+  document.getElementById('mobileBatchToolbar').addEventListener('keydown', handleMobileBatchKeydown);
+  document.getElementById('mobileTicketActionsBackdrop').addEventListener('click', closeMobileTicketActions);
+  document.getElementById('btnCloseMobileTicketActions').addEventListener('click', closeMobileTicketActions);
+  document.getElementById('mobileTicketActionsSheet').addEventListener('keydown', handleBottomSheetKeydown);
+  document.getElementById('btnSaveMobileTicketActions').addEventListener('click', saveMobileTicketActions);
+  document.getElementById('btnDeleteMobileTicket').addEventListener('click', deleteMobileTicket);
   document.getElementById('responseTemplateSelect').addEventListener('change', (event) => {
     modalView.selectResponseTemplate(event.target.value);
   });
@@ -441,6 +461,21 @@ function bindStaticEvents() {
     event.preventDefault();
     dragDropController.onEditRequest(card.dataset.ticketId);
   });
+  boardEl.addEventListener('click', (event) => {
+    const target = event.target instanceof Element ? event.target : null;
+    const selectionButton = target?.closest('[data-select-ticket]');
+    if (selectionButton) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      toggleMobileTicketSelection(selectionButton.dataset.selectTicket);
+      return;
+    }
+    if (!suppressBoardClick) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    suppressBoardClick = false;
+    window.clearTimeout(boardClickSuppressTimeout);
+  }, true);
 
   document.getElementById('mobileStatusTabs').addEventListener('click', (event) => {
     const tab = event.target.closest('.mobile-status-tab');
@@ -477,14 +512,12 @@ function bindStaticEvents() {
   [document.getElementById('mobileFiltersSheet'), document.getElementById('ticketStatusSheet')].forEach((sheet) => {
     sheet.addEventListener('keydown', handleBottomSheetKeydown);
   });
-  boardEl.addEventListener('click', (event) => {
-    if (!suppressBoardClick) return;
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    suppressBoardClick = false;
-  }, true);
   boardEl.addEventListener('touchstart', handleMobileBoardTouchStart, { passive: true });
   boardEl.addEventListener('touchend', handleMobileBoardTouchEnd, { passive: false });
+  boardEl.addEventListener('touchstart', handleMobileCardTouchStart, { passive: true });
+  boardEl.addEventListener('touchmove', handleMobileCardTouchMove, { passive: true });
+  boardEl.addEventListener('touchend', handleMobileCardTouchEnd, { passive: false });
+  boardEl.addEventListener('touchcancel', clearMobileCardTouch);
   window.addEventListener('touchstart', handleMobilePullStart, { passive: true });
   window.addEventListener('touchend', handleMobilePullEnd, { passive: false });
   window.addEventListener('scroll', handleMobileScroll, { passive: true });
@@ -585,6 +618,7 @@ function closeMobileOverlay(id) {
     filters: closeMobileFilters,
     status: closeMobileStatusSheet,
     search: closeMobileSearch,
+    'quick-actions': closeMobileTicketActions,
     notifications: () => {
       document.getElementById('notificationsPanel').classList.add('hidden');
       document.getElementById('btnNotifications').setAttribute('aria-expanded', 'false');
@@ -614,6 +648,10 @@ function handleGlobalEscape(event) {
 
 function handleMobileBoardTouchStart(event) {
   if (!isMobileViewport() || event.touches.length !== 1) return;
+  if (event.target.closest?.('.ticket-card')) {
+    mobileBoardTouchStart = null;
+    return;
+  }
   mobileBoardTouchStart = {
     x: event.touches[0].clientX,
     y: event.touches[0].clientY,
@@ -622,6 +660,10 @@ function handleMobileBoardTouchStart(event) {
 }
 
 function handleMobileBoardTouchEnd(event) {
+  if (mobileBoardTouchStart?.target.closest?.('.ticket-card')) {
+    mobileBoardTouchStart = null;
+    return;
+  }
   if (!mobileBoardTouchStart || !isMobileViewport() || event.changedTouches.length !== 1) {
     mobileBoardTouchStart = null;
     return;
@@ -637,8 +679,7 @@ function handleMobileBoardTouchEnd(event) {
   const nextStatus = statusIds[currentIndex + (deltaX < 0 ? 1 : -1)];
   if (!nextStatus) return;
   event.preventDefault();
-  suppressBoardClick = true;
-  window.setTimeout(() => { suppressBoardClick = false; }, 400);
+  suppressNextBoardClick();
   boardView.setActiveStatus(nextStatus);
   document.querySelector(`.mobile-status-tab[data-status="${nextStatus}"]`)?.scrollIntoView({
     behavior: 'smooth',
@@ -646,6 +687,103 @@ function handleMobileBoardTouchEnd(event) {
     inline: 'center'
   });
   hapticFeedback();
+}
+
+function handleMobileCardTouchStart(event) {
+  clearMobileCardTouch();
+  if (!isMobileViewport() || event.touches.length !== 1) return;
+  const card = event.target.closest?.('.ticket-card');
+  if (!card) return;
+  const ticketId = card.dataset.ticketId;
+  const ticket = allTickets.find((item) => item.id === ticketId);
+  const onControl = Boolean(event.target.closest('button, a, input, select, textarea'));
+  mobileCardTouchStart = {
+    ticketId,
+    x: event.touches[0].clientX,
+    y: event.touches[0].clientY,
+    onControl,
+    longPressTriggered: false,
+    timer: null
+  };
+  if (mobileSelectionMode || onControl || !canSelectMobileTicket(ticket)) return;
+  mobileCardTouchStart.timer = window.setTimeout(() => {
+    if (!mobileCardTouchStart || mobileCardTouchStart.ticketId !== ticketId) return;
+    mobileCardTouchStart.longPressTriggered = true;
+    startMobileSelection(ticketId, true);
+    hapticFeedback();
+  }, 400);
+}
+
+function handleMobileCardTouchMove(event) {
+  if (!mobileCardTouchStart || event.touches.length !== 1) return;
+  const touch = event.touches[0];
+  if (Math.abs(touch.clientX - mobileCardTouchStart.x) > 12
+    || Math.abs(touch.clientY - mobileCardTouchStart.y) > 12) {
+    window.clearTimeout(mobileCardTouchStart.timer);
+    mobileCardTouchStart.timer = null;
+  }
+}
+
+function handleMobileCardTouchEnd(event) {
+  const touchStart = mobileCardTouchStart;
+  if (!touchStart || event.changedTouches.length !== 1) {
+    clearMobileCardTouch();
+    return;
+  }
+  window.clearTimeout(touchStart.timer);
+  mobileCardTouchStart = null;
+  if (touchStart.longPressTriggered) {
+    event.preventDefault();
+    suppressNextBoardClick();
+    return;
+  }
+  const deltaX = event.changedTouches[0].clientX - touchStart.x;
+  const deltaY = event.changedTouches[0].clientY - touchStart.y;
+  if (touchStart.onControl || Math.abs(deltaX) < 60 || Math.abs(deltaX) < Math.abs(deltaY) * 1.3) {
+    if (mobileSelectionMode && !touchStart.onControl && Math.abs(deltaX) < 20 && Math.abs(deltaY) < 20) {
+      event.preventDefault();
+      suppressNextBoardClick();
+      toggleMobileTicketSelection(touchStart.ticketId);
+    }
+    return;
+  }
+  event.preventDefault();
+  suppressNextBoardClick();
+  if (mobileSelectionMode) return;
+  if (deltaX > 0) {
+    resolveTicketFromSwipe(touchStart.ticketId);
+  } else {
+    openMobileTicketActions(touchStart.ticketId);
+  }
+}
+
+function clearMobileCardTouch() {
+  if (mobileCardTouchStart?.timer) window.clearTimeout(mobileCardTouchStart.timer);
+  mobileCardTouchStart = null;
+}
+
+function suppressNextBoardClick() {
+  suppressBoardClick = true;
+  window.clearTimeout(boardClickSuppressTimeout);
+  boardClickSuppressTimeout = window.setTimeout(() => { suppressBoardClick = false; }, 400);
+}
+
+async function resolveTicketFromSwipe(ticketId) {
+  const ticket = allTickets.find((item) => item.id === ticketId);
+  if (!ticket || ticket.status === 'resolved') return;
+  if (!auth.canChangeStatus(activeUser, ticket)) {
+    showToast('No tienes permiso para resolver este ticket.');
+    return;
+  }
+  try {
+    await ticketService.changeTicketStatus(ticketId, 'resolved');
+    await loadTickets();
+    renderBoard();
+    hapticFeedback();
+    showToast('Ticket marcado como resuelto.');
+  } catch (error) {
+    showToast(error.message || 'No se pudo resolver el ticket.');
+  }
 }
 
 function handleMobilePullStart(event) {
@@ -962,11 +1100,297 @@ async function handleMobileStatusSelection(event) {
   }
 }
 
+function canSelectMobileTicket(ticket) {
+  return Boolean(isMobileViewport() && activeUser && ticket
+    && (auth.canChangeStatus(activeUser, ticket) || auth.canAssignOrSetDue(activeUser)));
+}
+
+function startMobileSelection(ticketId = null, preserveTouchTarget = false) {
+  if (!isMobileViewport()) return;
+  mobileSelectionMode = true;
+  if (ticketId && canSelectMobileTicket(allTickets.find((ticket) => ticket.id === ticketId))) {
+    selectedMobileTicketIds.add(ticketId);
+  }
+  document.getElementById('boardPanel').classList.add('is-selection-mode');
+  renderMobileBatchToolbar();
+  if (preserveTouchTarget) syncMobileCardSelectionButtons();
+  else renderBoard();
+}
+
+function toggleMobileTicketSelection(ticketId) {
+  if (!mobileSelectionMode) return;
+  const ticket = allTickets.find((item) => item.id === ticketId);
+  if (!canSelectMobileTicket(ticket)) return;
+  if (selectedMobileTicketIds.has(ticketId)) selectedMobileTicketIds.delete(ticketId);
+  else selectedMobileTicketIds.add(ticketId);
+  renderMobileBatchToolbar();
+  renderBoard();
+}
+
+function exitMobileSelection() {
+  mobileSelectionMode = false;
+  selectedMobileTicketIds.clear();
+  document.getElementById('boardPanel').classList.remove('is-selection-mode');
+  renderMobileBatchToolbar();
+  renderBoard();
+}
+
+function renderMobileBatchToolbar() {
+  const toolbar = document.getElementById('mobileBatchToolbar');
+  const selectionButton = document.getElementById('btnStartBatchSelection');
+  const selectedCount = selectedMobileTicketIds.size;
+  selectionButton.classList.toggle('hidden', mobileSelectionMode || !activeUser);
+  toolbar.classList.toggle('hidden', !mobileSelectionMode);
+  document.getElementById('mobileBatchSelectionCount').textContent =
+    `${selectedCount} ${selectedCount === 1 ? 'seleccionado' : 'seleccionados'}`;
+  document.getElementById('mobileBatchHint').classList.toggle('hidden', selectedCount > 0);
+
+  const statusSelect = document.getElementById('mobileBatchStatus');
+  const previousStatus = statusSelect.value;
+  const statusPlaceholder = document.createElement('option');
+  statusPlaceholder.value = '';
+  statusPlaceholder.textContent = 'Selecciona un estado';
+  const statusOptions = Object.values(STATUS_DEFINITIONS).map(({ id, name }) => {
+    const option = document.createElement('option');
+    option.value = id;
+    option.textContent = name;
+    return option;
+  });
+  statusSelect.replaceChildren(statusPlaceholder, ...statusOptions);
+  statusSelect.value = STATUS_DEFINITIONS[previousStatus] ? previousStatus : '';
+
+  const assigneeSelect = document.getElementById('mobileBatchAssignee');
+  const previousAssignee = assigneeSelect.value;
+  const assigneePlaceholder = document.createElement('option');
+  assigneePlaceholder.value = '';
+  assigneePlaceholder.textContent = 'Selecciona un responsable';
+  const assigneeOptions = [...usersMap.values()]
+    .filter((user) => ['Admin', 'Agent'].includes(user.role) && user.workspaceId === activeUser?.workspaceId)
+    .map((user) => {
+      const option = document.createElement('option');
+      option.value = user.id;
+      option.textContent = user.fullName;
+      return option;
+    });
+  const unassignedOption = document.createElement('option');
+  unassignedOption.value = '__unassigned__';
+  unassignedOption.textContent = 'Sin asignar';
+  assigneeSelect.replaceChildren(assigneePlaceholder, unassignedOption, ...assigneeOptions);
+  assigneeSelect.value = [ '', '__unassigned__', ...assigneeOptions.map((option) => option.value) ]
+    .includes(previousAssignee) ? previousAssignee : '';
+
+  const canAssign = auth.canAssignOrSetDue(activeUser);
+  document.getElementById('mobileBatchAssigneeGroup').classList.toggle('hidden', !canAssign || !selectedCount);
+  document.getElementById('mobileBatchMoveGroup').classList.toggle('hidden', !selectedCount);
+  document.getElementById('btnMobileBatchMove').disabled = !selectedCount || !statusSelect.value;
+  document.getElementById('btnMobileBatchClose').disabled = !selectedCount;
+  document.getElementById('btnMobileBatchAssign').disabled = !selectedCount || !canAssign || !assigneeSelect.value;
+}
+
+function syncMobileCardSelectionButtons() {
+  boardEl.querySelectorAll('[data-select-ticket]').forEach((button) => {
+    const selected = selectedMobileTicketIds.has(button.dataset.selectTicket);
+    button.classList.add('is-visible');
+    button.setAttribute('aria-pressed', String(selected));
+    button.setAttribute('aria-label', `${selected ? 'Quitar' : 'Seleccionar'} ticket ${button.dataset.selectTicket}`);
+    button.querySelector('span').textContent = selected ? '✓' : '';
+  });
+}
+
+function handleMobileBatchKeydown(event) {
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    exitMobileSelection();
+  }
+}
+
+async function applyMobileBatchStatus(status) {
+  if (!STATUS_DEFINITIONS[status] || !selectedMobileTicketIds.size) return;
+  await runMobileBatchAction(
+    status === 'closed' ? 'Tickets cerrados' : `Tickets movidos a ${STATUS_DEFINITIONS[status].name}`,
+    (ticketId) => ticketService.changeTicketStatus(ticketId, status)
+  );
+}
+
+async function applyMobileBatchAssignee() {
+  const value = document.getElementById('mobileBatchAssignee').value;
+  if (!selectedMobileTicketIds.size || !value) return;
+  if (!auth.canAssignOrSetDue(activeUser)) {
+    showToast('No tienes permiso para reasignar tickets.');
+    return;
+  }
+  const assignedTo = value === '__unassigned__' ? null : value;
+  await runMobileBatchAction('Responsables actualizados', async (ticketId) => {
+    const ticket = allTickets.find((item) => item.id === ticketId);
+    if (!ticket) throw new Error('El ticket ya no está disponible.');
+    return ticketService.updateTicket({ ...ticket, assignedTo });
+  });
+  document.getElementById('mobileBatchAssignee').value = '';
+  renderMobileBatchToolbar();
+}
+
+async function runMobileBatchAction(successMessage, action) {
+  const ticketIds = [...selectedMobileTicketIds];
+  if (!ticketIds.length) return;
+  const buttons = [...document.querySelectorAll('#mobileBatchToolbar button')];
+  buttons.forEach((button) => { button.disabled = true; });
+  const failed = [];
+  let succeeded = 0;
+  try {
+    for (const ticketId of ticketIds) {
+      try {
+        await action(ticketId);
+        succeeded += 1;
+      } catch (error) {
+        failed.push({ ticketId, error });
+      }
+    }
+    if (succeeded) {
+      await loadTickets();
+      ticketIds.filter((ticketId) => !failed.some((item) => item.ticketId === ticketId))
+        .forEach((ticketId) => selectedMobileTicketIds.delete(ticketId));
+      hapticFeedback();
+    }
+    renderBoard();
+    renderMobileBatchToolbar();
+    if (failed.length) {
+      const firstError = failed[0].error.message || 'No se pudo completar la acción.';
+      showToast(`${successMessage}: ${succeeded}; ${failed.length} no se pudieron actualizar. ${firstError}`, 7000);
+    } else {
+      showToast(`${successMessage}: ${succeeded}.`);
+    }
+  } catch (error) {
+    showToast(error.message || 'No se pudieron sincronizar los tickets actualizados.', 7000);
+  } finally {
+    buttons.forEach((button) => { button.disabled = false; });
+    renderMobileBatchToolbar();
+  }
+}
+
+function mobileTicketActionPermissions(ticket) {
+  return {
+    canEdit: auth.canEditTicket(activeUser, ticket),
+    canAssign: auth.canAssignOrSetDue(activeUser),
+    canDelete: auth.canDelete(activeUser)
+  };
+}
+
+function populateMobileAssigneeSelect(select, selectedValue) {
+  const options = [...usersMap.values()]
+    .filter((user) => ['Admin', 'Agent'].includes(user.role) && user.workspaceId === activeUser?.workspaceId)
+    .map((user) => {
+      const option = document.createElement('option');
+      option.value = user.id;
+      option.textContent = user.fullName;
+      return option;
+    });
+  const unassignedOption = document.createElement('option');
+  unassignedOption.value = '';
+  unassignedOption.textContent = 'Sin asignar';
+  select.replaceChildren(unassignedOption, ...options);
+  select.value = selectedValue || '';
+}
+
+function openMobileTicketActions(ticketId) {
+  const ticket = allTickets.find((item) => item.id === ticketId);
+  if (!ticket) return;
+  const permissions = mobileTicketActionPermissions(ticket);
+  if (!permissions.canEdit && !permissions.canAssign && !permissions.canDelete) {
+    showToast('No tienes permisos para modificar este ticket.');
+    return;
+  }
+  mobileActionTicketId = ticketId;
+  document.getElementById('mobileTicketActionsTicketId').textContent = ticket.id;
+  const prioritySelect = document.getElementById('mobileTicketPriority');
+  prioritySelect.replaceChildren(...PRIORITY_ORDER.map((priority) => {
+    const option = document.createElement('option');
+    option.value = priority;
+    option.textContent = priority;
+    return option;
+  }));
+  prioritySelect.value = ticket.priority;
+  document.getElementById('mobileTicketPriorityGroup').classList.toggle('hidden', !permissions.canEdit);
+  const assigneeSelect = document.getElementById('mobileTicketAssignee');
+  populateMobileAssigneeSelect(assigneeSelect, ticket.assignedTo);
+  document.getElementById('mobileTicketAssigneeGroup').classList.toggle('hidden', !permissions.canAssign);
+  document.getElementById('btnSaveMobileTicketActions').classList.toggle('hidden', !permissions.canEdit && !permissions.canAssign);
+  document.getElementById('btnDeleteMobileTicket').classList.toggle('hidden', !permissions.canDelete);
+  document.getElementById('mobileTicketActionsLayer').classList.remove('hidden');
+  trackMobileOverlayOpen('quick-actions');
+  document.getElementById('mobileTicketActionsSheet').querySelector('button:not(.hidden)')?.focus();
+}
+
+function closeMobileTicketActions() {
+  const wasOpen = !document.getElementById('mobileTicketActionsLayer').classList.contains('hidden');
+  document.getElementById('mobileTicketActionsLayer').classList.add('hidden');
+  if (wasOpen) trackMobileOverlayClose('quick-actions');
+  const ticketId = mobileActionTicketId;
+  mobileActionTicketId = null;
+  [...boardEl.querySelectorAll('.ticket-card')]
+    .find((card) => card.dataset.ticketId === ticketId)?.focus();
+}
+
+async function saveMobileTicketActions() {
+  const ticket = allTickets.find((item) => item.id === mobileActionTicketId);
+  if (!ticket) return;
+  const permissions = mobileTicketActionPermissions(ticket);
+  const priority = permissions.canEdit
+    ? document.getElementById('mobileTicketPriority').value
+    : ticket.priority;
+  const assignedTo = permissions.canAssign
+    ? document.getElementById('mobileTicketAssignee').value || null
+    : ticket.assignedTo;
+  if (priority === ticket.priority && assignedTo === ticket.assignedTo) {
+    closeMobileTicketActions();
+    return;
+  }
+  const saveButton = document.getElementById('btnSaveMobileTicketActions');
+  saveButton.disabled = true;
+  try {
+    await ticketService.updateTicket({ ...ticket, priority, assignedTo });
+    await loadTickets();
+    closeMobileTicketActions();
+    renderBoard();
+    hapticFeedback();
+    showToast('Acciones guardadas correctamente.');
+  } catch (error) {
+    showToast(error.message || 'No se pudieron guardar los cambios.');
+  } finally {
+    saveButton.disabled = false;
+  }
+}
+
+async function deleteMobileTicket() {
+  const ticket = allTickets.find((item) => item.id === mobileActionTicketId);
+  if (!ticket) return;
+  if (!auth.canDelete(activeUser)) {
+    showToast('Solo un administrador puede eliminar tickets.');
+    return;
+  }
+  if (!window.confirm(`¿Eliminar el ticket ${ticket.id}? Esta acción no se puede deshacer.`)) return;
+  const deleteButton = document.getElementById('btnDeleteMobileTicket');
+  deleteButton.disabled = true;
+  try {
+    await ticketService.deleteTicket(ticket.id);
+    selectedMobileTicketIds.delete(ticket.id);
+    await loadTickets();
+    closeMobileTicketActions();
+    renderBoard();
+    hapticFeedback();
+    showToast('Ticket eliminado correctamente.');
+  } catch (error) {
+    showToast(error.message || 'No se pudo eliminar el ticket.');
+  } finally {
+    deleteButton.disabled = false;
+  }
+}
+
 function handleBottomSheetKeydown(event) {
   if (event.key === 'Escape') {
     event.preventDefault();
     if (event.currentTarget.id === 'mobileFiltersSheet') closeMobileFilters();
     else if (event.currentTarget.id === 'mobileSearchLayer') closeMobileSearch();
+    else if (event.currentTarget.id === 'mobileTicketActionsSheet') closeMobileTicketActions();
     else closeMobileStatusSheet();
     return;
   }
@@ -1223,6 +1647,10 @@ function renderBoard() {
 
   if (!activeUser) {
     boardEl.innerHTML = '';
+    mobileSelectionMode = false;
+    selectedMobileTicketIds.clear();
+    document.getElementById('boardPanel').classList.remove('is-selection-mode');
+    renderMobileBatchToolbar();
     if (calendarView) calendarView.render([], false);
     renderMobileFilterChips();
     return;
@@ -1246,8 +1674,14 @@ function renderBoard() {
   boardView.render(
     visibleTickets,
     (ticket) => auth.canChangeStatus(activeUser, ticket),
-    statusCountTickets || visibleTickets
+    statusCountTickets || visibleTickets,
+    {
+      selectionMode: mobileSelectionMode,
+      selectedTicketIds: selectedMobileTicketIds,
+      canSelectTicket: canSelectMobileTicket
+    }
   );
+  renderMobileBatchToolbar();
   renderMobileFilterChips();
   const mobileSearchInput = document.getElementById('mobileSearchInput');
   if (mobileSearchInput && document.activeElement !== mobileSearchInput) {

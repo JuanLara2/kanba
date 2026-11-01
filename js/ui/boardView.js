@@ -11,7 +11,7 @@ export class BoardView {
     this.activeStatus = 'new';
   }
 
-  render(tickets, canChangeStatus = () => false, statusCountTickets = tickets) {
+  render(tickets, canChangeStatus = () => false, statusCountTickets = tickets, mobileSelection = {}) {
     const fragment = document.createDocumentFragment();
     const statusCounts = new Map();
     Object.values(STATUS_DEFINITIONS).forEach(({ id }) => {
@@ -49,6 +49,13 @@ export class BoardView {
         colTickets.forEach((ticket) => {
           const card = this.buildCard(ticket, colDef);
           if (canChangeStatus(ticket)) card.appendChild(this.buildStatusMenuButton(ticket));
+          if (mobileSelection.canSelectTicket?.(ticket)) {
+            card.appendChild(this.buildSelectionButton(
+              ticket,
+              mobileSelection.selectedTicketIds?.has(ticket.id) || false,
+              mobileSelection.selectionMode || false
+            ));
+          }
           cardsFragment.appendChild(card);
         });
         dropZone.appendChild(cardsFragment);
@@ -93,6 +100,18 @@ export class BoardView {
     button.setAttribute('aria-label', `Cambiar estado de ${ticket.id}`);
     button.setAttribute('aria-expanded', 'false');
     button.innerHTML = '<span aria-hidden="true">⋮</span>';
+    return button;
+  }
+
+  buildSelectionButton(ticket, selected, selectionMode) {
+    const button = document.createElement('button');
+    button.className = 'card-selection-toggle';
+    button.type = 'button';
+    button.dataset.selectTicket = ticket.id;
+    button.setAttribute('aria-pressed', String(selected));
+    button.setAttribute('aria-label', `${selected ? 'Quitar' : 'Seleccionar'} ticket ${ticket.id}`);
+    button.classList.toggle('is-visible', selectionMode);
+    button.innerHTML = `<span aria-hidden="true">${selected ? '✓' : ''}</span>`;
     return button;
   }
 

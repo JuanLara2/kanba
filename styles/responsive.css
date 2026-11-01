@@ -518,7 +518,8 @@
   }
 
   #mobileFiltersLayer:not(.hidden),
-  #ticketStatusLayer:not(.hidden) {
+  #ticketStatusLayer:not(.hidden),
+  #mobileTicketActionsLayer:not(.hidden) {
     position: fixed;
     z-index: 50;
     inset: 0;
@@ -1041,6 +1042,140 @@
   }
 }
 
-.mobile-search-layer.hidden {
+.mobile-search-layer.hidden,
+#mobileTicketActionsLayer.hidden {
   display: none !important;
+}
+
+.mobile-selection-entry,
+.mobile-batch-toolbar,
+.card-selection-toggle {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .mobile-selection-entry {
+    display: flex;
+    justify-content: flex-end;
+    padding: 0 0.75rem 0.45rem;
+  }
+
+  .mobile-selection-entry .btn {
+    min-height: 2.5rem;
+  }
+
+  .mobile-batch-toolbar:not(.hidden) {
+    display: grid;
+    gap: 0.75rem;
+    margin: 0 0.75rem 0.75rem;
+    padding: 0.8rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: 14px;
+    background: var(--bg-surface);
+    box-shadow: var(--shadow-card);
+  }
+
+  .mobile-batch-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    color: var(--text-main);
+  }
+
+  .mobile-batch-hint {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.78rem;
+  }
+
+  .mobile-batch-header .btn,
+  .mobile-batch-controls .btn {
+    min-height: 2.65rem;
+    padding: 0.45rem 0.65rem;
+    font-size: 0.8rem;
+  }
+
+  .mobile-batch-controls {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.45rem;
+  }
+
+  .mobile-batch-controls label {
+    grid-column: 1 / -1;
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    font-weight: 650;
+  }
+
+  .mobile-batch-controls select,
+  .mobile-action-control select {
+    min-width: 0;
+    min-height: 2.65rem;
+    padding: 0.45rem 0.6rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: 9px;
+    background: var(--bg-input);
+    color: var(--text-main);
+  }
+
+  #btnMobileBatchClose {
+    grid-column: 1 / -1;
+  }
+
+  .mobile-batch-controls .btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+
+  .card-selection-toggle {
+    position: absolute;
+    z-index: 2;
+    top: 0.4rem;
+    left: 0.4rem;
+    width: 2rem;
+    height: 2rem;
+    place-items: center;
+    border: 1px solid var(--border-subtle);
+    border-radius: 50%;
+    background: var(--bg-surface);
+    color: var(--text-main);
+    box-shadow: var(--shadow-card);
+  }
+
+  #boardPanel.is-selection-mode .card-selection-toggle.is-visible {
+    display: grid;
+  }
+
+  #boardPanel.is-selection-mode .ticket-card .card-top {
+    padding-left: 2.35rem;
+  }
+
+  .card-selection-toggle[aria-pressed="true"] {
+    border-color: var(--color-primary-start);
+    background: var(--color-primary-start);
+    color: #fff;
+  }
+
+  .mobile-action-control {
+    display: grid;
+    gap: 0.4rem;
+  }
+
+  .mobile-action-control label {
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    font-weight: 650;
+  }
+
+  #mobileTicketActionsSheet .mobile-filter-actions {
+    flex-wrap: wrap;
+  }
+
+  #mobileTicketActionsSheet .mobile-filter-actions .btn {
+    min-height: 2.9rem;
+    flex: 1 1 9rem;
+  }
 }
