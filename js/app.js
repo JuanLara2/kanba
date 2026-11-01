@@ -82,48 +82,6 @@ async function bootstrap() {
       } catch (error) {
         showToast(error.message || 'No tienes permisos para mover este ticket');
       }
-
-      function applySelectedTemplate() {
-        const template = responseTemplates.find((item) => item.id === document.getElementById('responseTemplateSelect').value);
-        if (!template) {
-          showToast('Selecciona una plantilla primero.');
-          return;
-        }
-        const input = document.getElementById('ticketCommentInput');
-        input.value = input.value ? `${input.value}\n\n${template.body}` : template.body;
-        input.focus();
-      }
-
-      async function saveResponseTemplate() {
-        const select = document.getElementById('responseTemplateSelect');
-        const selectedId = select.value || undefined;
-        try {
-          await ticketService.saveResponseTemplate({
-            id: selectedId,
-            title: document.getElementById('templateTitle').value,
-            body: document.getElementById('templateBody').value
-          });
-          await loadResponseTemplates();
-          modalView.setResponseTemplates(responseTemplates, true);
-          showToast('Plantilla guardada para el equipo.');
-        } catch (error) {
-          showToast(error.message || 'No se pudo guardar la plantilla.');
-        }
-      }
-
-      async function deleteResponseTemplate() {
-        const templateId = document.getElementById('responseTemplateSelect').value;
-        if (!templateId) return;
-        try {
-          await ticketService.deleteResponseTemplate(templateId);
-          await loadResponseTemplates();
-          modalView.clearResponseTemplateEditor();
-          modalView.setResponseTemplates(responseTemplates, true);
-          showToast('Plantilla eliminada.');
-        } catch (error) {
-          showToast(error.message || 'No se pudo eliminar la plantilla.');
-        }
-      }
     },
     onEditRequest: openTicketForEditing
   });
@@ -145,17 +103,59 @@ async function bootstrap() {
     if (activeUser && modalEl.classList.contains('hidden') && !boardEl.contains(document.activeElement)) {
       renderBoard();
     }
-
-    function initializeMetricsDates() {
-      const now = new Date();
-      const start = new Date(now.getFullYear(), now.getMonth(), 1);
-      const formatDate = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-      document.getElementById('metricsStart').value ||= formatDate(start);
-      document.getElementById('metricsEnd').value ||= formatDate(now);
-      renderMetrics();
-    }
     if (activeUser) refreshNotificationList();
   }, SLA_REFRESH_INTERVAL_MS);
+}
+
+function initializeMetricsDates() {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  const formatDate = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  document.getElementById('metricsStart').value ||= formatDate(start);
+  document.getElementById('metricsEnd').value ||= formatDate(now);
+  renderMetrics();
+}
+
+function applySelectedTemplate() {
+  const template = responseTemplates.find((item) => item.id === document.getElementById('responseTemplateSelect').value);
+  if (!template) {
+    showToast('Selecciona una plantilla primero.');
+    return;
+  }
+  const input = document.getElementById('ticketCommentInput');
+  input.value = input.value ? `${input.value}\n\n${template.body}` : template.body;
+  input.focus();
+}
+
+async function saveResponseTemplate() {
+  const select = document.getElementById('responseTemplateSelect');
+  const selectedId = select.value || undefined;
+  try {
+    await ticketService.saveResponseTemplate({
+      id: selectedId,
+      title: document.getElementById('templateTitle').value,
+      body: document.getElementById('templateBody').value
+    });
+    await loadResponseTemplates();
+    modalView.setResponseTemplates(responseTemplates, true);
+    showToast('Plantilla guardada para el equipo.');
+  } catch (error) {
+    showToast(error.message || 'No se pudo guardar la plantilla.');
+  }
+}
+
+async function deleteResponseTemplate() {
+  const templateId = document.getElementById('responseTemplateSelect').value;
+  if (!templateId) return;
+  try {
+    await ticketService.deleteResponseTemplate(templateId);
+    await loadResponseTemplates();
+    modalView.clearResponseTemplateEditor();
+    modalView.setResponseTemplates(responseTemplates, true);
+    showToast('Plantilla eliminada.');
+  } catch (error) {
+    showToast(error.message || 'No se pudo eliminar la plantilla.');
+  }
 }
 
 async function loadUsers(user = activeUser) {
