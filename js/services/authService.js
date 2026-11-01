@@ -136,7 +136,9 @@ export class AuthService {
     try {
       authUser = await this.client.requestAuth('user', { accessToken });
     } catch (error) {
-      if (error.status === 401) {
+      const sessionNoLongerExists = error.status === 403
+        && /session from session_id claim in jwt does not exist/i.test(error.message || '');
+      if (error.status === 401 || sessionNoLongerExists) {
         this.clearSession();
         return null;
       }

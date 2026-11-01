@@ -287,6 +287,21 @@ test('Supabase auth clears the session when its refresh token is no longer valid
   assert.equal(localStorage.getItem('nexusdesk-supabase-session'), null);
 });
 
+test('Supabase auth clears a stored session that no longer exists on the server', async () => {
+  const { auth } = createContext();
+  await auth.login('admin@nexus.com', 'AdminPassword123!');
+  auth.currentUser = null;
+  auth.client.requestAuth = async (path) => {
+    if (path !== 'user') throw new Error(`Unexpected auth request: ${path}`);
+    const error = new Error('Session from session_id claim in JWT does not exist');
+    error.status = 403;
+    throw error;
+  };
+
+  assert.equal(await auth.getCurrentUser(), null);
+  assert.equal(localStorage.getItem('nexusdesk-supabase-session'), null);
+});
+
 test('only administrators can create users through the secure provisioning adapter', async () => {
   const { auth, users } = createContext();
 

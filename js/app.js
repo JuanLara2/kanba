@@ -1,6 +1,6 @@
 import { SupabaseClient } from './data/supabaseClient.js';
 import { SupabaseAdapter } from './data/db.js';
-import { AuthService } from './services/authService.js';
+import { AuthService } from './services/authService.js?v=session-recovery-20261101';
 import { TicketService } from './services/ticketService.js';
 import { FilterSortService } from './services/filterService.js';
 import { BoardView } from './ui/boardView.js';
