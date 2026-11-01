@@ -914,13 +914,15 @@ test('Realtime service subscribes workspace tables and forwards database changes
   }
 
   const changes = [];
+  const statuses = [];
   const service = new RealtimeService({
     url: 'https://project.supabase.co',
     anonKey: 'public-key',
     isConfigured: true
   }, {
     WebSocketImpl: MockWebSocket,
-    onChange: (change) => changes.push(change)
+    onChange: (change) => changes.push(change),
+    onStatus: (status) => statuses.push(status)
   });
   await service.subscribe({
     userId: 'user-1',
@@ -930,6 +932,8 @@ test('Realtime service subscribes workspace tables and forwards database changes
   await new Promise((resolve) => setTimeout(resolve, 0));
   const socket = service.socket;
   assert.match(socket.url, /^wss:/);
+  assert.equal(new URL(socket.url).searchParams.get('vsn'), '2.0.0');
+  assert.deepEqual(statuses, ['connecting']);
   socket.emit('open');
   const join = socket.sent[0];
   assert.equal(join[3], 'phx_join');
@@ -939,6 +943,10 @@ test('Realtime service subscribes workspace tables and forwards database changes
     'ticket_comments',
     'notifications'
   ]);
+  socket.emit('message', {
+    data: JSON.stringify([service.joinRef, '2', service.topic, 'phx_reply', { status: 'ok', response: {} }])
+  });
+  assert.deepEqual(statuses, ['connecting', 'connected']);
   socket.emit('message', {
     data: JSON.stringify([service.joinRef, '2', service.topic, 'postgres_changes', { data: { record: { id: 'TCK-1' } } }])
   });

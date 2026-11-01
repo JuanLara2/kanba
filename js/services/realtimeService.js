@@ -39,7 +39,7 @@ export class RealtimeService {
     if (this.closed) return;
     const url = new URL(`${this.client.url.replace(/^http/, 'ws')}/realtime/v1/websocket`);
     url.searchParams.set('apikey', this.client.anonKey);
-    url.searchParams.set('vsn', '1.0.0');
+    url.searchParams.set('vsn', '2.0.0');
 
     this.onStatus?.('connecting');
     let socket;

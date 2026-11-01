@@ -10,7 +10,7 @@ import { CalendarView, dueDateForCalendarDay } from './ui/calendarView.js';
 import { initializeThemeController } from './ui/themeController.js';
 import { SLA_REFRESH_INTERVAL_MS } from './config/constants.js';
 import { calculateTicketMetrics, metricsToCsv } from './services/metricsService.js';
-import { RealtimeService } from './services/realtimeService.js';
+import { RealtimeService } from './services/realtimeService.js?v=realtime-protocol-v2';
 import { createSplashScreen } from './ui/splashScreen.js';
 
 const splashScreen = createSplashScreen();
