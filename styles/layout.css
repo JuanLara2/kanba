@@ -163,6 +163,24 @@
   color: #9ca3af;
 }
 
+.login-forgot-button {
+  align-self: flex-end;
+  min-height: 2.5rem;
+  padding: 0.35rem 0;
+  border: 0;
+  background: transparent;
+  color: #7c3aed;
+  font-size: 0.9rem;
+  font-weight: 650;
+  text-align: right;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.login-forgot-button:hover {
+  color: #a21caf;
+}
+
 .login-submit {
   min-height: 3.35rem;
   margin-top: 0.15rem;

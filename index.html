@@ -9,7 +9,7 @@
     <link rel="manifest" href="manifest.json" />
     <meta name="theme-color" content="#151a2a" />
     <link rel="stylesheet" href="styles/base.css" />
-    <link rel="stylesheet" href="styles/layout.css?v=mobile-login-0e14ac4" />
+    <link rel="stylesheet" href="styles/layout.css?v=password-recovery-v1" />
     <link rel="stylesheet" href="styles/components.css" />
     <link rel="stylesheet" href="styles/responsive.css?v=mobile-login-0e14ac4" />
     <link rel="stylesheet" href="styles/splash.css" />
@@ -80,6 +80,7 @@
           </section>
         </div>
         <button id="btnManageUsers" class="btn btn-outline hidden"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M10 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM20 8v6M23 11h-6"/></svg>Administrar usuarios</button>
+        <button id="btnChangePassword" class="btn btn-outline" type="button"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M17 6l3 3M14 9l3 3"/></svg>Cambiar contraseña</button>
         <button id="btnLogout" class="btn btn-outline"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 17l5-5-5-5M15 12H3M21 19V5a2 2 0 0 0-2-2h-6"/></svg>Salir</button>
       </div>
     </header>
@@ -454,6 +455,30 @@
       </div>
     </div>
 
+    <div id="changePasswordModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="changePasswordHeading">
+      <div class="modal-card">
+        <header class="modal-header">
+          <h3 id="changePasswordHeading">Cambiar contraseña</h3>
+          <button id="changePasswordCloseBtn" class="close-x" type="button" aria-label="Cerrar">&times;</button>
+        </header>
+        <form id="changePasswordForm" class="modal-body">
+          <p>Elige una contraseña nueva de al menos 12 caracteres.</p>
+          <div class="form-row">
+            <label for="newAccountPassword">Nueva contraseña</label>
+            <input id="newAccountPassword" type="password" autocomplete="new-password" minlength="12" required />
+          </div>
+          <div class="form-row">
+            <label for="confirmAccountPassword">Confirmar nueva contraseña</label>
+            <input id="confirmAccountPassword" type="password" autocomplete="new-password" minlength="12" required />
+          </div>
+          <footer class="modal-actions">
+            <button id="changePasswordCancelBtn" class="btn btn-outline" type="button">Cancelar</button>
+            <button class="btn btn-primary" type="submit">Guardar contraseña</button>
+          </footer>
+        </form>
+      </div>
+    </div>
+
     <main id="loginModal" class="login-screen" aria-labelledby="loginHeading">
       <section class="login-brand-panel" aria-label="Vortex Task">
         <div class="login-brand-content">
@@ -480,12 +505,29 @@
             <label for="loginPassword">Contraseña</label>
             <input id="loginPassword" type="password" autocomplete="current-password" placeholder="Ingresa tu contraseña" required />
           </div>
+          <button id="btnForgotPassword" class="login-forgot-button" type="button">¿Olvidaste tu contraseña?</button>
           <button type="submit" class="btn btn-primary login-submit">Ingresar al tablero</button>
           <p class="login-security-note">Acceso seguro a tu espacio de trabajo</p>
+        </form>
+        <form id="passwordRecoveryForm" class="login-form hidden" aria-labelledby="passwordRecoveryHeading">
+          <div class="login-heading-group">
+            <p class="login-eyebrow">RECUPERACIÓN DE CUENTA</p>
+            <h1 id="passwordRecoveryHeading">Crear nueva contraseña</h1>
+            <p>Ingresa una contraseña nueva para tu cuenta.</p>
+          </div>
+          <div class="form-row">
+            <label for="recoveryPassword">Nueva contraseña</label>
+            <input id="recoveryPassword" type="password" autocomplete="new-password" minlength="12" required />
+          </div>
+          <div class="form-row">
+            <label for="recoveryPasswordConfirm">Confirmar nueva contraseña</label>
+            <input id="recoveryPasswordConfirm" type="password" autocomplete="new-password" minlength="12" required />
+          </div>
+          <button type="submit" class="btn btn-primary login-submit">Guardar contraseña</button>
         </form>
       </section>
     </main>
 
-    <script type="module" src="js/app.js?v=session-recovery-20261101"></script>
+    <script type="module" src="js/app.js?v=password-recovery-v1"></script>
   </body>
 </html>

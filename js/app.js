@@ -1,6 +1,6 @@
 import { SupabaseClient } from './data/supabaseClient.js';
 import { SupabaseAdapter } from './data/db.js';
-import { AuthService } from './services/authService.js?v=session-recovery-20261101';
+import { AuthService } from './services/authService.js?v=password-recovery-v1';
 import { TicketService } from './services/ticketService.js';
 import { FilterSortService } from './services/filterService.js';
 import { BoardView } from './ui/boardView.js';
@@ -24,6 +24,9 @@ const modalEl = document.getElementById('ticketModal');
 const form = document.getElementById('ticketForm');
 const loginModal = document.getElementById('loginModal');
 const loginForm = document.getElementById('loginForm');
+const passwordRecoveryForm = document.getElementById('passwordRecoveryForm');
+const changePasswordModal = document.getElementById('changePasswordModal');
+const changePasswordForm = document.getElementById('changePasswordForm');
 const usersModal = document.getElementById('usersModal');
 const usersForm = document.getElementById('userForm');
 const filters = {
@@ -49,12 +52,15 @@ let boardView;
 let calendarView;
 let modalView;
 let dragDropController;
+let passwordRecoveryAccessToken = null;
+let passwordRecoveryLinkExpired = false;
 const realtimeService = new RealtimeService(client, {
   onChange: handleRealtimeChange,
   onStatus: renderRealtimeStatus
 });
 
 async function bootstrap() {
+  initializePasswordRecovery();
   splashScreen.setProgress(20, 'Preparando espacio de trabajo...');
   initializeThemeController();
   boardView = new BoardView(boardEl, ticketService, usersMap);
@@ -95,6 +101,13 @@ async function bootstrap() {
   bindStaticEvents();
   splashScreen.setProgress(55, 'Sincronizando tareas...');
   await syncAuthState();
+  if (passwordRecoveryAccessToken) {
+    loginForm.classList.add('hidden');
+    passwordRecoveryForm.classList.remove('hidden');
+    document.getElementById('recoveryPassword').focus();
+  } else if (passwordRecoveryLinkExpired) {
+    showToast('El enlace venció o ya fue usado. Solicita uno nuevo desde el inicio de sesión.', 7000);
+  }
   splashScreen.setProgress(90, 'Preparando tablero...');
   renderBoard();
   splashScreen.hide();
@@ -193,7 +206,99 @@ async function loadTickets() {
   allTickets = await ticketService.getAllTickets();
 }
 
+function initializePasswordRecovery() {
+  const recoveryParams = new URLSearchParams(window.location.hash.slice(1));
+  const recoveryType = recoveryParams.get('type');
+  const accessToken = recoveryParams.get('access_token');
+  const hasRecoveryError = recoveryParams.has('error') || recoveryParams.has('error_code');
+
+  if (recoveryType === 'recovery' && accessToken) {
+    passwordRecoveryAccessToken = accessToken;
+    auth.clearSession();
+  } else if (hasRecoveryError) {
+    passwordRecoveryLinkExpired = true;
+    auth.clearSession();
+  } else {
+    return;
+  }
+
+  window.history.replaceState(null, document.title, `${window.location.pathname}${window.location.search}`);
+}
+
+async function handleForgotPassword() {
+  const emailInput = document.getElementById('loginEmail');
+  const email = emailInput.value.trim();
+  if (!email || !emailInput.checkValidity()) {
+    showToast('Ingresa un correo válido para enviarte el enlace.');
+    emailInput.focus();
+    return;
+  }
+
+  const redirectTo = new URL(window.location.pathname, window.location.origin).href;
+  try {
+    await auth.requestPasswordReset(email, redirectTo);
+    showToast('Si existe una cuenta con ese correo, recibirás un enlace para restablecer la contraseña.', 7000);
+  } catch (error) {
+    showToast(error.message || 'No se pudo enviar el enlace de recuperación.', 7000);
+  }
+}
+
+async function handlePasswordRecoverySubmit(event) {
+  event.preventDefault();
+  const password = document.getElementById('recoveryPassword').value;
+  const confirmation = document.getElementById('recoveryPasswordConfirm').value;
+  if (password !== confirmation) {
+    showToast('Las contraseñas no coinciden.');
+    return;
+  }
+
+  try {
+    await auth.updatePassword(password, passwordRecoveryAccessToken);
+    passwordRecoveryAccessToken = null;
+    passwordRecoveryForm.reset();
+    passwordRecoveryForm.classList.add('hidden');
+    loginForm.reset();
+    loginForm.classList.remove('hidden');
+    document.getElementById('loginEmail').focus();
+    showToast('Contraseña actualizada. Ya puedes iniciar sesión.', 6000);
+  } catch (error) {
+    showToast(error.message || 'No se pudo actualizar la contraseña.', 7000);
+  }
+}
+
+function closeChangePasswordModal() {
+  changePasswordModal.classList.add('hidden');
+  changePasswordForm.reset();
+}
+
+async function handleChangePasswordSubmit(event) {
+  event.preventDefault();
+  const password = document.getElementById('newAccountPassword').value;
+  const confirmation = document.getElementById('confirmAccountPassword').value;
+  if (password !== confirmation) {
+    showToast('Las contraseñas no coinciden.');
+    return;
+  }
+
+  try {
+    await auth.updatePassword(password);
+    closeChangePasswordModal();
+    showToast('Contraseña actualizada correctamente.');
+  } catch (error) {
+    showToast(error.message || 'No se pudo actualizar la contraseña.', 7000);
+  }
+}
+
 function bindStaticEvents() {
+  document.getElementById('btnForgotPassword').addEventListener('click', handleForgotPassword);
+  passwordRecoveryForm.addEventListener('submit', handlePasswordRecoverySubmit);
+  document.getElementById('btnChangePassword').addEventListener('click', () => {
+    changePasswordModal.classList.remove('hidden');
+    document.getElementById('newAccountPassword').focus();
+  });
+  document.getElementById('changePasswordCloseBtn').addEventListener('click', closeChangePasswordModal);
+  document.getElementById('changePasswordCancelBtn').addEventListener('click', closeChangePasswordModal);
+  changePasswordForm.addEventListener('submit', handleChangePasswordSubmit);
   document.getElementById('boardTab').addEventListener('click', () => setActiveView('board'));
   document.getElementById('calendarTab').addEventListener('click', () => setActiveView('calendar'));
   document.getElementById('metricsTab').addEventListener('click', () => setActiveView('metrics'));

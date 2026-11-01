@@ -256,6 +256,58 @@ test('Supabase login authenticates each configured role and stores a managed ses
   await assert.rejects(() => auth.login('admin@nexus.com', 'incorrect'), /Credenciales inválidas/);
 });
 
+test('Supabase password recovery sends a normalized email to the configured redirect URL', async () => {
+  const { auth } = createContext();
+  let request;
+  auth.client.requestAuth = async (path, options) => {
+    request = { path, options };
+    return null;
+  };
+
+  await auth.requestPasswordReset(' User@Example.com ', 'https://juanlara2.github.io/kanba/');
+
+  assert.equal(request.path, 'recover?redirect_to=https%3A%2F%2Fjuanlara2.github.io%2Fkanba%2F');
+  assert.deepEqual(request.options, {
+    method: 'POST',
+    body: { email: 'user@example.com' }
+  });
+  await auth.requestPasswordReset('user@example.com', 'http://127.0.0.1:8765/');
+  await assert.rejects(
+    () => auth.requestPasswordReset('not-an-email', 'https://juanlara2.github.io/kanba/'),
+    /correo electrónico válido/
+  );
+  await assert.rejects(
+    () => auth.requestPasswordReset('user@example.com', 'http://example.com/'),
+    /debe usar HTTPS/
+  );
+  await assert.rejects(
+    () => auth.requestPasswordReset('user@example.com', 'ftp://localhost/'),
+    /debe usar HTTPS/
+  );
+});
+
+test('Supabase password update uses an active or password-recovery access token', async () => {
+  const { auth } = createContext();
+  await auth.login('admin@nexus.com', 'AdminPassword123!');
+  let update;
+  auth.client.requestAuth = async (path, options) => {
+    update = { path, options };
+    return {};
+  };
+
+  await auth.updatePassword('ChangedPassword123');
+  assert.equal(update.path, 'user');
+  assert.equal(update.options.method, 'PUT');
+  assert.equal(update.options.accessToken, 'access-usr-admin-01');
+  assert.deepEqual(update.options.body, { password: 'ChangedPassword123' });
+
+  auth.clearSession();
+  await auth.updatePassword('RecoveredPassword123', 'recovery-access-token');
+  assert.equal(update.options.accessToken, 'recovery-access-token');
+  assert.equal(localStorage.getItem('nexusdesk-supabase-session'), null);
+  await assert.rejects(() => auth.updatePassword('short'), /al menos 12 caracteres/);
+});
+
 test('Supabase auth refreshes an expired access token before database requests', async () => {
   const { auth } = createContext();
   await auth.login('admin@nexus.com', 'AdminPassword123!');

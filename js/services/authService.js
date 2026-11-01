@@ -97,6 +97,46 @@ export class AuthService {
     return profile || null;
   }
 
+  async requestPasswordReset(email, redirectTo) {
+    const normalizedEmail = String(email ?? '').trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      throw new Error('Ingresa un correo electrónico válido.');
+    }
+
+    let redirectUrl;
+    try {
+      redirectUrl = new URL(redirectTo);
+    } catch {
+      throw new Error('La dirección para restablecer la contraseña no es válida.');
+    }
+
+    const isLocalHttpRedirect = redirectUrl.protocol === 'http:'
+      && ['localhost', '127.0.0.1', '[::1]'].includes(redirectUrl.hostname);
+    if (redirectUrl.protocol !== 'https:' && !isLocalHttpRedirect) {
+      throw new Error('La dirección para restablecer la contraseña debe usar HTTPS.');
+    }
+
+    await this.client.requestAuth(`recover?redirect_to=${encodeURIComponent(redirectUrl.href)}`, {
+      method: 'POST',
+      body: { email: normalizedEmail }
+    });
+  }
+
+  async updatePassword(password, recoveryAccessToken = null) {
+    if (typeof password !== 'string' || password.length < 12) {
+      throw new Error('La contraseña debe tener al menos 12 caracteres.');
+    }
+
+    const accessToken = recoveryAccessToken || await this.getAccessToken();
+    if (!accessToken) throw new Error('Tu sesión expiró. Inicia sesión de nuevo.');
+
+    await this.client.requestAuth('user', {
+      method: 'PUT',
+      body: { password },
+      accessToken
+    });
+  }
+
   async registerUser({ fullName, email, password, role = 'Reporter' }) {
     const currentUser = await this.getCurrentUser();
     if (!this.canManageUsers(currentUser)) {

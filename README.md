@@ -47,6 +47,12 @@ supabase functions deploy admin-create-user
 
 La función usa `SUPABASE_SERVICE_ROLE_KEY` solo en el entorno aislado de Supabase y verifica el JWT y el perfil Admin del solicitante. No se requiere copiar ni exponer esa clave en el navegador. Despliégala después de las migraciones; las nuevas cuentas creadas por un Admin se unirán al espacio de ese equipo.
 
+## Recuperación y cambio de contraseña
+
+Los usuarios pueden cambiar su contraseña desde la sesión iniciada o solicitar un enlace desde el inicio de sesión. Para que el enlace regrese a GitHub Pages, agrega `https://juanlara2.github.io/kanba/` en **Authentication → URL Configuration → Redirect URLs** de Supabase.
+
+El SMTP predeterminado de Supabase sirve para pruebas: actualmente limita el envío a 2 correos por hora y solo entrega a direcciones autorizadas del equipo del proyecto. Para enviar enlaces a todos los usuarios, configura un proveedor SMTP externo en **Authentication → SMTP Settings**. El costo del correo depende del proveedor elegido.
+
 ## Publicar en GitHub Pages
 
 El workflow [deploy-pages.yml](./.github/workflows/deploy-pages.yml) ejecuta las pruebas y publica los archivos estáticos al hacer push a `main`.
