@@ -30,6 +30,7 @@ export function createSplashScreen() {
   let animationFrame;
   let rotation = 0;
   let hideTimeout;
+  let autoHideTimeout;
   let progressTimer;
   let currentProgress = 5;
   let hidePromise;
@@ -102,6 +103,7 @@ export function createSplashScreen() {
   function hide({ ready = true } = {}) {
     if (hidePromise) return hidePromise;
 
+    window.clearTimeout(autoHideTimeout);
     hidePromise = (async () => {
       if (ready) {
         const remainingTime = Math.max(0, minimumVisibleMs - (performance.now() - startedAt));
@@ -124,6 +126,10 @@ export function createSplashScreen() {
 
     return hidePromise;
   }
+
+  autoHideTimeout = window.setTimeout(() => {
+    if (!hidePromise) hide();
+  }, minimumVisibleMs);
 
   return { setProgress, hide };
 }
