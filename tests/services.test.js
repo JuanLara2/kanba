@@ -525,6 +525,15 @@ test('ticket checklists validate subtasks, persist updates, and respect ticket e
     checklist: updatedChecklist
   });
   assert.deepEqual(ticket.checklist, updatedChecklist);
+  await ticketService.setChecklistCompletion(ticket.id, 0, 'Analizar logs', false);
+  assert.deepEqual(ticket.checklist, [
+    { text: 'Analizar logs', completed: false },
+    { text: 'Probar en staging', completed: true }
+  ]);
+  await assert.rejects(
+    () => ticketService.setChecklistCompletion(ticket.id, 0, 'Texto obsoleto', true),
+    /La subtarea cambió/
+  );
   await ticketService.updateTicket({
     id: lockedTicket.id,
     title: 'Intento de edición no autorizado',
@@ -543,6 +552,10 @@ test('ticket checklists validate subtasks, persist updates, and respect ticket e
       checklist: [{ text: 'No autorizada', completed: false }]
     }),
     /no puede asignar responsables/
+  );
+  await assert.rejects(
+    () => ticketService.setChecklistCompletion(ticket.id, 0, 'Analizar logs', true),
+    /Permisos insuficientes/
   );
 
   assert.deepEqual(normalizeChecklist(checklist), checklist);
@@ -770,6 +783,12 @@ test('Supabase adapter maps ticket rows and requests the database audit history'
   const [profile] = await adapter.getAll('users');
   assert.equal(profile.workspaceId, 'workspace-id');
   assert.equal(profile.createdByAdminId, null);
+
+  const [syncIndex] = await adapter.getTicketSyncIndex();
+  assert.deepEqual(syncIndex, { id: 'TCK-1001', updatedAt: ticketRow.updated_at });
+  const [changedTicket] = await adapter.getTicketsUpdatedSince('2026-10-20T09:30:00.000Z');
+  assert.equal(changedTicket.id, 'TCK-1001');
+  assert.ok(calls.some(({ path }) => path.includes('updated_at=gt.2026-10-20T09%3A30%3A00.000Z')));
 });
 
 test('SLA filters classify overdue, warning, and future SLA deadlines', () => {

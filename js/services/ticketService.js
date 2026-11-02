@@ -38,6 +38,20 @@ export class TicketService {
     return this.db.getAll('tickets');
   }
 
+  async getTicketsUpdatedSince(timestamp) {
+    if (typeof this.db.getTicketsUpdatedSince !== 'function') {
+      throw new Error('La sincronización incremental de tickets no está disponible.');
+    }
+    return this.db.getTicketsUpdatedSince(timestamp);
+  }
+
+  async getTicketSyncIndex() {
+    if (typeof this.db.getTicketSyncIndex !== 'function') {
+      throw new Error('El índice de sincronización de tickets no está disponible.');
+    }
+    return this.db.getTicketSyncIndex();
+  }
+
   async createTicket({ title, description, priority = 'Media', category = 'Consulta', initialStatus = 'new', assignedTo = null, dueDate = null, checklist = [] }) {
     const user = await this.auth.getCurrentUser();
     if (!user) throw new Error('Sesión requerida para crear tickets.');
@@ -194,6 +208,17 @@ export class TicketService {
     ticket.updatedAt = now;
 
     return this.db.put('tickets', ticket);
+  }
+
+  async setChecklistCompletion(ticketId, index, text, completed) {
+    const ticket = await this.db.getById('tickets', ticketId);
+    if (!ticket) throw new Error('El ticket no existe.');
+    const checklist = (ticket.checklist || []).map((item) => ({ ...item }));
+    if (!checklist[index] || checklist[index].text !== text) {
+      throw new Error('La subtarea cambió desde la última sincronización. Recarga el ticket e inténtalo de nuevo.');
+    }
+    checklist[index].completed = completed;
+    return this.updateTicket({ ...ticket, checklist });
   }
 
   async reopenTicket(ticketId) {

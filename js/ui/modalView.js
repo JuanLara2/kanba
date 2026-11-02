@@ -202,6 +202,11 @@ export class ModalView {
     this.renderChecklistProgress();
   }
 
+  syncChecklist(items) {
+    this.checklistDraft = items.map((item) => ({ ...item }));
+    this.renderChecklist();
+  }
+
   renderChecklist() {
     const list = document.getElementById('checklistItems');
     const progressTrack = document.getElementById('checklistProgressTrack');

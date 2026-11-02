@@ -12,6 +12,8 @@ import { PRIORITY_ORDER, SLA_REFRESH_INTERVAL_MS, STATUS_DEFINITIONS } from './c
 import { calculateTicketMetrics, metricsToCsv } from './services/metricsService.js';
 import { RealtimeService } from './services/realtimeService.js?v=realtime-protocol-v2';
 import { createSplashScreen } from './ui/splashScreen.js';
+import { OutboxService } from './services/outboxService.js';
+import { MutationDispatcher } from './services/mutationDispatcher.js';
 
 const splashScreen = createSplashScreen();
 const client = new SupabaseClient();
@@ -19,6 +21,34 @@ let auth;
 const db = new SupabaseAdapter(client, () => auth.getAccessToken());
 auth = new AuthService(client, db);
 const ticketService = new TicketService(db, auth);
+const outbox = new OutboxService();
+const mutations = new MutationDispatcher({
+  outbox,
+  onError: (error) => showToast(error.message || 'No se pudo guardar el cambio.'),
+  onQueued: () => showToast('Sin conexión: el cambio quedó guardado para sincronizarse.'),
+  onSynced: handleMutationSynced
+});
+mutations.register('ticket.status.set', {
+  execute: (action) => ticketService.changeTicketStatus(action.entityId, action.payload.status),
+  applyPending: (ticket, payload) => ({ ...ticket, status: payload.status }),
+  onRejected: recoverRejectedMutation
+});
+mutations.register('ticket.checklist.complete', {
+  execute: (action) => ticketService.setChecklistCompletion(
+    action.entityId,
+    action.payload.index,
+    action.payload.text,
+    action.payload.completed
+  ),
+  applyPending: (ticket, payload) => {
+    const checklist = (ticket.checklist || []).map((item) => ({ ...item }));
+    if (checklist[payload.index]?.text === payload.text) {
+      checklist[payload.index].completed = payload.completed;
+    }
+    return { ...ticket, checklist };
+  },
+  onRejected: recoverRejectedMutation
+});
 const boardEl = document.getElementById('kanbanBoard');
 const modalEl = document.getElementById('ticketModal');
 const form = document.getElementById('ticketForm');
@@ -69,6 +99,8 @@ let lastScrollY = 0;
 let recentMobileSearches = [];
 let mobileRefreshInProgress = false;
 let appShortcutHandled = false;
+let lastRealtimeStatus = 'unavailable';
+let connectionRecoveryPromise = null;
 const realtimeService = new RealtimeService(client, {
   onChange: handleRealtimeChange,
   onStatus: renderRealtimeStatus
@@ -96,17 +128,7 @@ async function bootstrap() {
 
   dragDropController = new DragDropController({
     boardEl,
-    onStatusChange: async (ticketId, nextStatus) => {
-      try {
-        await ticketService.changeTicketStatus(ticketId, nextStatus);
-        await loadTickets();
-        renderBoard();
-        renderMobileSearchResults();
-        showToast('Estado actualizado');
-      } catch (error) {
-        showToast(error.message || 'No tienes permisos para mover este ticket');
-      }
-    },
+    onStatusChange: dispatchStatusMutation,
     onEditRequest: openTicketForEditing
   });
 
@@ -117,6 +139,7 @@ async function bootstrap() {
   });
 
   bindStaticEvents();
+  window.addEventListener('online', handleConnectionRestored);
   splashScreen.setProgress(55, 'Sincronizando tareas...');
   await syncAuthState();
   renderMobileFilterChips();
@@ -230,7 +253,13 @@ function populateAssigneeSelect(users, currentUser = activeUser) {
 }
 
 async function loadTickets() {
-  allTickets = await ticketService.getAllTickets();
+  const tickets = await ticketService.getAllTickets();
+  try {
+    allTickets = await mutations.applyPending(tickets);
+  } catch (error) {
+    allTickets = tickets;
+    showToast(error.message || 'No se pudo consultar la cola de acciones offline.');
+  }
 }
 
 function initializePasswordRecovery() {
@@ -411,7 +440,9 @@ function bindStaticEvents() {
   });
   document.getElementById('checklistItems').addEventListener('change', (event) => {
     const checkbox = event.target.closest('[data-checklist-complete]');
-    if (checkbox) modalView.setChecklistCompletion(Number(checkbox.dataset.checklistComplete), checkbox.checked);
+    if (checkbox) {
+      handleChecklistToggle(Number(checkbox.dataset.checklistComplete), checkbox.checked);
+    }
   });
   document.getElementById('checklistNewItem').addEventListener('keydown', (event) => {
     if (event.key === 'Enter') {
@@ -1766,14 +1797,204 @@ function showToast(message, duration = 2200) {
   showToast.timeoutId = setTimeout(() => toast.classList.add('hidden'), duration);
 }
 
+async function dispatchStatusMutation(ticketId, nextStatus) {
+  const ticket = allTickets.find((item) => item.id === ticketId);
+  if (!ticket || ticket.status === nextStatus) return { status: 'unchanged' };
+  const previousStatus = ticket.status;
+  const result = await mutations.dispatch({
+    type: 'ticket.status.set',
+    entityId: ticketId,
+    payload: { status: nextStatus, previousStatus },
+    optimistic: () => {
+      ticket.status = nextStatus;
+      renderBoard();
+      renderMobileSearchResults();
+    },
+    rollback: () => {
+      const current = allTickets.find((item) => item.id === ticketId);
+      if (current?.status === nextStatus) current.status = previousStatus;
+      renderBoard();
+      renderMobileSearchResults();
+    }
+  });
+  if (result.status === 'synced') showToast('Estado actualizado');
+  return result;
+}
+
+function handleChecklistToggle(index, completed) {
+  const ticketId = modalView.currentTicketId;
+  const ticket = allTickets.find((item) => item.id === ticketId);
+  const checklist = ticket?.checklist || [];
+  const item = checklist[index];
+  const draftItem = modalView.getChecklist()[index];
+  if (!item || item.completed === completed) return;
+  if (draftItem?.text !== item.text) {
+    modalView.setChecklistCompletion(index, item.completed);
+    showToast('Guarda los cambios de subtareas antes de cambiar su estado.');
+    return;
+  }
+  const previousCompleted = item.completed;
+  void mutations.dispatch({
+    type: 'ticket.checklist.complete',
+    entityId: ticketId,
+    payload: { index, text: item.text, completed, previousCompleted },
+    optimistic: () => {
+      item.completed = completed;
+      modalView.setChecklistCompletion(index, completed);
+      renderBoard();
+      renderMobileSearchResults();
+    },
+    rollback: () => {
+      const current = allTickets.find((item) => item.id === ticketId);
+      if (current?.checklist[index]?.text === item.text) {
+        current.checklist[index].completed = previousCompleted;
+      }
+      if (modalView.currentTicketId === ticketId) {
+        modalView.setChecklistCompletion(index, previousCompleted);
+      }
+      renderBoard();
+      renderMobileSearchResults();
+    }
+  }).then((result) => {
+    if (result.status === 'synced') showToast('Subtarea actualizada');
+  }).catch((error) => showToast(error.message || 'No se pudo actualizar la subtarea.'));
+}
+
+async function handleMutationSynced(action, ticket) {
+  if (ticket) {
+    const index = allTickets.findIndex((item) => item.id === ticket.id);
+    const previous = index === -1 ? null : allTickets[index];
+    const syncedTicket = {
+      ...ticket,
+      ...previous,
+      updatedAt: ticket.updatedAt || previous?.updatedAt,
+      statusHistory: ticket.statusHistory?.length ? ticket.statusHistory : previous?.statusHistory || []
+    };
+    if (index === -1) allTickets.unshift(syncedTicket);
+    else allTickets[index] = syncedTicket;
+    renderBoard();
+    renderMobileSearchResults();
+  }
+}
+
+async function recoverRejectedMutation(action) {
+  try {
+    await loadTickets();
+  } catch (error) {
+    const ticket = allTickets.find((item) => item.id === action.entityId);
+    if (ticket && action.type === 'ticket.status.set') {
+      ticket.status = action.payload.previousStatus;
+    } else if (ticket && action.type === 'ticket.checklist.complete') {
+      if (ticket.checklist[action.payload.index]?.text === action.payload.text) {
+        ticket.checklist[action.payload.index].completed = action.payload.previousCompleted;
+      }
+      if (modalView.currentTicketId === action.entityId) {
+        modalView.setChecklistCompletion(action.payload.index, action.payload.previousCompleted);
+      }
+    }
+    throw error;
+  }
+  const current = allTickets.find((ticket) => ticket.id === action.entityId);
+  if (action.type === 'ticket.checklist.complete' && modalView.currentTicketId === action.entityId) {
+    const serverItem = current?.checklist?.[action.payload.index];
+    if (serverItem?.text === action.payload.text) {
+      modalView.setChecklistCompletion(action.payload.index, serverItem.completed);
+    } else if (current) {
+      modalView.syncChecklist(current.checklist || []);
+    }
+  }
+  renderBoard();
+  renderMobileSearchResults();
+}
+
+function syncCheckpointKey(user = activeUser) {
+  return user ? `last_sync:${user.workspaceId}:${user.id}` : null;
+}
+
+async function initializeSyncCheckpoint() {
+  const key = syncCheckpointKey();
+  if (!key) return;
+  try {
+    if (await outbox.getCheckpoint(key)) return;
+    const latest = allTickets
+      .map((ticket) => ticket.updatedAt)
+      .filter(Boolean)
+      .sort()
+      .at(-1);
+    if (latest) await outbox.setCheckpoint(key, latest);
+  } catch (error) {
+    showToast(error.message || 'No se pudo guardar el punto de sincronización.');
+  }
+}
+
+async function reconcileTicketsSinceLastSync() {
+  const key = syncCheckpointKey();
+  if (!key || !activeUser) return;
+  const checkpoint = await outbox.getCheckpoint(key);
+  if (!checkpoint) {
+    await loadTickets();
+    await initializeSyncCheckpoint();
+    return;
+  }
+
+  const syncIndex = await ticketService.getTicketSyncIndex();
+  const changedTickets = await ticketService.getTicketsUpdatedSince(checkpoint);
+  const visibleIds = new Set(syncIndex.map((ticket) => ticket.id));
+  const ticketsById = new Map(
+    allTickets
+      .filter((ticket) => visibleIds.has(ticket.id))
+      .map((ticket) => [ticket.id, ticket])
+  );
+  changedTickets.forEach((ticket) => {
+    const previous = ticketsById.get(ticket.id);
+    ticketsById.set(ticket.id, {
+      ...previous,
+      ...ticket,
+      statusHistory: ticket.statusHistory?.length ? ticket.statusHistory : previous?.statusHistory || []
+    });
+  });
+  allTickets = [...ticketsById.values()].sort((first, second) => (
+    (second.createdAt || '').localeCompare(first.createdAt || '')
+  ));
+  allTickets = await mutations.applyPending(allTickets);
+
+  const latest = [...syncIndex, ...changedTickets]
+    .map((ticket) => ticket.updatedAt)
+    .filter((timestamp) => timestamp && timestamp > checkpoint)
+    .sort()
+    .at(-1);
+  if (latest) await outbox.setCheckpoint(key, latest);
+}
+
+function handleConnectionRestored() {
+  if (!activeUser) return Promise.resolve();
+  if (connectionRecoveryPromise) return connectionRecoveryPromise;
+  connectionRecoveryPromise = (async () => {
+    try {
+      const syncedCount = await mutations.flush();
+      await reconcileTicketsSinceLastSync();
+      renderBoard();
+      renderMobileSearchResults();
+      if (syncedCount > 0) showToast(`Se sincronizaron ${syncedCount} cambios pendientes.`);
+    } catch (error) {
+      showToast(error.message || 'No se pudieron recuperar los cambios de Supabase.');
+    } finally {
+      connectionRecoveryPromise = null;
+    }
+  })();
+  return connectionRecoveryPromise;
+}
+
 async function syncAuthState() {
   const currentUser = await auth.getCurrentUser();
   const btnNewTicket = document.getElementById('btnNewTicket');
   const btnManageUsers = document.getElementById('btnManageUsers');
 
   if (currentUser) {
-    await Promise.all([loadUsers(currentUser), loadTickets(), loadResponseTemplates(), loadSatisfactionEntries()]);
     activeUser = currentUser;
+    mutations.setScope({ userId: currentUser.id, workspaceId: currentUser.workspaceId });
+    await Promise.all([loadUsers(currentUser), loadTickets(), loadResponseTemplates(), loadSatisfactionEntries()]);
+    await initializeSyncCheckpoint();
     await realtimeService.subscribe({
       userId: currentUser.id,
       workspaceId: currentUser.workspaceId,
@@ -1790,6 +2011,7 @@ async function syncAuthState() {
   } else {
     realtimeService.stop();
     activeUser = null;
+    mutations.setScope(null);
     modalView.showLogin();
     btnNewTicket.disabled = true;
     btnNewTicket.style.opacity = '0.5';
@@ -1853,6 +2075,9 @@ function renderRealtimeStatus(status, error) {
   statusEl.textContent = labels[status] || 'Sin conexión en vivo';
   statusEl.className = `realtime-status is-${status}`;
   statusEl.title = error?.message || '';
+  const reconnected = status === 'connected' && lastRealtimeStatus !== 'connected';
+  lastRealtimeStatus = status;
+  if (reconnected) void handleConnectionRestored();
 }
 
 async function handleTicketReopen() {

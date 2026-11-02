@@ -111,6 +111,31 @@ export class SupabaseAdapter {
     throw new Error(`Almacén de datos no reconocido: ${storeName}`);
   }
 
+  async getTicketsUpdatedSince(timestamp) {
+    const accessToken = await this.accessToken();
+    const rows = await this.client.requestRest(
+      `tickets?select=${TICKET_FIELDS}&updated_at=gt.${encodeURIComponent(timestamp)}&order=updated_at.asc`,
+      { accessToken }
+    );
+    if (rows.length === 0) return [];
+
+    const ids = rows.map((ticket) => `"${ticket.id}"`).join(',');
+    const history = await this.client.requestRest(
+      `ticket_status_history?select=${HISTORY_FIELDS}&ticket_id=in.(${ids})&order=changed_at.asc`,
+      { accessToken }
+    );
+    return rows.map((ticket) => mapTicket(ticket, history));
+  }
+
+  async getTicketSyncIndex() {
+    const accessToken = await this.accessToken();
+    const rows = await this.client.requestRest(
+      'tickets?select=id,updated_at&order=id.asc',
+      { accessToken }
+    );
+    return rows.map((row) => ({ id: row.id, updatedAt: row.updated_at }));
+  }
+
   async getById(storeName, id, providedAccessToken) {
     const accessToken = providedAccessToken || await this.accessToken();
     const encodedId = encodeURIComponent(id);
