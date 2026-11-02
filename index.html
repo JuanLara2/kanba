@@ -10,7 +10,7 @@
     <meta name="theme-color" content="#151a2a" />
     <link rel="stylesheet" href="styles/base.css" />
     <link rel="stylesheet" href="styles/layout.css?v=password-recovery-v1" />
-    <link rel="stylesheet" href="styles/components.css" />
+    <link rel="stylesheet" href="styles/components.css?v=ticket-attachments-v1" />
     <link rel="stylesheet" href="styles/responsive.css?v=mobile-native-v2" />
     <link rel="stylesheet" href="styles/splash.css" />
   </head>
@@ -465,11 +465,26 @@
             <div id="ticketCommentComposer" class="comment-composer">
               <label for="ticketCommentInput">Escribe un comentario</label>
               <textarea id="ticketCommentInput" rows="3" maxlength="4000" placeholder="Comparte una actualización o pregunta..."></textarea>
+              <label for="ticketAttachmentInput">Adjuntar imágenes</label>
+              <input
+                id="ticketAttachmentInput"
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                multiple
+                aria-describedby="ticketAttachmentHelp"
+              />
+              <small id="ticketAttachmentHelp" class="attachment-help">JPG, PNG, WebP o GIF · hasta 5 imágenes de 8 MB cada una.</small>
+              <div id="selectedAttachments" class="attachment-selection" aria-live="polite"></div>
               <div class="comment-composer-footer">
-                <small>Máximo 4000 caracteres</small>
+                <small>Comentario: máximo 4000 caracteres</small>
                 <button id="btnPostComment" type="button" class="btn btn-primary">Publicar comentario</button>
               </div>
             </div>
+          </section>
+
+          <section id="ticketAttachmentsSection" class="ticket-attachments hidden" aria-labelledby="ticketAttachmentsHeading">
+            <h4 id="ticketAttachmentsHeading">Imágenes del ticket</h4>
+            <div id="ticketAttachmentsList" class="attachment-gallery"></div>
           </section>
 
           <footer class="modal-actions">
@@ -481,6 +496,12 @@
         </form>
       </div>
     </div>
+
+    <dialog id="attachmentLightbox" class="attachment-lightbox" aria-labelledby="attachmentLightboxCaption">
+      <button id="btnCloseAttachmentLightbox" class="close-x" type="button" aria-label="Cerrar visor">&times;</button>
+      <img id="attachmentLightboxImage" alt="" />
+      <p id="attachmentLightboxCaption"></p>
+    </dialog>
 
     <div id="satisfactionModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="satisfactionHeading">
       <div class="modal-card satisfaction-card">
@@ -636,6 +657,6 @@
       </section>
     </main>
 
-    <script type="module" src="js/app.js?v=mobile-native-v2"></script>
+    <script type="module" src="js/app.js?v=ticket-attachments-v1"></script>
   </body>
 </html>

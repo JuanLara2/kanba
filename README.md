@@ -18,9 +18,9 @@ Aplicación de tickets con frontend Vanilla JavaScript y backend Supabase (Auth,
    ```
 
    El rol inicial solo se asigna desde el entorno de administración de Supabase. Después, la creación de cuentas y perfiles se hace mediante la función protegida.
-5. Ejecuta las migraciones de `supabase/migrations/` en orden para activar el aislamiento de equipos, las listas de subtareas, SLA, comentarios, notificaciones, categorías, plantillas compartidas, encuestas de satisfacción y Supabase Realtime. La migración de SLA requiere la extensión `pg_cron`, disponible en Supabase, para generar avisos aunque nadie tenga abierta la aplicación.
+5. Ejecuta las migraciones de `supabase/migrations/` en orden para activar el aislamiento de equipos, las listas de subtareas, SLA, comentarios, notificaciones, categorías, plantillas compartidas, encuestas de satisfacción, Supabase Realtime y los adjuntos privados de tickets. La migración de SLA requiere la extensión `pg_cron`, disponible en Supabase, para generar avisos aunque nadie tenga abierta la aplicación.
 
-Si el proyecto ya tiene `schema.sql` y el perfil Admin configurados, vincula Supabase CLI al proyecto y ejecuta las migraciones pendientes en orden con `npx.cmd supabase db push --linked`; no vuelvas a ejecutar el esquema base. Este comando aplica, entre otras, las migraciones de SLA y colaboración, y la de categorías, métricas, plantillas, satisfacción y Realtime.
+Si el proyecto ya tiene `schema.sql` y el perfil Admin configurados, vincula Supabase CLI al proyecto y ejecuta las migraciones pendientes en orden con `npx.cmd supabase db push --linked`; no vuelvas a ejecutar el esquema base. Este comando aplica, entre otras, las migraciones de SLA y colaboración, categorías, métricas, plantillas, satisfacción, Realtime y adjuntos.
 
 ## Configurar el frontend
 
@@ -32,6 +32,12 @@ export const SUPABASE_ANON_KEY = '<publishable-or-anon-key>';
 ```
 
 La clave publishable/anon puede estar en el navegador porque los datos están protegidos con RLS. **Nunca pongas la clave `service_role` en el frontend ni en este archivo.**
+
+### Adjuntos de tickets
+
+Aplica la migración `20261101000000_ticket_attachments.sql` en Supabase antes de habilitar los adjuntos en producción (`npx.cmd supabase db push --linked`). La migración crea el bucket privado `ticket-attachments`, las políticas RLS de Storage y la tabla `ticket_attachments` para asociar metadatos de archivos con un ticket y, opcionalmente, un comentario. Las rutas siguen el formato `workspace_id/ticket_id/archivo`; tanto la política de objetos como la tabla verifican el espacio de trabajo y los permisos aplicables al ticket. Las imágenes se sirven mediante enlaces firmados con vencimiento, nunca con un bucket público.
+
+El frontend acepta JPG, PNG, WebP y GIF, con un máximo de cinco imágenes por comentario y 8 MB por archivo. JPEG/PNG/WebP se intentan convertir a WebP con calidad moderada y un lado máximo de 1920 px; los GIF se conservan para no perder la animación. Si Storage o la sesión no están disponibles, se informa el error. La publicación del comentario y el almacenamiento no forman una transacción atómica; el cliente intenta limpiar cargas parciales y avisa si no logra vincular un adjunto al comentario.
 
 Sirve la carpeta del proyecto desde un servidor HTTP local (por ejemplo, Live Server); no abras `index.html` con `file://`, porque el navegador no permite correctamente los módulos y solicitudes de red bajo ese esquema.
 

@@ -808,6 +808,112 @@ html[data-theme="pink"] .btn-danger { color: #b91c1c; }
   line-height: 1.5;
 }
 
+.ticket-attachments {
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 0.9rem;
+}
+
+.ticket-attachments h4 {
+  margin-bottom: 0.65rem;
+}
+
+.attachment-gallery,
+.comment-attachments,
+.attachment-selection {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.attachment-thumbnail {
+  width: 96px;
+  height: 84px;
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--bg-surface);
+  cursor: zoom-in;
+}
+
+.attachment-thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.attachment-record,
+.attachment-selection-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  max-width: 120px;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  overflow-wrap: anywhere;
+}
+
+.attachment-selection-item {
+  position: relative;
+}
+
+.attachment-selection-remove {
+  position: absolute;
+  z-index: 1;
+  top: 3px;
+  right: 3px;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--bg-surface);
+  color: var(--text-main);
+  cursor: pointer;
+}
+
+.attachment-help {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+
+.attachment-lightbox {
+  position: fixed;
+  inset: 0;
+  width: min(94vw, 1100px);
+  max-width: none;
+  max-height: 94vh;
+  margin: auto;
+  padding: 2.5rem 1rem 1rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: var(--bg-surface);
+  color: var(--text-main);
+}
+
+.attachment-lightbox::backdrop {
+  background: rgb(0 0 0 / 78%);
+}
+
+.attachment-lightbox > .close-x {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.65rem;
+}
+
+.attachment-lightbox img {
+  display: block;
+  max-width: 100%;
+  max-height: calc(94vh - 5.5rem);
+  margin: auto;
+  object-fit: contain;
+}
+
+.attachment-lightbox p {
+  margin-top: 0.6rem;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
 .comment-composer {
   display: flex;
   flex-direction: column;

@@ -14,6 +14,7 @@ import { RealtimeService } from './services/realtimeService.js?v=realtime-protoc
 import { createSplashScreen } from './ui/splashScreen.js';
 import { OutboxService } from './services/outboxService.js';
 import { MutationDispatcher } from './services/mutationDispatcher.js';
+import { AttachmentService, validateAttachmentFiles } from './services/attachmentService.js';
 
 const splashScreen = createSplashScreen();
 const client = new SupabaseClient();
@@ -21,6 +22,7 @@ let auth;
 const db = new SupabaseAdapter(client, () => auth.getAccessToken());
 auth = new AuthService(client, db);
 const ticketService = new TicketService(db, auth);
+const attachmentService = new AttachmentService({ ticketService, db });
 const outbox = new OutboxService();
 const mutations = new MutationDispatcher({
   outbox,
@@ -99,6 +101,8 @@ let lastScrollY = 0;
 let recentMobileSearches = [];
 let mobileRefreshInProgress = false;
 let appShortcutHandled = false;
+let ticketAttachmentsById = new Map();
+let attachmentErrorShown = false;
 let lastRealtimeStatus = 'unavailable';
 let connectionRecoveryPromise = null;
 const realtimeService = new RealtimeService(client, {
@@ -426,6 +430,28 @@ function bindStaticEvents() {
   document.getElementById('btnDeleteTemplate').addEventListener('click', deleteResponseTemplate);
   document.getElementById('notificationList').addEventListener('click', handleNotificationClick);
   document.getElementById('btnPostComment').addEventListener('click', handleCommentSubmit);
+  document.getElementById('ticketAttachmentInput').addEventListener('change', (event) => {
+    try {
+      const selected = [
+        ...modalView.getSelectedAttachments(),
+        ...Array.from(event.currentTarget.files || [])
+      ];
+      modalView.setSelectedAttachments(validateAttachmentFiles(selected));
+    } catch (error) {
+      showToast(error.message || 'No se pudieron seleccionar las imágenes.');
+    } finally {
+      event.currentTarget.value = '';
+    }
+  });
+  document.getElementById('selectedAttachments').addEventListener('click', (event) => {
+    const removeButton = event.target.closest('[data-remove-selected-attachment]');
+    if (removeButton) modalView.removeSelectedAttachment(Number(removeButton.dataset.removeSelectedAttachment));
+  });
+  document.getElementById('ticketCommentsList').addEventListener('click', handleAttachmentPreview);
+  document.getElementById('ticketAttachmentsList').addEventListener('click', handleAttachmentPreview);
+  document.getElementById('btnCloseAttachmentLightbox').addEventListener('click', () => {
+    document.getElementById('attachmentLightbox').close();
+  });
   document.getElementById('btnCancelModal').addEventListener('click', () => modalView.closeTicket());
   document.getElementById('checklistAddRow').addEventListener('click', (event) => {
     if (event.target.closest('#btnAddChecklistItem')) modalView.addChecklistItem();
@@ -1443,6 +1469,7 @@ function handleBottomSheetKeydown(event) {
 async function openTicketForEditing(ticketId) {
   const ticket = allTickets.find((item) => item.id === ticketId);
   if (!ticket) return;
+  ticketAttachmentsById = new Map();
   const user = await auth.getCurrentUser();
   modalView.openTicket(ticket, {
     canEdit: auth.canEditTicket(user, ticket),
@@ -1467,11 +1494,47 @@ async function loadTicketComments(ticketId) {
   modalView.setCommentsLoading();
   try {
     const comments = await ticketService.getComments(ticketId);
-    if (modalView.currentTicketId === ticketId) modalView.renderComments(comments);
+    if (modalView.currentTicketId !== ticketId) return;
+    let attachments = [];
+    try {
+      attachments = await attachmentService.getForTicket(ticketId);
+      attachmentErrorShown = false;
+      modalView.renderTicketAttachments(attachments);
+    } catch (error) {
+      modalView.showTicketAttachmentsError(`No se pudieron cargar los adjuntos: ${error.message}`);
+      if (!attachmentErrorShown) {
+        showToast(error.message || 'No se pudieron cargar los adjuntos.');
+        attachmentErrorShown = true;
+      }
+    }
+    ticketAttachmentsById = new Map(attachments.map((attachment) => [attachment.id, attachment]));
+    const attachmentsByComment = new Map();
+    attachments.forEach((attachment) => {
+      if (!attachment.commentId) return;
+      const grouped = attachmentsByComment.get(attachment.commentId) || [];
+      grouped.push(attachment);
+      attachmentsByComment.set(attachment.commentId, grouped);
+    });
+    modalView.renderComments(comments.map((comment) => ({
+      ...comment,
+      attachments: attachmentsByComment.get(comment.id) || []
+    })));
   } catch (error) {
     modalView.showCommentsError(error.message || 'No se pudieron cargar los comentarios.');
     showToast(error.message || 'No se pudieron cargar los comentarios.');
   }
+}
+
+function handleAttachmentPreview(event) {
+  const button = event.target.closest('[data-attachment-id]');
+  const attachment = button && ticketAttachmentsById.get(button.dataset.attachmentId);
+  if (!attachment) return;
+  const lightbox = document.getElementById('attachmentLightbox');
+  document.getElementById('attachmentLightboxImage').src = attachment.signedUrl;
+  document.getElementById('attachmentLightboxImage').alt = attachment.fileName;
+  document.getElementById('attachmentLightboxImage').referrerPolicy = 'no-referrer';
+  document.getElementById('attachmentLightboxCaption').textContent = attachment.fileName;
+  if (!lightbox.open) lightbox.showModal();
 }
 
 async function handleCalendarDateChange(ticketId, dateKey) {
@@ -1565,16 +1628,55 @@ async function handleCommentSubmit() {
   const button = document.getElementById('btnPostComment');
   if (!ticketId) return;
 
+  const selectedFiles = modalView.getSelectedAttachments();
+  const commentBody = input.value.trim()
+    || (selectedFiles.length ? `Adjuntó ${selectedFiles.length} ${selectedFiles.length === 1 ? 'imagen' : 'imágenes'}.` : '');
+  if (!commentBody) {
+    showToast('Escribe un comentario o selecciona al menos una imagen.');
+    return;
+  }
+
   button.disabled = true;
+  let uploadedAttachments = [];
+  let commentPosted = false;
   try {
-    await ticketService.addComment(ticketId, input.value);
+    if (selectedFiles.length) {
+      uploadedAttachments = await attachmentService.uploadFiles(ticketId, selectedFiles);
+    }
+    const comment = await ticketService.addComment(ticketId, commentBody);
+    commentPosted = true;
+    if (uploadedAttachments.length) {
+      await attachmentService.linkToComment(uploadedAttachments, comment.id);
+    }
     input.value = '';
+    modalView.clearSelectedAttachments();
     await loadTicketComments(ticketId);
     await refreshNotificationList();
     initializeMetricsDates();
     showToast('Comentario publicado correctamente.');
   } catch (error) {
-    showToast(error.message || 'No se pudo publicar el comentario.');
+    if (commentPosted) {
+      input.value = '';
+      modalView.clearSelectedAttachments();
+      await loadTicketComments(ticketId);
+      showToast(`Comentario publicado, pero no se pudieron vincular todos los adjuntos: ${error.message}`);
+    } else {
+      if (uploadedAttachments.length) {
+        const cleanupErrors = [];
+        for (const attachment of uploadedAttachments) {
+          try {
+            await attachmentService.removeUploaded(attachment);
+          } catch (cleanupError) {
+            cleanupErrors.push(cleanupError);
+          }
+        }
+        if (cleanupErrors.length) {
+          showToast(`${error.message} No se pudo limpiar un archivo temporal: ${cleanupErrors[0].message}`, 7000);
+          return;
+        }
+      }
+      showToast(error.message || 'No se pudo publicar el comentario.');
+    }
   } finally {
     button.disabled = false;
   }
@@ -2012,6 +2114,7 @@ async function syncAuthState() {
     realtimeService.stop();
     activeUser = null;
     mutations.setScope(null);
+    ticketAttachmentsById = new Map();
     modalView.showLogin();
     btnNewTicket.disabled = true;
     btnNewTicket.style.opacity = '0.5';

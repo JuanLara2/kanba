@@ -16,22 +16,32 @@ export class SupabaseClient {
     }
   }
 
-  async request(endpoint, path, { method = 'GET', body, accessToken, prefer } = {}) {
+  async request(endpoint, path, {
+    method = 'GET',
+    body,
+    accessToken,
+    prefer,
+    headers: additionalHeaders = {},
+    rawBody = false,
+    contentType
+  } = {}) {
     this.requireConfiguration();
     const headers = {
       apikey: this.anonKey,
       Accept: 'application/json'
     };
-    if (body !== undefined) headers['Content-Type'] = 'application/json';
+    if (body !== undefined && !rawBody) headers['Content-Type'] = contentType || 'application/json';
+    if (contentType) headers['Content-Type'] = contentType;
     if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
     if (prefer) headers.Prefer = prefer;
+    Object.assign(headers, additionalHeaders);
 
     let response;
     try {
       response = await fetch(`${this.url}/${endpoint}/${path}`, {
         method,
         headers,
-        body: body === undefined ? undefined : JSON.stringify(body)
+        body: body === undefined ? undefined : (rawBody ? body : JSON.stringify(body))
       });
     } catch {
       throw new Error('No fue posible conectar con Supabase. Comprueba tu conexión e intenta de nuevo.');
@@ -63,5 +73,9 @@ export class SupabaseClient {
 
   requestRest(path, options = {}) {
     return this.request('rest/v1', path, options);
+  }
+
+  requestStorage(path, options = {}) {
+    return this.request('storage/v1', path, options);
   }
 }

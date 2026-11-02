@@ -244,6 +244,23 @@ export class TicketService {
     return this.db.getComments(ticketId);
   }
 
+  async getAttachmentContext(ticketId) {
+    const user = await this.auth.getCurrentUser();
+    const ticket = await this.db.getById('tickets', ticketId);
+    if (!this.auth.canCommentOnTicket(user, ticket)) {
+      throw new Error('No tienes permiso para consultar o adjuntar archivos a este ticket.');
+    }
+    return { workspaceId: user.workspaceId };
+  }
+
+  async getAttachments(ticketId) {
+    await this.getAttachmentContext(ticketId);
+    if (typeof this.db.getAttachments !== 'function') {
+      throw new Error('La consulta de adjuntos no está disponible.');
+    }
+    return this.db.getAttachments(ticketId);
+  }
+
   async addComment(ticketId, body) {
     const user = await this.auth.getCurrentUser();
     const ticket = await this.db.getById('tickets', ticketId);

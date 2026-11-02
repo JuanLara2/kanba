@@ -15,6 +15,8 @@ export class ModalView {
     this.onOverlayOpen = onOverlayOpen;
     this.onOverlayClose = onOverlayClose;
     this.checklistDraft = [];
+    this.selectedAttachments = [];
+    this.attachmentPreviewUrls = [];
     this.bindEvents();
   }
 
@@ -92,6 +94,12 @@ export class ModalView {
     const canEditContent = !ticket || Boolean(permissions.canEdit);
     const canSave = !ticket || canEditContent || Boolean(permissions.canManageAssignment);
     this.currentTicketId = ticket?.id || null;
+    this.clearSelectedAttachments();
+    document.getElementById('ticketAttachmentsSection').classList.toggle(
+      'hidden',
+      !ticket || !permissions.canComment
+    );
+    this.renderTicketAttachments([]);
 
     if (ticket) {
       heading.textContent = 'Editar solicitud';
@@ -150,6 +158,9 @@ export class ModalView {
     document.getElementById('btnReopenTicket').classList.add('hidden');
     document.getElementById('ticketHistorySection').classList.add('hidden');
     document.getElementById('ticketCommentsSection').classList.add('hidden');
+    document.getElementById('ticketAttachmentsSection').classList.add('hidden');
+    this.renderTicketAttachments([]);
+    this.clearSelectedAttachments();
     document.getElementById('ticketCommentComposer').classList.remove('hidden');
     document.getElementById('ticketCommentInput').value = '';
     this.currentTicketId = null;
@@ -166,6 +177,58 @@ export class ModalView {
 
   getChecklist() {
     return this.checklistDraft.map((item) => ({ ...item }));
+  }
+
+  getSelectedAttachments() {
+    return this.selectedAttachments.slice();
+  }
+
+  setSelectedAttachments(files) {
+    this.selectedAttachments = Array.from(files || []);
+    this.renderSelectedAttachments();
+  }
+
+  removeSelectedAttachment(index) {
+    if (!Number.isInteger(index) || index < 0 || index >= this.selectedAttachments.length) return;
+    this.selectedAttachments.splice(index, 1);
+    this.renderSelectedAttachments();
+  }
+
+  clearSelectedAttachments() {
+    this.selectedAttachments = [];
+    this.renderSelectedAttachments();
+    const input = document.getElementById('ticketAttachmentInput');
+    if (input) input.value = '';
+  }
+
+  renderSelectedAttachments() {
+    this.attachmentPreviewUrls.forEach((url) => URL.revokeObjectURL(url));
+    this.attachmentPreviewUrls = [];
+    const list = document.getElementById('selectedAttachments');
+    if (!list) return;
+
+    const fragment = document.createDocumentFragment();
+    this.selectedAttachments.forEach((file, index) => {
+      const item = document.createElement('div');
+      item.className = 'attachment-selection-item';
+      const preview = document.createElement('img');
+      const url = URL.createObjectURL(file);
+      this.attachmentPreviewUrls.push(url);
+      preview.src = url;
+      preview.alt = file.name;
+      preview.className = 'attachment-thumbnail';
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'attachment-selection-remove';
+      remove.dataset.removeSelectedAttachment = String(index);
+      remove.setAttribute('aria-label', `Quitar ${file.name}`);
+      remove.textContent = '×';
+      const name = document.createElement('span');
+      name.textContent = file.name;
+      item.append(preview, remove, name);
+      fragment.appendChild(item);
+    });
+    list.replaceChildren(fragment);
   }
 
   addChecklistItem() {
@@ -331,10 +394,62 @@ export class ModalView {
         body.textContent = record.body;
         header.append(author, date);
         item.append(header, body);
+        this.appendAttachmentPreviews(item, record.attachments || []);
         fragment.appendChild(item);
       });
     }
     list.replaceChildren(fragment);
+  }
+
+  renderTicketAttachments(records) {
+    const list = document.getElementById('ticketAttachmentsList');
+    if (!list) return;
+    const fragment = document.createDocumentFragment();
+    if (!records?.length) {
+      const empty = document.createElement('p');
+      empty.className = 'comments-empty';
+      empty.textContent = 'Todavía no hay imágenes adjuntas.';
+      fragment.appendChild(empty);
+    } else {
+      records.forEach((record) => {
+        const item = document.createElement('div');
+        item.className = 'attachment-record';
+        this.appendAttachmentPreviews(item, [record]);
+        const name = document.createElement('span');
+        name.textContent = record.fileName;
+        item.appendChild(name);
+        fragment.appendChild(item);
+      });
+    }
+    list.replaceChildren(fragment);
+  }
+
+  showTicketAttachmentsError(message) {
+    const list = document.getElementById('ticketAttachmentsList');
+    const error = document.createElement('p');
+    error.className = 'comments-empty';
+    error.textContent = message;
+    list.replaceChildren(error);
+  }
+
+  appendAttachmentPreviews(container, attachments) {
+    if (!attachments.length) return;
+    const list = document.createElement('div');
+    list.className = 'comment-attachments';
+    attachments.forEach((attachment) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'attachment-thumbnail';
+      button.dataset.attachmentId = attachment.id;
+      button.setAttribute('aria-label', `Abrir ${attachment.fileName}`);
+      const image = document.createElement('img');
+      image.src = attachment.signedUrl;
+      image.alt = attachment.fileName;
+      image.referrerPolicy = 'no-referrer';
+      button.appendChild(image);
+      list.appendChild(button);
+    });
+    container.appendChild(list);
   }
 
   showCommentsError(message) {

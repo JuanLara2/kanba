@@ -2,7 +2,12 @@ const PROFILE_FIELDS = 'id,full_name,email,role,workspace_id,created_by_admin_id
 const TICKET_FIELDS = 'id,title,description,status,priority,category,assigned_to,created_by,workspace_id,created_at,updated_at,due_date,sla_due_at,sla_warning_at,checklist';
 const HISTORY_FIELDS = 'id,ticket_id,from_status,to_status,changed_at,changed_by';
 const COMMENT_FIELDS = 'id,ticket_id,author_id,body,created_at';
+const ATTACHMENT_FIELDS = 'id,ticket_id,comment_id,storage_path,file_name,mime_type,size_bytes,uploaded_by,created_at';
 const NOTIFICATION_FIELDS = 'id,user_id,ticket_id,kind,message,created_at,read_at';
+
+function encodeStoragePath(path) {
+  return path.split('/').map((part) => encodeURIComponent(part)).join('/');
+}
 
 function mapProfile(row) {
   return {
@@ -225,6 +230,128 @@ export class SupabaseAdapter {
     });
     if (!rows?.[0]) throw new Error('Supabase no devolvió el comentario creado.');
     return mapComment(rows[0]);
+  }
+
+  async getAttachments(ticketId) {
+    const accessToken = await this.accessToken();
+    const rows = await this.client.requestRest(
+      `ticket_attachments?select=${ATTACHMENT_FIELDS}&ticket_id=eq.${encodeURIComponent(ticketId)}&order=created_at.desc&limit=100`,
+      { accessToken }
+    );
+    return rows.map((row) => ({
+      id: row.id,
+      ticketId: row.ticket_id,
+      commentId: row.comment_id,
+      storagePath: row.storage_path,
+      fileName: row.file_name,
+      mimeType: row.mime_type,
+      sizeBytes: row.size_bytes,
+      uploadedBy: row.uploaded_by,
+      createdAt: row.created_at
+    }));
+  }
+
+  async uploadAttachmentObject(storagePath, file) {
+    const accessToken = await this.accessToken();
+    return this.client.requestStorage(
+      `object/ticket-attachments/${encodeStoragePath(storagePath)}`,
+      {
+        method: 'POST',
+        accessToken,
+        body: file,
+        rawBody: true,
+        contentType: file.type,
+        headers: { 'x-upsert': 'false' }
+      }
+    );
+  }
+
+  async deleteAttachmentObject(storagePath) {
+    const accessToken = await this.accessToken();
+    return this.client.requestStorage('object/ticket-attachments', {
+      method: 'DELETE',
+      accessToken,
+      body: { prefixes: [storagePath] }
+    });
+  }
+
+  async createAttachmentRecord({ ticketId, commentId = null, storagePath, fileName, mimeType, sizeBytes }) {
+    const accessToken = await this.accessToken();
+    const rows = await this.client.requestRest('ticket_attachments', {
+      method: 'POST',
+      accessToken,
+      prefer: 'return=representation',
+      body: {
+        ticket_id: ticketId,
+        comment_id: commentId,
+        storage_path: storagePath,
+        file_name: fileName,
+        mime_type: mimeType,
+        size_bytes: sizeBytes
+      }
+    });
+    if (!rows?.[0]) throw new Error('Supabase no devolvió los metadatos del adjunto.');
+    const row = rows[0];
+    return {
+      id: row.id,
+      ticketId: row.ticket_id,
+      commentId: row.comment_id,
+      storagePath: row.storage_path,
+      fileName: row.file_name,
+      mimeType: row.mime_type,
+      sizeBytes: row.size_bytes,
+      uploadedBy: row.uploaded_by,
+      createdAt: row.created_at
+    };
+  }
+
+  async linkAttachmentsToComment(attachmentIds, commentId) {
+    if (!attachmentIds.length) return;
+    const accessToken = await this.accessToken();
+    const ids = attachmentIds.map((id) => `"${id}"`).join(',');
+    const rows = await this.client.requestRest(
+      `ticket_attachments?id=in.(${ids})&comment_id=is.null`,
+      {
+        method: 'PATCH',
+        accessToken,
+        prefer: 'return=representation',
+        body: { comment_id: commentId }
+      }
+    );
+    if (rows.length !== attachmentIds.length) {
+      throw new Error('No se pudieron vincular todos los adjuntos al comentario.');
+    }
+  }
+
+  async deleteAttachmentRecord(attachmentId) {
+    const accessToken = await this.accessToken();
+    return this.client.requestRest(`ticket_attachments?id=eq.${encodeURIComponent(attachmentId)}`, {
+      method: 'DELETE',
+      accessToken
+    });
+  }
+
+  async createAttachmentSignedUrls(storagePaths, expiresIn = 3600) {
+    if (!storagePaths.length) return [];
+    const accessToken = await this.accessToken();
+    const result = await this.client.requestStorage('object/sign/ticket-attachments', {
+      method: 'POST',
+      accessToken,
+      body: { expiresIn, paths: storagePaths }
+    });
+    const signedUrls = Array.isArray(result) ? result : result?.signedURLs;
+    if (!Array.isArray(signedUrls) || signedUrls.length !== storagePaths.length) {
+      throw new Error('Supabase no devolvió enlaces seguros para todos los adjuntos.');
+    }
+    const urlsByPath = new Map(signedUrls.map((item) => [item.path, item.signedURL || item.signedUrl]));
+    return storagePaths.map((storagePath) => {
+      const signedPath = urlsByPath.get(storagePath);
+      if (!signedPath) throw new Error('Supabase no devolvió un enlace seguro para un adjunto.');
+      if (/^https?:\/\//i.test(signedPath)) return signedPath;
+      if (signedPath.startsWith('/storage/v1/')) return `${this.client.url}${signedPath}`;
+      if (signedPath.startsWith('storage/v1/')) return `${this.client.url}/${signedPath}`;
+      return `${this.client.url}/storage/v1/${signedPath.replace(/^\/+/, '')}`;
+    });
   }
 
   async getNotifications(userId) {

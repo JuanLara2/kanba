@@ -1021,11 +1021,13 @@ test('ticket comments enforce role, workspace, and text length before persistenc
   assert.equal(comment.authorId, reporter.id);
   assert.equal(comment.body, 'Ya adjunté los detalles.');
   assert.equal((await ticketService.getComments(ticket.id)).length, 1);
+  assert.equal((await ticketService.getAttachmentContext(ticket.id)).workspaceId, reporter.workspaceId);
   await assert.rejects(() => ticketService.addComment(ticket.id, '  '), /entre 1 y 4000/);
   await assert.rejects(() => ticketService.addComment(ticket.id, 'x'.repeat(4001)), /entre 1 y 4000/);
 
   await auth.login(agent.email, 'AgentPassword123!');
   assert.equal((await ticketService.addComment(ticket.id, 'Lo estamos revisando.')).authorId, agent.id);
+  assert.equal((await ticketService.getAttachmentContext(ticket.id)).workspaceId, agent.workspaceId);
 
   await auth.login(users.find((user) => user.role === 'Admin').email, 'AdminPassword123!');
   const adminTicket = await ticketService.createTicket({
@@ -1033,6 +1035,10 @@ test('ticket comments enforce role, workspace, and text length before persistenc
     description: 'El Reporter no debe comentar en tickets de otras personas.'
   });
   await auth.login(reporter.email, 'ReporterPassword123!');
+  await assert.rejects(
+    () => ticketService.getAttachmentContext(adminTicket.id),
+    /permiso para consultar o adjuntar archivos/
+  );
   await assert.rejects(
     () => ticketService.addComment(adminTicket.id, 'No autorizado'),
     /permiso para comentar/
@@ -1044,6 +1050,10 @@ test('ticket comments enforce role, workspace, and text length before persistenc
     workspaceId: 'another-workspace'
   };
   await db.put('tickets', outsideTicket);
+  await assert.rejects(
+    () => ticketService.getAttachmentContext(outsideTicket.id),
+    /permiso para consultar o adjuntar archivos/
+  );
   await assert.rejects(
     () => ticketService.addComment(outsideTicket.id, 'No autorizado'),
     /permiso para comentar/
