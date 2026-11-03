@@ -246,6 +246,13 @@
           <div class="metrics-controls">
             <label>Desde <input id="metricsStart" type="date" /></label>
             <label>Hasta <input id="metricsEnd" type="date" /></label>
+            <label for="metricsGrouping">Agrupar por
+              <select id="metricsGrouping">
+                <option value="day">Día</option>
+                <option value="week">Semana</option>
+                <option value="month">Mes</option>
+              </select>
+            </label>
             <button id="btnExportMetrics" class="btn btn-outline" type="button">Exportar CSV</button>
           </div>
         </header>
@@ -259,6 +266,33 @@
           <article class="metrics-card"><span>Cumplimiento SLA</span><strong id="metricSla">0%</strong></article>
           <article class="metrics-card"><span>Resolución promedio</span><strong id="metricResolution">0 h</strong></article>
           <article class="metrics-card"><span>Satisfacción promedio</span><strong id="metricSatisfaction">Sin datos</strong></article>
+        </div>
+        <div class="metrics-charts-grid">
+          <section class="metrics-chart-card" aria-labelledby="ticketVolumeChartHeading">
+            <h3 id="ticketVolumeChartHeading">Tickets creados vs. resueltos</h3>
+            <div id="chartTicketVolume" class="metrics-chart-canvas"></div>
+            <div id="legendTicketVolume" class="metrics-chart-legend" aria-label="Leyenda"></div>
+          </section>
+          <section class="metrics-chart-card" aria-labelledby="backlogChartHeading">
+            <h3 id="backlogChartHeading">Backlog histórico por estado</h3>
+            <p class="metrics-chart-note">Se reconstruye con el historial disponible; en tickets antiguos sin historial completo, el estado puede ser aproximado.</p>
+            <div id="chartBacklog" class="metrics-chart-canvas"></div>
+            <div id="legendBacklog" class="metrics-chart-legend" aria-label="Estados"></div>
+          </section>
+          <section class="metrics-chart-card" aria-labelledby="agentChartHeading">
+            <h3 id="agentChartHeading">Tickets cerrados por responsable</h3>
+            <div id="chartByAgent" class="metrics-chart-canvas"></div>
+          </section>
+          <section class="metrics-chart-card" aria-labelledby="categoryChartHeading">
+            <h3 id="categoryChartHeading">Tickets por categoría</h3>
+            <div id="chartByCategory" class="metrics-chart-canvas"></div>
+            <div id="legendByCategory" class="metrics-chart-legend" aria-label="Leyenda"></div>
+          </section>
+          <section class="metrics-chart-card" aria-labelledby="resolutionChartHeading">
+            <h3 id="resolutionChartHeading">Distribución del tiempo de resolución</h3>
+            <p class="metrics-chart-note">Cada barra muestra cuántos tickets resueltos tardaron el intervalo indicado.</p>
+            <div id="chartResolutionTime" class="metrics-chart-canvas"></div>
+          </section>
         </div>
         <section class="agent-metrics" aria-labelledby="agentMetricsHeading">
           <h3 id="agentMetricsHeading">Capacidad productiva por responsable</h3>

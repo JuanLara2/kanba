@@ -9,7 +9,8 @@ import { DragDropController } from './ui/dragDrop.js?v=mobile-native-v1';
 import { CalendarView, dueDateForCalendarDay } from './ui/calendarView.js';
 import { initializeThemeController } from './ui/themeController.js';
 import { PRIORITY_ORDER, SLA_REFRESH_INTERVAL_MS, STATUS_DEFINITIONS } from './config/constants.js';
-import { calculateTicketMetrics, metricsToCsv } from './services/metricsService.js?v=complexity-scoring-v1';
+import { calculateTicketMetrics, metricsToCsv } from './services/metricsService.js?v=metrics-charts-v1';
+import { clearMetricsCharts, renderMetricsCharts } from './ui/metricsCharts.js?v=metrics-charts-v1';
 import { RealtimeService } from './services/realtimeService.js?v=realtime-protocol-v2';
 import { createSplashScreen } from './ui/splashScreen.js';
 import { OutboxService } from './services/outboxService.js';
@@ -574,6 +575,7 @@ function bindStaticEvents() {
   });
   document.getElementById('metricsStart').addEventListener('change', renderMetrics);
   document.getElementById('metricsEnd').addEventListener('change', renderMetrics);
+  document.getElementById('metricsGrouping').addEventListener('change', renderMetrics);
   document.getElementById('btnExportMetrics').addEventListener('click', exportMetrics);
   document.getElementById('btnReopenTicket').addEventListener('click', handleTicketReopen);
   document.getElementById('satisfactionCloseBtn').addEventListener('click', closeSatisfactionModal);
@@ -1973,9 +1975,17 @@ function renderMetrics() {
   if (!start || !end || !start.value || !end.value) return;
   let metrics;
   try {
-    metrics = calculateTicketMetrics(allTickets, usersMap, start.value, end.value, satisfactionEntries);
+    metrics = calculateTicketMetrics(
+      allTickets,
+      usersMap,
+      start.value,
+      end.value,
+      satisfactionEntries,
+      document.getElementById('metricsGrouping').value
+    );
   } catch (error) {
     document.getElementById('agentMetricsBody').replaceChildren();
+    clearMetricsCharts('No se pudieron calcular las gráficas para este período.');
     const message = error.message || 'El rango de fechas del informe no es válido.';
     document.getElementById('metricsError').textContent = message;
     document.getElementById('metricsError').classList.remove('hidden');
@@ -1992,6 +2002,7 @@ function renderMetrics() {
   document.getElementById('metricSatisfaction').textContent = metrics.averageSatisfaction === null
     ? 'Sin datos'
     : `${metrics.averageSatisfaction} / 5`;
+  renderMetricsCharts(metrics);
   const body = document.getElementById('agentMetricsBody');
   const rows = metrics.byAgent.map((agent) => {
     const row = document.createElement('tr');

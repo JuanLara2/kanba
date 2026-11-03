@@ -1,6 +1,73 @@
+const STATUS_LABELS = {
+  new: 'Nuevo',
+  open: 'Abierto',
+  in_progress: 'En progreso',
+  resolved: 'Resuelto',
+  closed: 'Cerrado',
+  blocked: 'Bloqueado'
+};
+const BACKLOG_STATUS_LABELS = {
+  new: STATUS_LABELS.new,
+  open: STATUS_LABELS.open,
+  in_progress: STATUS_LABELS.in_progress,
+  blocked: STATUS_LABELS.blocked
+};
+
+const RESOLUTION_BUCKETS = [
+  { label: '< 1 h', max: 1 },
+  { label: '1–4 h', max: 4 },
+  { label: '4–24 h', max: 24 },
+  { label: '1–3 días', max: 72 },
+  { label: '> 3 días', max: Infinity }
+];
+
 function isWithinRange(value, start, end) {
   const timestamp = new Date(value).getTime();
   return Number.isFinite(timestamp) && timestamp >= start && timestamp <= end;
+}
+
+function dateKey(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function periodKey(date, grouping) {
+  const groupedDate = new Date(date);
+  if (grouping === 'week') {
+    groupedDate.setDate(groupedDate.getDate() - ((groupedDate.getDay() + 6) % 7));
+  } else if (grouping === 'month') {
+    groupedDate.setDate(1);
+  }
+  return dateKey(groupedDate);
+}
+
+function formatPeriod(date, grouping) {
+  const options = grouping === 'month'
+    ? { month: 'short', year: '2-digit' }
+    : { day: 'numeric', month: 'short' };
+  return new Intl.DateTimeFormat('es', options).format(date);
+}
+
+function buildPeriods(startAt, endAt, grouping) {
+  const periods = new Map();
+  const cursor = new Date(startAt);
+  const lastDay = new Date(endAt);
+  cursor.setHours(0, 0, 0, 0);
+  lastDay.setHours(0, 0, 0, 0);
+
+  while (cursor <= lastDay) {
+    const key = periodKey(cursor, grouping);
+    if (!periods.has(key)) {
+      periods.set(key, { key, date: new Date(cursor), lastDate: new Date(cursor) });
+    } else {
+      periods.get(key).lastDate = new Date(cursor);
+    }
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  return [...periods.values()].map((period) => ({
+    ...period,
+    label: formatPeriod(period.date, grouping)
+  }));
 }
 
 function firstResolution(ticket) {
@@ -28,13 +95,40 @@ function finalClosure(ticket) {
       : null);
 }
 
-export function calculateTicketMetrics(tickets, usersMap, start, end, satisfaction = []) {
+function statusAt(ticket, timestamp, history) {
+  if (new Date(ticket.createdAt).getTime() > timestamp) return null;
+  let status = null;
+  for (const record of history) {
+    if (new Date(record.changedAt).getTime() <= timestamp) {
+      status = record.to;
+    } else {
+      if (!status) status = record.from;
+      break;
+    }
+  }
+  return status || ticket.status;
+}
+
+export function calculateTicketMetrics(tickets, usersMap, start, end, satisfaction = [], grouping = 'day') {
   const startAt = new Date(`${start}T00:00:00`).getTime();
   const endAt = new Date(`${end}T23:59:59.999`).getTime();
   if (!Number.isFinite(startAt) || !Number.isFinite(endAt) || startAt > endAt) {
     throw new Error('El rango de fechas del informe no es válido.');
   }
+  if (!['day', 'week', 'month'].includes(grouping)) {
+    throw new Error('La agrupación temporal seleccionada no es válida.');
+  }
 
+  const periods = buildPeriods(startAt, endAt, grouping);
+  const periodByKey = new Map(periods.map((period) => [period.key, period]));
+  const historyByTicket = new Map(tickets.map((ticket) => [ticket.id, (ticket.statusHistory || [])
+    .slice()
+    .sort((a, b) => new Date(a.changedAt) - new Date(b.changedAt))]));
+  const getPeriod = (value) => {
+    const date = new Date(value);
+    if (!Number.isFinite(date.getTime()) || !isWithinRange(value, startAt, endAt)) return null;
+    return periodByKey.get(periodKey(date, grouping)) || null;
+  };
   const created = tickets.filter((ticket) => isWithinRange(ticket.createdAt, startAt, endAt));
   const resolved = tickets.map((ticket) => ({ ticket, resolvedAt: firstResolution(ticket) }))
     .filter(({ resolvedAt }) => resolvedAt && isWithinRange(resolvedAt, startAt, endAt));
@@ -80,6 +174,48 @@ export function calculateTicketMetrics(tickets, usersMap, start, end, satisfacti
   });
 
   const periodSatisfaction = satisfaction.filter((item) => isWithinRange(item.createdAt, startAt, endAt));
+  const volumeByPeriod = new Map(periods.map((period) => [period.key, {
+    label: period.label,
+    created: 0,
+    resolved: 0
+  }]));
+  created.forEach((ticket) => {
+    const period = getPeriod(ticket.createdAt);
+    if (period) volumeByPeriod.get(period.key).created += 1;
+  });
+  resolved.forEach(({ resolvedAt }) => {
+    const period = getPeriod(resolvedAt);
+    if (period) volumeByPeriod.get(period.key).resolved += 1;
+  });
+
+  const backlogByPeriod = periods.map((period) => {
+    const timestamp = new Date(period.lastDate);
+    timestamp.setHours(23, 59, 59, 999);
+    const counts = Object.fromEntries(Object.keys(BACKLOG_STATUS_LABELS).map((status) => [status, 0]));
+    tickets.forEach((ticket) => {
+      const status = statusAt(ticket, timestamp.getTime(), historyByTicket.get(ticket.id));
+      if (status && Object.prototype.hasOwnProperty.call(counts, status)) counts[status] += 1;
+    });
+    return { label: period.label, counts };
+  });
+
+  const categories = new Map();
+  created.forEach((ticket) => {
+    const name = ticket.category || 'Sin categoría';
+    if (!categories.has(name)) categories.set(name, { name, created: 0, closed: 0 });
+    categories.get(name).created += 1;
+  });
+  closed.forEach(({ ticket }) => {
+    const name = ticket.category || 'Sin categoría';
+    if (!categories.has(name)) categories.set(name, { name, created: 0, closed: 0 });
+    categories.get(name).closed += 1;
+  });
+
+  const resolutionDistribution = RESOLUTION_BUCKETS.map(({ label }) => ({ label, count: 0 }));
+  resolutionHours.forEach((hours) => {
+    const bucket = RESOLUTION_BUCKETS.findIndex(({ max }) => hours < max);
+    if (bucket >= 0) resolutionDistribution[bucket].count += 1;
+  });
 
   return {
     createdCount: created.length,
@@ -100,7 +236,15 @@ export function calculateTicketMetrics(tickets, usersMap, start, end, satisfacti
       b.completedPoints - a.completedPoints
       || b.resolved - a.resolved
       || a.name.localeCompare(b.name, 'es')
-    ))
+    )),
+    charts: {
+      grouping,
+      volume: periods.map((period) => volumeByPeriod.get(period.key)),
+      backlog: backlogByPeriod,
+      byCategory: [...categories.values()].sort((a, b) => b.created - a.created || a.name.localeCompare(b.name, 'es')),
+      resolutionDistribution,
+      statusLabels: BACKLOG_STATUS_LABELS
+    }
   };
 }
 

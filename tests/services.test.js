@@ -1160,6 +1160,58 @@ test('metrics calculate date-bounded volume, SLA, satisfaction, and per-agent lo
   assert.throws(() => calculateTicketMetrics(tickets, users, '2026-11-01', '2026-10-01'), /rango de fechas/);
 });
 
+test('metrics build volume, historical backlog, category, and resolution chart data', () => {
+  const tickets = [
+    {
+      id: 'TCK-10',
+      title: 'Acceso',
+      category: 'Acceso',
+      status: 'open',
+      createdAt: '2026-10-01T12:00:00.000Z',
+      statusHistory: [
+        { from: 'new', to: 'open', changedAt: '2026-10-01T14:00:00.000Z' }
+      ]
+    },
+    {
+      id: 'TCK-11',
+      title: 'Correo',
+      category: 'Correo',
+      status: 'resolved',
+      createdAt: '2026-10-02T12:00:00.000Z',
+      statusHistory: [{ from: 'new', to: 'resolved', changedAt: '2026-10-03T12:00:00.000Z' }]
+    }
+  ];
+
+  const daily = calculateTicketMetrics(tickets, new Map(), '2026-10-01', '2026-10-03');
+  assert.deepEqual(daily.charts.volume.map(({ created, resolved }) => [created, resolved]), [
+    [1, 0],
+    [1, 0],
+    [0, 1]
+  ]);
+  assert.deepEqual(daily.charts.backlog.map(({ counts }) => [counts.new, counts.open, counts.blocked]), [
+    [0, 1, 0],
+    [1, 1, 0],
+    [0, 1, 0]
+  ]);
+  assert.deepEqual(daily.charts.byCategory, [
+    { name: 'Acceso', created: 1, closed: 0 },
+    { name: 'Correo', created: 1, closed: 0 }
+  ]);
+  assert.equal(daily.charts.resolutionDistribution[3].count, 1);
+
+  const weekly = calculateTicketMetrics(tickets, new Map(), '2026-10-01', '2026-10-03', [], 'week');
+  assert.equal(weekly.charts.volume.length, 1);
+  assert.deepEqual(weekly.charts.volume[0], {
+    label: weekly.charts.volume[0].label,
+    created: 2,
+    resolved: 1
+  });
+  assert.throws(
+    () => calculateTicketMetrics(tickets, new Map(), '2026-10-01', '2026-10-03', [], 'year'),
+    /agrupación temporal/
+  );
+});
+
 test('Realtime service subscribes workspace tables and forwards database changes', async () => {
   class MockWebSocket {
     static CONNECTING = 0;
