@@ -17,7 +17,7 @@
   }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 768px), (orientation: landscape) and (max-height: 600px) and (max-width: 1024px) {
   .app-shell {
     min-width: 0;
     width: 100%;
@@ -444,7 +444,7 @@
   }
 }
 
-@media (max-width: 768px) and (max-height: 700px) {
+@media (max-width: 768px) and (max-height: 700px), (orientation: landscape) and (max-height: 500px) and (max-width: 1024px) {
   .login-brand-panel {
     padding-bottom: 0.9rem;
   }
@@ -511,7 +511,7 @@
   display: contents;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 768px), (orientation: landscape) and (max-height: 600px) and (max-width: 1024px) {
   .controls-toolbar {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
@@ -1070,7 +1070,7 @@
   display: none;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 768px), (orientation: landscape) and (max-height: 600px) and (max-width: 1024px) {
   .mobile-selection-entry {
     display: flex;
     justify-content: flex-end;
