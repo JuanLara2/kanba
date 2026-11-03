@@ -59,10 +59,18 @@ Deno.serve(async (request: Request) => {
   const fullName = typeof payload.fullName === 'string' ? payload.fullName.trim() : '';
   const email = typeof payload.email === 'string' ? payload.email.trim().toLowerCase() : '';
   const password = typeof payload.password === 'string' ? payload.password : '';
-  const role = payload.role;
+  if (payload.createWorkspace !== undefined && typeof payload.createWorkspace !== 'boolean') {
+    return jsonResponse({ error: 'La opción de espacio independiente no es válida.' }, 400);
+  }
+  const createWorkspace = payload.createWorkspace === true;
+  const workspaceName = typeof payload.workspaceName === 'string' ? payload.workspaceName.trim() : '';
+  const role = createWorkspace ? 'Admin' : payload.role;
   if (fullName.length < 2 || fullName.length > 100) return jsonResponse({ error: 'El nombre no es válido.' }, 400);
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
     return jsonResponse({ error: 'El correo electrónico no es válido.' }, 400);
+  }
+  if (createWorkspace && (workspaceName.length < 2 || workspaceName.length > 100)) {
+    return jsonResponse({ error: 'El nombre del equipo debe tener entre 2 y 100 caracteres.' }, 400);
   }
   if (password.length < 12 || password.length > 128) {
     return jsonResponse({ error: 'La contraseña debe tener entre 12 y 128 caracteres.' }, 400);
@@ -85,7 +93,8 @@ Deno.serve(async (request: Request) => {
     p_full_name: fullName,
     p_email: email,
     p_role: role,
-    p_created_by_admin_id: authData.user.id
+    p_created_by_admin_id: authData.user.id,
+    p_new_workspace_name: createWorkspace ? workspaceName : null
   });
 
   if (insertError) {

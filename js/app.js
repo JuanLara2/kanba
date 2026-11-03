@@ -684,6 +684,12 @@ async function handleProfileAvatarRemoval() {
 function bindStaticEvents() {
   const userRoleSelect = document.getElementById('userRole');
   userRoleSelect.addEventListener('change', updateUserRoleDescription);
+  const createWorkspaceCheckbox = document.getElementById('userCreateWorkspace');
+  createWorkspaceCheckbox.addEventListener('change', syncNewWorkspaceForm);
+  usersForm.addEventListener('reset', () => {
+    setTimeout(syncNewWorkspaceForm, 0);
+  });
+  syncNewWorkspaceForm();
   updateUserRoleDescription();
   document.getElementById('btnManageCategories').addEventListener('click', openCategoriesModal);
   document.getElementById('categoriesModalCloseBtn').addEventListener('click', closeCategoriesModal);
@@ -1922,6 +1928,11 @@ function setActiveView(view) {
 }
 
 function updateUserRoleDescription() {
+  if (document.getElementById('userCreateWorkspace').checked) {
+    document.getElementById('userRoleDescription').textContent = 'Se creará un espacio independiente y esta cuenta será su Administrador inicial.';
+    return;
+  }
+
   const descriptions = {
     Reporter: 'Puede crear tickets nuevos, consultar los tickets del equipo, comentar en los que creó y valorar sus tickets al cerrarse. No puede asignar, editar ni cambiar estados.',
     Agent: 'Puede trabajar tickets abiertos o asignados: editarlos, cambiar su estado, gestionar subtareas, asignar responsables y definir fechas límite. No administra usuarios ni categorías.',
@@ -1929,6 +1940,30 @@ function updateUserRoleDescription() {
   };
   const role = document.getElementById('userRole').value;
   document.getElementById('userRoleDescription').textContent = descriptions[role] || '';
+}
+
+function syncNewWorkspaceForm() {
+  const checkbox = document.getElementById('userCreateWorkspace');
+  const roleSelect = document.getElementById('userRole');
+  const nameRow = document.getElementById('newWorkspaceNameRow');
+  const nameInput = document.getElementById('newWorkspaceName');
+
+  if (checkbox.checked) {
+    if (!roleSelect.disabled) roleSelect.dataset.previousValue = roleSelect.value;
+    roleSelect.value = 'Admin';
+    roleSelect.disabled = true;
+    nameRow.hidden = false;
+    nameInput.required = true;
+  } else {
+    if (roleSelect.disabled) roleSelect.value = roleSelect.dataset.previousValue || 'Reporter';
+    delete roleSelect.dataset.previousValue;
+    roleSelect.disabled = false;
+    nameRow.hidden = true;
+    nameInput.required = false;
+    nameInput.value = '';
+  }
+
+  updateUserRoleDescription();
 }
 
 async function handleTicketSubmit(event) {
@@ -2077,6 +2112,7 @@ async function handleUserSubmit(event) {
   event.preventDefault();
   const password = document.getElementById('userPassword').value;
   const passwordConfirm = document.getElementById('userPasswordConfirm').value;
+  const createWorkspace = document.getElementById('userCreateWorkspace').checked;
   if (password !== passwordConfirm) {
     showToast('Las contraseñas no coinciden.');
     return;
@@ -2087,11 +2123,15 @@ async function handleUserSubmit(event) {
       fullName: document.getElementById('userFullName').value,
       email: document.getElementById('userEmail').value,
       role: document.getElementById('userRole').value,
-      password
+      password,
+      createWorkspace,
+      workspaceName: document.getElementById('newWorkspaceName').value
     });
     await loadUsers();
     modalView.openUsers([...usersMap.values()], activeUser?.id);
-    showToast('Usuario creado correctamente.');
+    showToast(createWorkspace
+      ? 'Espacio de trabajo creado y Administrador inicial registrado.'
+      : 'Usuario creado correctamente.');
   } catch (error) {
     showToast(error.message || 'No se pudo crear el usuario.');
   }

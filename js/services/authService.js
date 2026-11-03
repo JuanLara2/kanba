@@ -137,7 +137,7 @@ export class AuthService {
     });
   }
 
-  async registerUser({ fullName, email, password, role = 'Reporter' }) {
+  async registerUser({ fullName, email, password, role = 'Reporter', createWorkspace = false, workspaceName = '' }) {
     const currentUser = await this.getCurrentUser();
     if (!this.canManageUsers(currentUser)) {
       throw new Error('Solo un administrador puede crear usuarios.');
@@ -145,9 +145,15 @@ export class AuthService {
 
     const normalizedName = String(fullName ?? '').trim();
     const normalizedEmail = String(email ?? '').trim().toLowerCase();
+    const normalizedWorkspaceName = String(workspaceName ?? '').trim();
+    if (typeof createWorkspace !== 'boolean') throw new Error('La opción de espacio independiente no es válida.');
+    const userRole = createWorkspace ? 'Admin' : role;
     if (normalizedName.length < 2) throw new Error('El nombre debe tener al menos 2 caracteres.');
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) throw new Error('El correo electrónico no es válido.');
-    if (!VALID_ROLES.includes(role)) throw new Error('El rol seleccionado no es válido.');
+    if (!VALID_ROLES.includes(userRole)) throw new Error('El rol seleccionado no es válido.');
+    if (createWorkspace && (normalizedWorkspaceName.length < 2 || normalizedWorkspaceName.length > 100)) {
+      throw new Error('El nombre del equipo debe tener entre 2 y 100 caracteres.');
+    }
     if (typeof password !== 'string' || password.length < 12) {
       throw new Error('La contraseña debe tener al menos 12 caracteres.');
     }
@@ -161,7 +167,9 @@ export class AuthService {
       fullName: normalizedName,
       email: normalizedEmail,
       password,
-      role
+      ...(!createWorkspace && { role: userRole }),
+      createWorkspace,
+      workspaceName: createWorkspace ? normalizedWorkspaceName : null
     });
   }
 

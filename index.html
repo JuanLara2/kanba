@@ -624,6 +624,17 @@
               <p id="userRoleDescription" class="role-description" aria-live="polite"></p>
             </div>
             <div class="form-row">
+              <label class="workspace-creation-option" for="userCreateWorkspace">
+                <input id="userCreateWorkspace" type="checkbox" />
+                Crear un espacio de trabajo independiente
+              </label>
+              <small>El usuario será Administrador de su propio equipo, separado del tuyo.</small>
+            </div>
+            <div id="newWorkspaceNameRow" class="form-row" hidden>
+              <label for="newWorkspaceName">Nombre del nuevo equipo *</label>
+              <input id="newWorkspaceName" type="text" maxlength="100" autocomplete="organization" />
+            </div>
+            <div class="form-row">
               <label for="userPassword">Contraseña (mínimo 12 caracteres) *</label>
               <input id="userPassword" type="password" autocomplete="new-password" required minlength="12" />
             </div>

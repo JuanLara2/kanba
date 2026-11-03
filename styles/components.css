@@ -944,6 +944,23 @@
   line-height: 1.45;
 }
 
+.workspace-creation-option {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-weight: 600;
+}
+
+.workspace-creation-option input {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  accent-color: var(--color-primary-start);
+}
+
 .user-role-controls {
   display: flex;
   flex: 0 0 auto;

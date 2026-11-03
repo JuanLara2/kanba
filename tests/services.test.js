@@ -127,9 +127,16 @@ function createContext() {
       const index = responseTemplates.findIndex((item) => item.id === templateId);
       if (index !== -1) responseTemplates.splice(index, 1);
     },
-    async createUser({ fullName, email, role }) {
+    async createUser({ fullName, email, role, createWorkspace, workspaceName }) {
       const id = `usr-created-${++createdUserId}`;
-      const user = { id, fullName, email, role, workspaceId: 'workspace-test' };
+      const user = {
+        id,
+        fullName,
+        email,
+        role: createWorkspace ? 'Admin' : role,
+        workspaceName,
+        workspaceId: createWorkspace ? `workspace-created-${createdUserId}` : 'workspace-test'
+      };
       users.push(user);
       return user;
     },
@@ -739,6 +746,34 @@ test('admin-created members share assigned tickets while other workspaces stay i
       assignedTo: 'usr-isolated-01'
     }),
     /responsable debe pertenecer a tu espacio/
+  );
+});
+
+test('admins can create an independent workspace with its own initial admin', async () => {
+  const { auth } = createContext();
+  await auth.login('admin@nexus.com', 'AdminPassword123!');
+  const createdAdmin = await auth.registerUser({
+    fullName: 'Admin de otro equipo',
+    email: 'new.admin@example.com',
+    password: 'SecurePassword123',
+    role: 'Reporter',
+    createWorkspace: true,
+    workspaceName: 'Equipo Independiente'
+  });
+
+  assert.equal(createdAdmin.role, 'Admin');
+  assert.equal(createdAdmin.workspaceId, 'workspace-created-1');
+  assert.equal(createdAdmin.workspaceName, 'Equipo Independiente');
+  assert.notEqual(createdAdmin.workspaceId, 'workspace-test');
+
+  await assert.rejects(
+    () => auth.registerUser({
+      fullName: 'Equipo sin nombre',
+      email: 'missing.workspace@example.com',
+      password: 'SecurePassword123',
+      createWorkspace: true
+    }),
+    /nombre del equipo debe tener entre 2 y 100 caracteres/
   );
 });
 

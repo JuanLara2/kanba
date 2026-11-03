@@ -39,13 +39,24 @@ cross join (
 ) as category(name)
 on conflict (workspace_id, name) do nothing;
 
-alter table public.tickets
-  add constraint tickets_workspace_category_fkey
-  foreign key (workspace_id, category)
-  references public.ticket_categories (workspace_id, name)
-  on update cascade
-  on delete restrict
-  not valid;
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'tickets_workspace_category_fkey'
+      and conrelid = 'public.tickets'::regclass
+  ) then
+    alter table public.tickets
+      add constraint tickets_workspace_category_fkey
+      foreign key (workspace_id, category)
+      references public.ticket_categories (workspace_id, name)
+      on update cascade
+      on delete restrict
+      not valid;
+  end if;
+end;
+$$;
 
 alter table public.tickets
   validate constraint tickets_workspace_category_fkey;
