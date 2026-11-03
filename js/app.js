@@ -1,10 +1,10 @@
 import { SupabaseClient } from './data/supabaseClient.js';
 import { SupabaseAdapter } from './data/db.js';
-import { AuthService } from './services/authService.js?v=password-recovery-v1';
+import { AuthService } from './services/authService.js?v=user-role-management-v1';
 import { TicketService } from './services/ticketService.js';
 import { FilterSortService } from './services/filterService.js';
 import { BoardView } from './ui/boardView.js?v=mobile-native-v2';
-import { ModalView } from './ui/modalView.js?v=mobile-native-v1';
+import { ModalView } from './ui/modalView.js?v=user-role-management-v1';
 import { DragDropController } from './ui/dragDrop.js?v=mobile-native-v1';
 import { CalendarView, dueDateForCalendarDay } from './ui/calendarView.js';
 import { initializeThemeController } from './ui/themeController.js';
@@ -550,8 +550,15 @@ function bindStaticEvents() {
       showToast('Solo un administrador puede administrar usuarios.');
       return;
     }
-    modalView.openUsers([...usersMap.values()]);
+    modalView.openUsers([...usersMap.values()], user.id);
   });
+  document.getElementById('usersModal').addEventListener('change', (event) => {
+    const select = event.target.closest('[data-user-role-id]');
+    if (!select) return;
+    const saveButton = select.closest('li')?.querySelector('[data-update-user-role]');
+    if (saveButton) saveButton.disabled = select.value === usersMap.get(select.dataset.userRoleId)?.role;
+  });
+  document.getElementById('usersModal').addEventListener('click', handleUserRoleUpdate);
   document.getElementById('usersModalCloseBtn').addEventListener('click', () => modalView.closeUsers());
   document.getElementById('usersModalCancelBtn').addEventListener('click', () => modalView.closeUsers());
   document.getElementById('btnNotifications').addEventListener('click', () => {
@@ -1835,10 +1842,59 @@ async function handleUserSubmit(event) {
       password
     });
     await loadUsers();
-    modalView.openUsers([...usersMap.values()]);
+    modalView.openUsers([...usersMap.values()], activeUser?.id);
     showToast('Usuario creado correctamente.');
   } catch (error) {
     showToast(error.message || 'No se pudo crear el usuario.');
+  }
+}
+
+async function handleUserRoleUpdate(event) {
+  const button = event.target.closest('[data-update-user-role]');
+  if (!button || button.disabled) return;
+
+  const target = usersMap.get(button.dataset.updateUserRole);
+  const roleSelect = button.closest('li')?.querySelector('[data-user-role-id]');
+  if (!target || !roleSelect || target.role === roleSelect.value) return;
+
+  let currentUser;
+  try {
+    currentUser = await auth.getCurrentUser();
+  } catch (error) {
+    showToast(error.message || 'No se pudo verificar tu sesión.');
+    return;
+  }
+  if (!auth.canManageUsers(currentUser)) {
+    showToast('Solo un administrador puede cambiar roles.');
+    return;
+  }
+
+  const isSelf = target.id === currentUser.id;
+  const confirmation = isSelf
+    ? `¿Cambiar tu rol de ${target.role} a ${roleSelect.value}? Tus permisos cambiarán de inmediato.`
+    : `¿Cambiar el rol de ${target.fullName} de ${target.role} a ${roleSelect.value}?`;
+  if (!window.confirm(confirmation)) return;
+
+  button.disabled = true;
+  roleSelect.disabled = true;
+  try {
+    await auth.updateUserRole(target.id, roleSelect.value);
+    if (isSelf) {
+      modalView.closeUsers();
+      await auth.refreshCurrentUser();
+      await syncAuthState();
+      renderBoard();
+    } else {
+      await loadUsers();
+      modalView.openUsers([...usersMap.values()], activeUser?.id);
+    }
+    showToast(`Rol actualizado a ${roleSelect.value}.`);
+  } catch (error) {
+    roleSelect.value = target.role;
+    button.disabled = true;
+    showToast(error.message || 'No se pudo cambiar el rol.');
+  } finally {
+    roleSelect.disabled = false;
   }
 }
 

@@ -250,6 +250,17 @@ export class SupabaseAdapter {
     });
   }
 
+  async updateUserRole(userId, role) {
+    const accessToken = await this.accessToken();
+    const updatedRole = await this.client.requestRest('rpc/admin_update_user_role', {
+      method: 'POST',
+      accessToken,
+      body: { p_user_id: userId, p_role: role }
+    });
+    if (updatedRole !== role) throw new Error('Supabase no confirmó el cambio de rol.');
+    return updatedRole;
+  }
+
   async getComments(ticketId) {
     const accessToken = await this.accessToken();
     const rows = await this.client.requestRest(

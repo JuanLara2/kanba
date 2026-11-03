@@ -321,6 +321,14 @@
     gap: 0.25rem;
   }
 
+  .user-role-controls {
+    width: 100%;
+  }
+
+  .user-role-controls select {
+    flex: 1;
+  }
+
   .user-list-details {
     text-align: left;
     overflow-wrap: anywhere;

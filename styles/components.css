@@ -565,6 +565,13 @@
   background: var(--bg-list-item);
 }
 
+.user-list-identity {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
 .user-list-name {
   font-weight: 600;
 }
@@ -572,7 +579,23 @@
 .user-list-details {
   color: var(--text-muted);
   font-size: 0.8rem;
-  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.user-role-controls {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.user-role-controls select {
+  min-width: 8rem;
+}
+
+.user-role-controls .btn {
+  padding: 0.45rem 0.65rem;
+  font-size: 0.78rem;
 }
 
 .category-admin-note,

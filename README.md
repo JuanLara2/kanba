@@ -18,7 +18,7 @@ Aplicación de tickets con frontend Vanilla JavaScript y backend Supabase (Auth,
    ```
 
    El rol inicial solo se asigna desde el entorno de administración de Supabase. Después, la creación de cuentas y perfiles se hace mediante la función protegida.
-5. Ejecuta las migraciones de `supabase/migrations/` en orden para activar el aislamiento de equipos, las listas de subtareas, SLA, comentarios, notificaciones, categorías por espacio de trabajo, plantillas compartidas, encuestas de satisfacción y Supabase Realtime. La migración `20261102000000_workspace_ticket_categories.sql` crea las categorías existentes para cada equipo y habilita su administración exclusiva por Admin. La migración de SLA requiere la extensión `pg_cron`, disponible en Supabase, para generar avisos aunque nadie tenga abierta la aplicación.
+5. Ejecuta las migraciones de `supabase/migrations/` en orden para activar el aislamiento de equipos, las listas de subtareas, SLA, comentarios, notificaciones, categorías por espacio de trabajo, plantillas compartidas, encuestas de satisfacción, Supabase Realtime y el cambio seguro de roles. La migración `20261102000000_workspace_ticket_categories.sql` crea las categorías existentes para cada equipo y habilita su administración exclusiva por Admin. La migración `20261102225100_admin_update_user_role.sql` instala la función transaccional para actualizar roles y protege al último Admin. La migración de SLA requiere la extensión `pg_cron`, disponible en Supabase, para generar avisos aunque nadie tenga abierta la aplicación.
 
 Si el proyecto ya tiene `schema.sql` y el perfil Admin configurados, vincula Supabase CLI al proyecto y ejecuta las migraciones pendientes en orden con `npx.cmd supabase db push --linked`; no vuelvas a ejecutar el esquema base. Este comando aplica, entre otras, las migraciones de SLA y colaboración, y la de categorías, métricas, plantillas, satisfacción y Realtime.
 
@@ -37,7 +37,7 @@ Sirve la carpeta del proyecto desde un servidor HTTP local (por ejemplo, Live Se
 
 ## Desplegar la función de administración
 
-Instala e inicia sesión en Supabase CLI, vincula el proyecto y despliega la función:
+Instala e inicia sesión en Supabase CLI, vincula el proyecto y despliega las funciones:
 
 ```powershell
 supabase login
@@ -45,7 +45,9 @@ supabase link --project-ref <project-ref>
 supabase functions deploy admin-create-user
 ```
 
-La función usa `SUPABASE_SERVICE_ROLE_KEY` solo en el entorno aislado de Supabase y verifica el JWT y el perfil Admin del solicitante. No se requiere copiar ni exponer esa clave en el navegador. Despliégala después de las migraciones; las nuevas cuentas creadas por un Admin se unirán al espacio de ese equipo.
+La función de creación de usuarios usa `SUPABASE_SERVICE_ROLE_KEY` solo en el entorno aislado de Supabase y verifica el JWT y el perfil Admin del solicitante. El cambio de rol se ejecuta mediante la función SQL protegida por `auth.uid()` instalada por la migración; se limita al mismo espacio de trabajo, no permite degradar al último Admin y requiere reasignar o cerrar tickets antes de cambiar a Reporter a alguien con tickets asignados que no estén cerrados. No se requiere copiar ni exponer la clave de servicio en el navegador. Despliega la función de creación después de las migraciones; las nuevas cuentas creadas por un Admin se unirán al espacio de ese equipo.
+
+El rol Reporter puede crear tickets nuevos, consultar los tickets de su espacio de trabajo, comentar en sus propios tickets y valorar los que haya creado cuando se cierren. No puede cambiar estados, editar tickets, asignar responsables, establecer fechas, gestionar subtareas, usuarios ni categorías.
 
 ## Recuperación y cambio de contraseña
 

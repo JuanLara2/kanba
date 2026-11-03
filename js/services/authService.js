@@ -165,6 +165,26 @@ export class AuthService {
     });
   }
 
+  async updateUserRole(userId, role) {
+    const currentUser = await this.getCurrentUser();
+    if (!this.canManageUsers(currentUser)) {
+      throw new Error('Solo un administrador puede cambiar roles.');
+    }
+    if (typeof userId !== 'string' || !userId.trim()) {
+      throw new Error('El usuario seleccionado no es válido.');
+    }
+    if (!VALID_ROLES.includes(role)) throw new Error('El rol seleccionado no es válido.');
+    if (typeof this.db.updateUserRole !== 'function') {
+      throw new Error('El cambio de roles no está disponible.');
+    }
+    return this.db.updateUserRole(userId, role);
+  }
+
+  async refreshCurrentUser() {
+    this.currentUser = null;
+    return this.getCurrentUser();
+  }
+
   async getCurrentUser() {
     if (this.currentUser) return this.currentUser;
     const session = this.readSession();

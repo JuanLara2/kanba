@@ -132,6 +132,12 @@ function createContext() {
       const user = { id, fullName, email, role, workspaceId: 'workspace-test' };
       users.push(user);
       return user;
+    },
+    async updateUserRole(userId, role) {
+      const user = users.find((item) => item.id === userId);
+      if (!user) throw new Error('El usuario no existe.');
+      user.role = role;
+      return role;
     }
   };
   const client = {
@@ -456,6 +462,21 @@ test('only administrators can create users through the secure provisioning adapt
     }),
     /al menos 12/
   );
+});
+
+test('only admins can change existing user roles and the active profile can be refreshed', async () => {
+  const { auth, users } = createContext();
+  const admin = users.find((user) => user.role === 'Admin');
+  const agent = users.find((user) => user.role === 'Agent');
+
+  await assert.rejects(() => auth.updateUserRole(agent.id, 'Reporter'), /Solo un administrador/);
+  await auth.login(admin.email, 'AdminPassword123!');
+  assert.equal(await auth.updateUserRole(agent.id, 'Reporter'), 'Reporter');
+  assert.equal(agent.role, 'Reporter');
+  await assert.rejects(() => auth.updateUserRole(agent.id, 'Owner'), /rol seleccionado no es válido/);
+
+  assert.equal(await auth.updateUserRole(admin.id, 'Agent'), 'Agent');
+  assert.equal((await auth.refreshCurrentUser()).role, 'Agent');
 });
 
 test('ticket operations enforce roles and preserve state audit history', async () => {
@@ -841,6 +862,27 @@ test('Supabase adapter reads and manages workspace ticket categories', async () 
   assert.equal(calls[2].options.method, undefined);
   assert.equal(calls[3].options.method, 'DELETE');
   assert.equal(calls[3].options.prefer, 'return=representation');
+});
+
+test('Supabase adapter changes roles through the authenticated database function', async () => {
+  const calls = [];
+  const client = {
+    async requestRest(path, options) {
+      calls.push({ path, options });
+      return options.body.p_role;
+    }
+  };
+  const adapter = new SupabaseAdapter(client, async () => 'test-access-token');
+
+  assert.equal(await adapter.updateUserRole('user-123', 'Agent'), 'Agent');
+  assert.deepEqual(calls, [{
+    path: 'rpc/admin_update_user_role',
+    options: {
+      method: 'POST',
+      accessToken: 'test-access-token',
+      body: { p_user_id: 'user-123', p_role: 'Agent' }
+    }
+  }]);
 });
 
 test('SLA filters classify overdue, warning, and future SLA deadlines', () => {

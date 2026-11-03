@@ -372,7 +372,7 @@ export class ModalView {
     document.getElementById('btnDeleteTemplate').classList.add('hidden');
   }
 
-  openUsers(users) {
+  openUsers(users, currentUserId = null) {
     if (this.usersModal.classList.contains('hidden')) {
       this.previousFocus = document.activeElement;
     }
@@ -384,15 +384,36 @@ export class ModalView {
       .sort((a, b) => a.fullName.localeCompare(b.fullName, 'es'))
       .forEach((user) => {
         const item = document.createElement('li');
+        const identity = document.createElement('div');
         const name = document.createElement('span');
         name.className = 'user-list-name';
-        name.textContent = user.fullName;
+        name.textContent = user.id === currentUserId ? `${user.fullName} (tú)` : user.fullName;
 
         const details = document.createElement('span');
         details.className = 'user-list-details';
-        details.textContent = `${user.email} · ${user.role}`;
+        details.textContent = user.email;
 
-        item.append(name, details);
+        const roleControls = document.createElement('div');
+        roleControls.className = 'user-role-controls';
+
+        const roleSelect = document.createElement('select');
+        roleSelect.dataset.userRoleId = user.id;
+        roleSelect.setAttribute('aria-label', `Rol de ${user.fullName}`);
+        ['Reporter', 'Agent', 'Admin'].forEach((role) => {
+          roleSelect.add(new Option(role, role, role === user.role, role === user.role));
+        });
+
+        const saveButton = document.createElement('button');
+        saveButton.className = 'btn btn-outline';
+        saveButton.type = 'button';
+        saveButton.dataset.updateUserRole = user.id;
+        saveButton.textContent = 'Guardar rol';
+        saveButton.disabled = true;
+
+        identity.className = 'user-list-identity';
+        identity.append(name, details);
+        roleControls.append(roleSelect, saveButton);
+        item.append(identity, roleControls);
         list.appendChild(item);
       });
 
