@@ -17,7 +17,7 @@
   }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 768px), (max-height: 600px) and (orientation: landscape) {
   .app-shell {
     min-width: 0;
     width: 100%;
@@ -444,7 +444,7 @@
   }
 }
 
-@media (max-width: 768px) and (max-height: 700px) {
+@media (max-width: 768px) and (max-height: 700px), (max-height: 600px) and (orientation: landscape) {
   .login-brand-panel {
     padding-bottom: 0.9rem;
   }
@@ -511,7 +511,7 @@
   display: contents;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 768px), (max-height: 600px) and (orientation: landscape) {
   .controls-toolbar {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
@@ -1074,7 +1074,7 @@
   display: none;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 768px), (max-height: 600px) and (orientation: landscape) {
   .mobile-selection-entry {
     display: flex;
     justify-content: flex-end;
@@ -1198,5 +1198,58 @@
   #mobileTicketActionsSheet .mobile-filter-actions .btn {
     min-height: 2.9rem;
     flex: 1 1 9rem;
+  }
+}
+
+@media (max-height: 600px) and (orientation: landscape) {
+  .app-header {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.65rem;
+  }
+
+  .header-left {
+    width: auto;
+    flex: 0 0 auto;
+    gap: 0.45rem;
+  }
+
+  .app-title {
+    font-size: 0.95rem;
+  }
+
+  .app-subtitle {
+    display: none;
+  }
+
+  .header-right {
+    display: flex;
+    width: auto;
+    min-width: 0;
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.3rem;
+  }
+
+  .header-right .btn {
+    min-height: 2.25rem;
+    padding: 0.35rem 0.45rem;
+    font-size: 0.72rem;
+  }
+
+  .user-session-pill,
+  .theme-picker {
+    padding: 0.3rem 0.4rem;
+    font-size: 0.72rem;
+  }
+
+  .controls-toolbar {
+    padding: 0.45rem 0.65rem;
+  }
+
+  .board-wrapper {
+    padding-top: 0.45rem;
   }
 }
