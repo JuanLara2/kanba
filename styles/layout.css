@@ -218,6 +218,13 @@
   flex-wrap: wrap;
 }
 
+.header-status-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-right: auto;
+}
+
 .logo-mark {
   width: 42px;
   height: 42px;

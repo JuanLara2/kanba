@@ -189,17 +189,27 @@
     justify-content: center;
   }
 
-  .header-right #btnNewTicket {
+  #btnNewTicket {
     position: fixed;
-    right: 1rem;
-    bottom: calc(1rem + env(safe-area-inset-bottom));
+    right: 1.25rem;
     left: auto;
+    bottom: calc(5rem + env(safe-area-inset-bottom));
     z-index: 40;
-    width: auto;
-    min-height: 3.1rem;
-    padding: 0.7rem 1rem;
-    border-radius: 999px;
-    box-shadow: 0 16px 28px rgba(168, 85, 247, 0.3);
+    display: grid;
+    place-items: center;
+    width: 3.5rem;
+    height: 3.5rem;
+    min-height: 3.5rem;
+    padding: 0;
+    border-radius: 50%;
+    font-size: 0;
+    line-height: 0;
+    box-shadow: 0 12px 24px rgba(168, 85, 247, 0.28);
+  }
+
+  #btnNewTicket .icon {
+    width: 1.5rem;
+    height: 1.5rem;
   }
 
   .header-right > .pending-sync-status {
@@ -837,26 +847,6 @@
     padding: 0.35rem 0.25rem;
     border-radius: 10px;
     font-size: 0.7rem;
-  }
-
-  .header-right #btnNewTicket {
-    position: fixed;
-    z-index: 21;
-    right: 1rem;
-    bottom: calc(4.8rem + env(safe-area-inset-bottom));
-    display: grid;
-    width: 3.5rem;
-    height: 3.5rem;
-    place-items: center;
-    padding: 0;
-    border-radius: 50%;
-    font-size: 0;
-    box-shadow: 0 8px 24px color-mix(in srgb, var(--color-primary-start) 38%, transparent);
-  }
-
-  .header-right #btnNewTicket .icon {
-    width: 1.5rem;
-    height: 1.5rem;
   }
 
   .app-header {

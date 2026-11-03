@@ -248,9 +248,29 @@
 }
 
 #btnNewTicket {
+  position: fixed;
+  right: 2rem;
+  left: auto;
+  bottom: calc(2rem + env(safe-area-inset-bottom));
+  z-index: 40;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  min-height: 3rem;
+  padding: 0.8rem 1.2rem;
   border-radius: 999px;
-  padding-inline: 1.15rem;
-  box-shadow: 0 8px 18px rgba(168, 85, 247, 0.2);
+  box-shadow: 0 14px 28px rgba(168, 85, 247, 0.22);
+}
+
+#btnNewTicket:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 16px 32px rgba(168, 85, 247, 0.26);
+}
+
+#btnNewTicket .icon {
+  width: 1rem;
+  height: 1rem;
 }
 
 #btnNewTicket:disabled {
