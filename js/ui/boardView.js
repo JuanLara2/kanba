@@ -180,6 +180,16 @@ export class BoardView {
       </div>
     `;
 
+    if (assignee.avatarUrl) {
+      const avatarImage = card.querySelector('.avatar-with-image img');
+      avatarImage.addEventListener('error', () => {
+        const avatar = avatarImage.closest('.avatar-circle');
+        if (!avatar) return;
+        avatar.replaceChildren(document.createTextNode(initial));
+        avatar.classList.remove('avatar-with-image');
+      }, { once: true });
+    }
+
     return card;
   }
 

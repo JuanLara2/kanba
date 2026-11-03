@@ -750,6 +750,17 @@
   line-height: 1.45;
 }
 
+.profile-avatar-status {
+  margin: 0;
+  color: var(--color-success, #15803d);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.profile-avatar-status.is-error {
+  color: var(--color-danger, #b91c1c);
+}
+
 .profile-upload-row {
   display: flex;
   align-items: center;

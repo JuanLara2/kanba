@@ -496,9 +496,14 @@ function renderAvatarFallback(element, user, fallback = 'U') {
   const initials = user?.fullName ? user.fullName.trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase() : fallback;
   if (user?.avatarUrl) {
     const image = document.createElement('img');
-    image.src = user.avatarUrl;
     image.alt = '';
     image.loading = 'lazy';
+    image.addEventListener('error', () => {
+      if (image.parentElement !== target) return;
+      target.replaceChildren();
+      target.textContent = initials || fallback;
+    }, { once: true });
+    image.src = user.avatarUrl;
     target.appendChild(image);
     return;
   }
@@ -526,6 +531,9 @@ function openProfileModal() {
   trackMobileOverlayOpen('profile');
   profileAvatarInput.value = '';
   profileFileName.textContent = 'Ningún archivo seleccionado';
+  const avatarStatus = document.getElementById('profileAvatarStatus');
+  avatarStatus.textContent = '';
+  avatarStatus.classList.remove('is-error');
   profileAvatarInput.focus();
 }
 
@@ -566,6 +574,9 @@ async function handleProfileAvatarUpload() {
     return;
   }
 
+  const avatarStatus = document.getElementById('profileAvatarStatus');
+  avatarStatus.classList.remove('is-error');
+  avatarStatus.textContent = 'Guardando la foto de perfil…';
   const extension = file.name.includes('.') ? file.name.split('.').pop() || 'png' : 'png';
   const blobName = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}.${extension}`;
   const objectPath = `${user.id}/${blobName}`;
@@ -579,13 +590,15 @@ async function handleProfileAvatarUpload() {
         apikey: client.anonKey,
         Authorization: `Bearer ${token}`,
         'Content-Type': file.type || 'application/octet-stream',
-        'x-upsert': 'true'
       },
       body: file
     });
 
     if (!uploadResponse.ok) {
       const errorText = await uploadResponse.text();
+      if (uploadResponse.status === 403 && errorText.includes('row-level security')) {
+        throw new Error('Supabase rechazó la carga del avatar por permisos RLS. Aplica la migración 20261103000000_profile_avatar_support.sql en el proyecto configurado y vuelve a iniciar sesión.');
+      }
       throw new Error(errorText || 'No se pudo subir la imagen del avatar.');
     }
 
@@ -601,6 +614,7 @@ async function handleProfileAvatarUpload() {
     usersMap.set(activeUser.id, activeUser);
     renderProfileSummary(activeUser);
     renderBoard();
+    avatarStatus.textContent = 'Foto de perfil actualizada correctamente.';
     showToast('Avatar actualizado correctamente.');
     profileAvatarInput.value = '';
     profileFileName.textContent = 'Ningún archivo seleccionado';
@@ -608,6 +622,8 @@ async function handleProfileAvatarUpload() {
       showToast('El perfil se actualizó, pero no se devolvió confirmación del servidor.', 5000);
     }
   } catch (error) {
+    avatarStatus.classList.add('is-error');
+    avatarStatus.textContent = error.message || 'No se pudo guardar tu avatar.';
     showToast(error.message || 'No se pudo guardar tu avatar.', 7000);
   }
 }
@@ -706,7 +722,14 @@ function bindStaticEvents() {
   profileAvatarInput.addEventListener('change', () => {
     const file = profileAvatarInput.files?.[0];
     profileFileName.textContent = file ? file.name : 'Ningún archivo seleccionado';
-    if (!file) return;
+    const avatarStatus = document.getElementById('profileAvatarStatus');
+    if (!file) {
+      avatarStatus.textContent = '';
+      avatarStatus.classList.remove('is-error');
+      return;
+    }
+    avatarStatus.classList.remove('is-error');
+    avatarStatus.textContent = 'Vista previa lista. Pulsa «Guardar avatar» para confirmar el cambio.';
     const reader = new FileReader();
     reader.onload = () => {
       const preview = document.getElementById('profileAvatarPreview');
