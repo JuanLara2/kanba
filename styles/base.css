@@ -21,6 +21,12 @@
   --border-subtle: #475569;
   --text-main: #f8fafc;
   --text-muted: #94a3b8;
+  --header-glass-bg: rgba(15, 23, 42, 0.68);
+  --header-glass-border: rgba(148, 163, 184, 0.22);
+  --header-glass-shadow: rgba(15, 23, 42, 0.18);
+  --pill-surface: linear-gradient(135deg, rgba(15, 23, 42, 0.82), rgba(30, 41, 59, 0.72));
+  --pill-surface-border: rgba(148, 163, 184, 0.2);
+  --theme-picker-bg: rgba(15, 23, 42, 0.18);
   --color-primary-start: #3b82f6;
   --color-primary-end: #8b5cf6;
   --color-focus: #38bdf8;
@@ -45,6 +51,12 @@ html[data-theme="light"] {
   --border-subtle: #cbd5e1;
   --text-main: #172033;
   --text-muted: #64748b;
+  --header-glass-bg: rgba(255, 255, 255, 0.7);
+  --header-glass-border: rgba(148, 163, 184, 0.35);
+  --header-glass-shadow: rgba(148, 163, 184, 0.18);
+  --pill-surface: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(241, 245, 249, 0.78));
+  --pill-surface-border: rgba(148, 163, 184, 0.5);
+  --theme-picker-bg: rgba(255, 255, 255, 0.72);
   --color-primary-start: #2563eb;
   --color-primary-end: #7c3aed;
   --color-focus: #2563eb;
@@ -65,6 +77,12 @@ html[data-theme="pink"] {
   --border-subtle: #f3bfd0;
   --text-main: #4a1930;
   --text-muted: #865b6d;
+  --header-glass-bg: rgba(255, 248, 251, 0.72);
+  --header-glass-border: rgba(244, 114, 182, 0.28);
+  --header-glass-shadow: rgba(190, 24, 93, 0.12);
+  --pill-surface: linear-gradient(135deg, rgba(255, 255, 255, 0.88), rgba(254, 242, 248, 0.8));
+  --pill-surface-border: rgba(244, 114, 182, 0.32);
+  --theme-picker-bg: rgba(255, 255, 255, 0.7);
   --color-primary-start: #ec4899;
   --color-primary-end: #a855f7;
   --color-focus: #db2777;
