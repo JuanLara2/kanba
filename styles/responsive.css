@@ -155,15 +155,15 @@
   }
 
   .header-right {
-    position: relative;
+    position: static;
     z-index: 1;
   }
 
-  #btnLogout {
+  .app-header #btnLogout {
     position: absolute;
     top: 0.7rem;
     left: 0.75rem;
-    z-index: 2;
+    z-index: 4;
     box-shadow: 0 10px 24px rgba(15, 23, 42, 0.22);
   }
 
