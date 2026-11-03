@@ -534,6 +534,10 @@
     display: none !important;
   }
 
+  #ticketModal {
+    z-index: 70;
+  }
+
   #mobileFiltersLayer:not(.hidden),
   #ticketStatusLayer:not(.hidden),
   #mobileTicketActionsLayer:not(.hidden) {
