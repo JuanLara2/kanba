@@ -134,12 +134,16 @@ export class BoardView {
     const sla = this.ticketService.evaluateSLA(ticket);
     const assignee = this.usersMap.get(ticket.assignedTo) || { fullName: 'Sin asignar' };
     const initial = assignee.fullName.charAt(0).toUpperCase();
+    const assigneeAccent = this.getAssigneeAccent(assignee.fullName);
 
     if (sla.state === 'overdue') {
       card.classList.add('sla-overdue');
     } else if (sla.state === 'warning') {
       card.classList.add('sla-warning');
     }
+
+    card.style.setProperty('--assignee-accent', assigneeAccent);
+    card.style.setProperty('--assignee-accent-soft', this.withAlpha(assigneeAccent, 0.18));
 
     card.innerHTML = `
       <div class="card-top">
@@ -201,6 +205,21 @@ export class BoardView {
     }
 
     return card;
+  }
+
+  getAssigneeAccent(fullName) {
+    const seed = String(fullName || 'Sin asignar').trim();
+    let hash = 0;
+    for (let index = 0; index < seed.length; index += 1) {
+      hash = (hash * 31 + seed.charCodeAt(index)) >>> 0;
+    }
+    const hue = hash % 360;
+    return `hsl(${hue} 72% 62%)`;
+  }
+
+  withAlpha(color, alpha) {
+    if (typeof color !== 'string' || !color.startsWith('hsl(')) return color;
+    return color.replace(/hsl\(([^)]+)\)/, (_, values) => `hsla(${values}, ${alpha})`);
   }
 
   escapeHtml(value) {
