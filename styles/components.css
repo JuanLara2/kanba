@@ -393,6 +393,19 @@
   white-space: nowrap;
 }
 
+.complexity-pill {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(168, 85, 247, 0.35);
+  border-radius: 999px;
+  padding: 0.2rem 0.5rem;
+  background: rgba(168, 85, 247, 0.14);
+  color: #d8b4fe;
+  font-size: 0.66rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 .sla-pill.warning { background: rgba(249, 115, 22, 0.2); color: #fdba74; }
 .sla-pill.overdue { background: rgba(220, 38, 38, 0.2); color: #fca5a5; }
 .sla-pill.normal { background: rgba(16, 185, 129, 0.15); color: #a7f3d0; }
@@ -1087,6 +1100,13 @@ html[data-theme="pink"] .btn-danger { color: #b91c1c; }
 .agent-metrics h3 {
   margin-bottom: 0.8rem;
   font-size: 0.95rem;
+}
+
+.metrics-note {
+  margin: -0.3rem 0 0.8rem;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
 }
 
 .metrics-table-wrap {

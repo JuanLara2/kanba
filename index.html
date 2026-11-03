@@ -241,7 +241,7 @@
         <header class="metrics-header">
           <div>
             <h2>Rendimiento del equipo</h2>
-            <p>Indicadores calculados con el historial de tickets del espacio.</p>
+            <p>Los puntos representan la complejidad estimada, no una medida aislada de calidad o productividad.</p>
           </div>
           <div class="metrics-controls">
             <label>Desde <input id="metricsStart" type="date" /></label>
@@ -253,16 +253,19 @@
         <div class="metrics-cards">
           <article class="metrics-card"><span>Tickets creados</span><strong id="metricCreated">0</strong></article>
           <article class="metrics-card"><span>Tickets resueltos</span><strong id="metricResolved">0</strong></article>
+          <article class="metrics-card"><span>Tickets cerrados</span><strong id="metricClosed">0</strong></article>
+          <article class="metrics-card"><span>Puntos completados</span><strong id="metricCompletedPoints">0</strong></article>
           <article class="metrics-card"><span>Abiertos actualmente</span><strong id="metricOpen">0</strong></article>
           <article class="metrics-card"><span>Cumplimiento SLA</span><strong id="metricSla">0%</strong></article>
           <article class="metrics-card"><span>Resolución promedio</span><strong id="metricResolution">0 h</strong></article>
           <article class="metrics-card"><span>Satisfacción promedio</span><strong id="metricSatisfaction">Sin datos</strong></article>
         </div>
         <section class="agent-metrics" aria-labelledby="agentMetricsHeading">
-          <h3 id="agentMetricsHeading">Tickets resueltos por agente</h3>
+          <h3 id="agentMetricsHeading">Capacidad productiva por responsable</h3>
+          <p class="metrics-note">Los tickets activos muestran la asignación actual; los cerrados y sus puntos se atribuyen a quien estaba asignado al cerrarlos.</p>
           <div class="metrics-table-wrap">
             <table>
-              <thead><tr><th>Agente</th><th>Activos asignados</th><th>Resueltos</th></tr></thead>
+              <thead><tr><th>Responsable</th><th>Activos asignados</th><th>Resueltos</th><th>Cerrados</th><th>Puntos</th></tr></thead>
               <tbody id="agentMetricsBody"></tbody>
             </table>
           </div>
@@ -380,7 +383,7 @@
             </div>
           </div>
 
-          <div class="form-row grid-2">
+          <div class="form-row grid-3">
             <div>
               <label for="formAssignee">Asignar a:</label>
               <select id="formAssignee">
@@ -390,6 +393,22 @@
             <div>
               <label for="formDueDate">Fecha límite</label>
               <input type="datetime-local" id="formDueDate" />
+            </div>
+            <div>
+              <label for="formComplexityScore">Complejidad (1–10)</label>
+              <select id="formComplexityScore" aria-describedby="formComplexityHelp">
+                <option value="1" selected>1 · Muy sencilla</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5 · Media</option>
+                <option value="6">6</option>
+                <option value="7">7</option>
+                <option value="8">8</option>
+                <option value="9">9</option>
+                <option value="10">10 · Muy compleja</option>
+              </select>
+              <small id="formComplexityHelp">Reporter inicia en 1. Admin y Agent pueden asignar o ajustar antes de cerrar.</small>
             </div>
           </div>
 
@@ -655,6 +674,6 @@
       </section>
     </main>
 
-    <script type="module" src="js/app.js?v=user-role-management-v1"></script>
+    <script type="module" src="js/app.js?v=complexity-scoring-v1"></script>
   </body>
 </html>

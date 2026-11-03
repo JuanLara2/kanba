@@ -123,13 +123,17 @@ export class TicketService {
     return this.db.getTicketSyncIndex();
   }
 
-  async createTicket({ title, description, priority = 'Media', category = null, initialStatus = 'new', assignedTo = null, dueDate = null, checklist = [] }) {
+  async createTicket({ title, description, priority = 'Media', category = null, complexityScore = 1, initialStatus = 'new', assignedTo = null, dueDate = null, checklist = [] }) {
     const user = await this.auth.getCurrentUser();
     if (!user) throw new Error('Sesión requerida para crear tickets.');
     if (user.role === 'Reporter' && initialStatus !== 'new') {
       throw new Error('Los reporteros solo pueden crear tickets en estado Nuevo.');
     }
     const canManageChecklist = this.auth.canAssignOrSetDue(user);
+    const canManageComplexity = this.auth.canAssignOrSetDue(user);
+    if (!canManageComplexity && Number(complexityScore) !== 1) {
+      throw new Error('Solo Admin y Agent pueden asignar el puntaje de complejidad.');
+    }
     if ((assignedTo || dueDate || (Array.isArray(checklist) && checklist.length > 0)) && !canManageChecklist) {
       throw new Error('Tu rol no puede asignar responsables, modificar plazos ni crear subtareas.');
     }
@@ -139,6 +143,7 @@ export class TicketService {
       description,
       priority,
       category,
+      complexityScore,
       initialStatus,
       assignedTo,
       dueDate,
@@ -152,6 +157,7 @@ export class TicketService {
       status: validated.initialStatus,
       priority: validated.priority,
       category: validated.category,
+      complexityScore: validated.complexityScore,
       assignedTo: validated.assignedTo,
       createdBy: user.id,
       workspaceId: user.workspaceId,
@@ -176,7 +182,7 @@ export class TicketService {
     return newTicket;
   }
 
-  async updateTicket({ id, title, description, priority, category, assignedTo, dueDate, checklist }) {
+  async updateTicket({ id, title, description, priority, category, complexityScore, assignedTo, dueDate, checklist }) {
     const user = await this.auth.getCurrentUser();
     const ticket = await this.db.getById('tickets', id);
     if (!ticket) throw new Error('El ticket no existe.');
@@ -184,8 +190,19 @@ export class TicketService {
     const canEditContent = this.auth.canEditTicket(user, ticket);
     const canManageChecklist = this.auth.canEditTicket(user, ticket);
     const canManageAssignment = this.auth.canAssignOrSetDue(user);
+    const canManageComplexity = this.auth.canAssignOrSetDue(user);
     if (!canEditContent && !canManageAssignment) {
       throw new Error('Permisos insuficientes para editar este ticket.');
+    }
+    if (complexityScore !== undefined && !canManageComplexity) {
+      throw new Error('Solo Admin y Agent pueden asignar el puntaje de complejidad.');
+    }
+    if (
+      complexityScore !== undefined
+      && ticket.status === 'closed'
+      && Number(complexityScore) !== Number(ticket.complexityScore ?? 1)
+    ) {
+      throw new Error('La complejidad no se puede cambiar después de cerrar el ticket.');
     }
 
     const validated = await this.validateTicketFields({
@@ -193,6 +210,9 @@ export class TicketService {
       description: canEditContent ? description : ticket.description,
       priority: canEditContent ? priority : ticket.priority,
       category: canEditContent && category !== undefined ? category : ticket.category,
+      complexityScore: canManageComplexity && complexityScore !== undefined
+        ? complexityScore
+        : ticket.complexityScore ?? 1,
       assignedTo: canManageAssignment && assignedTo !== undefined ? assignedTo : ticket.assignedTo,
       dueDate: canManageAssignment && dueDate !== undefined ? dueDate : ticket.dueDate,
       checklist: canManageChecklist && checklist !== undefined ? checklist : (ticket.checklist || []),
@@ -204,6 +224,7 @@ export class TicketService {
     ticket.description = validated.description;
     ticket.priority = validated.priority;
     ticket.category = validated.category;
+    ticket.complexityScore = validated.complexityScore;
     ticket.assignedTo = validated.assignedTo;
     ticket.dueDate = validated.dueDate;
     ticket.checklist = validated.checklist;
@@ -403,12 +424,16 @@ export class TicketService {
     return this.db.submitSatisfaction(ticketId, Number(rating), normalizedComment);
   }
 
-  async validateTicketFields({ title, description, priority, category = null, initialStatus, assignedTo, dueDate, checklist = [], workspaceId }) {
+  async validateTicketFields({ title, description, priority, category = null, complexityScore = 1, initialStatus, assignedTo, dueDate, checklist = [], workspaceId }) {
     const normalizedTitle = String(title ?? '').trim();
     const normalizedDescription = String(description ?? '').trim();
     if (normalizedTitle.length < 4) throw new Error('El título debe tener al menos 4 caracteres.');
     if (!normalizedDescription) throw new Error('La descripción es obligatoria.');
     if (!PRIORITY_ORDER.includes(priority)) throw new Error('La prioridad no es válida.');
+    const normalizedComplexityScore = Number(complexityScore);
+    if (!Number.isInteger(normalizedComplexityScore) || normalizedComplexityScore < 1 || normalizedComplexityScore > 10) {
+      throw new Error('El puntaje de complejidad debe ser un número entero entre 1 y 10.');
+    }
     const categories = await this.getCategories();
     if (categories.length === 0) throw new Error('No hay categorías disponibles. Solicita a un administrador que cree una.');
     const requestedCategory = String(category ?? '').trim();
@@ -440,6 +465,7 @@ export class TicketService {
       description: normalizedDescription,
       priority,
       category: normalizedCategory,
+      complexityScore: normalizedComplexityScore,
       initialStatus,
       assignedTo: assignedTo || null,
       dueDate: normalizedDueDate,

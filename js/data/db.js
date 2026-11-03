@@ -1,6 +1,6 @@
 const PROFILE_FIELDS = 'id,full_name,email,role,workspace_id,created_by_admin_id';
-const TICKET_FIELDS = 'id,title,description,status,priority,category,assigned_to,created_by,workspace_id,created_at,updated_at,due_date,sla_due_at,sla_warning_at,checklist';
-const HISTORY_FIELDS = 'id,ticket_id,from_status,to_status,changed_at,changed_by';
+const TICKET_FIELDS = 'id,title,description,status,priority,category,complexity_score,assigned_to,created_by,workspace_id,created_at,updated_at,due_date,sla_due_at,sla_warning_at,checklist';
+const HISTORY_FIELDS = 'id,ticket_id,from_status,to_status,changed_at,changed_by,assigned_to_at_change';
 const COMMENT_FIELDS = 'id,ticket_id,author_id,body,created_at';
 const NOTIFICATION_FIELDS = 'id,user_id,ticket_id,kind,message,created_at,read_at';
 
@@ -23,6 +23,7 @@ function mapTicket(row, history = []) {
     status: row.status,
     priority: row.priority,
     category: row.category,
+    complexityScore: row.complexity_score,
     assignedTo: row.assigned_to,
     createdBy: row.created_by,
     workspaceId: row.workspace_id,
@@ -38,7 +39,8 @@ function mapTicket(row, history = []) {
         from: record.from_status,
         to: record.to_status,
         changedAt: record.changed_at,
-        changedBy: record.changed_by
+        changedBy: record.changed_by,
+        assignedToAtChange: record.assigned_to_at_change
       }))
   };
 }
@@ -50,6 +52,7 @@ function toTicketRow(ticket) {
     status: ticket.status,
     priority: ticket.priority,
     category: ticket.category,
+    complexity_score: ticket.complexityScore,
     assigned_to: ticket.assignedTo,
     due_date: ticket.dueDate,
     checklist: ticket.checklist || []

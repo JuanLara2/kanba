@@ -101,6 +101,7 @@ export class ModalView {
       document.getElementById('formDescription').value = ticket.description;
       document.getElementById('formPriority').value = ticket.priority;
       document.getElementById('formCategory').value = ticket.category;
+      document.getElementById('formComplexityScore').value = String(ticket.complexityScore ?? 1);
       document.getElementById('formAssignee').value = ticket.assignedTo || '';
       document.getElementById('formInitialStatus').value = ticket.status;
       document.getElementById('formDueDate').value = ticket.dueDate ? this.toLocalDateTime(ticket.dueDate) : '';
@@ -132,6 +133,8 @@ export class ModalView {
     document.getElementById('formInitialStatus').disabled = Boolean(ticket) || !permissions.canManageAssignment;
     document.getElementById('formAssignee').disabled = !permissions.canManageAssignment;
     document.getElementById('formDueDate').disabled = !permissions.canManageAssignment;
+    document.getElementById('formComplexityScore').disabled = !permissions.canManageComplexity
+      || Boolean(ticket && ticket.status === 'closed');
     saveBtn.classList.toggle('hidden', !canSave);
     this.modalEl.classList.remove('hidden');
     this.onOverlayOpen?.('ticket');

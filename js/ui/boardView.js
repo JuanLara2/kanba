@@ -121,6 +121,7 @@ export class BoardView {
     card.draggable = true;
     card.tabIndex = 0;
     card.setAttribute('role', 'group');
+    const complexityScore = Number.isInteger(ticket.complexityScore) ? ticket.complexityScore : 1;
     const checklistProgress = getChecklistProgress(ticket.checklist);
     const checklistLabel = checklistProgress.total
       ? ` Subtareas: ${checklistProgress.completed} de ${checklistProgress.total}, ${checklistProgress.percentage}% completado.`
@@ -144,6 +145,7 @@ export class BoardView {
         <div class="badges-row">
           <span class="priority-pill priority-${ticket.priority.toLowerCase()}">${ticket.priority}</span>
           <span class="category-pill">${this.escapeHtml(ticket.category || 'Consulta')}</span>
+          <span class="complexity-pill" aria-label="Complejidad ${complexityScore} de 10">Complejidad ${complexityScore}/10</span>
           ${sla.state === 'overdue' ? '<span class="sla-pill overdue">⚠️ SLA vencido</span>' : ''}
           ${sla.state === 'warning' ? `<span class="sla-pill warning">⏳ SLA ${formatSlaRemaining(sla.remainingMs)}</span>` : ''}
           ${sla.state === 'normal' ? `<span class="sla-pill normal">SLA ${formatSlaRemaining(sla.remainingMs)}</span>` : ''}

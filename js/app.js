@@ -1,15 +1,15 @@
 import { SupabaseClient } from './data/supabaseClient.js';
-import { SupabaseAdapter } from './data/db.js';
+import { SupabaseAdapter } from './data/db.js?v=complexity-scoring-v1';
 import { AuthService } from './services/authService.js?v=user-role-management-v1';
-import { TicketService } from './services/ticketService.js';
+import { TicketService } from './services/ticketService.js?v=complexity-scoring-v1';
 import { FilterSortService } from './services/filterService.js';
-import { BoardView } from './ui/boardView.js?v=mobile-native-v2';
-import { ModalView } from './ui/modalView.js?v=user-role-management-v1';
+import { BoardView } from './ui/boardView.js?v=complexity-scoring-v1';
+import { ModalView } from './ui/modalView.js?v=complexity-scoring-v1';
 import { DragDropController } from './ui/dragDrop.js?v=mobile-native-v1';
 import { CalendarView, dueDateForCalendarDay } from './ui/calendarView.js';
 import { initializeThemeController } from './ui/themeController.js';
 import { PRIORITY_ORDER, SLA_REFRESH_INTERVAL_MS, STATUS_DEFINITIONS } from './config/constants.js';
-import { calculateTicketMetrics, metricsToCsv } from './services/metricsService.js';
+import { calculateTicketMetrics, metricsToCsv } from './services/metricsService.js?v=complexity-scoring-v1';
 import { RealtimeService } from './services/realtimeService.js?v=realtime-protocol-v2';
 import { createSplashScreen } from './ui/splashScreen.js';
 import { OutboxService } from './services/outboxService.js';
@@ -751,7 +751,8 @@ async function openNewTicketModal() {
   const user = await auth.getCurrentUser();
   modalView.openTicket(null, {
     canManageAssignment: auth.canAssignOrSetDue(user),
-    canManageChecklist: auth.canAssignOrSetDue(user)
+    canManageChecklist: auth.canAssignOrSetDue(user),
+    canManageComplexity: auth.canAssignOrSetDue(user)
   });
 }
 
@@ -1627,6 +1628,7 @@ async function openTicketForEditing(ticketId) {
     canEdit: auth.canEditTicket(user, ticket),
     canManageChecklist: auth.canEditTicket(user, ticket),
     canManageAssignment: auth.canAssignOrSetDue(user),
+    canManageComplexity: auth.canAssignOrSetDue(user),
     canDelete: auth.canDelete(user),
     canComment: auth.canCommentOnTicket(user, ticket)
   });
@@ -1721,6 +1723,7 @@ async function handleTicketSubmit(event) {
         description,
         priority,
         category: document.getElementById('formCategory').value,
+        complexityScore: Number(document.getElementById('formComplexityScore').value),
         assignedTo,
         dueDate,
         checklist: modalView.getChecklist()
@@ -1732,6 +1735,7 @@ async function handleTicketSubmit(event) {
         description,
         priority,
         category: document.getElementById('formCategory').value,
+        complexityScore: Number(document.getElementById('formComplexityScore').value),
         initialStatus,
         assignedTo,
         dueDate,
@@ -1980,6 +1984,8 @@ function renderMetrics() {
   document.getElementById('metricsError').classList.add('hidden');
   document.getElementById('metricCreated').textContent = String(metrics.createdCount);
   document.getElementById('metricResolved').textContent = String(metrics.resolvedCount);
+  document.getElementById('metricClosed').textContent = String(metrics.closedCount);
+  document.getElementById('metricCompletedPoints').textContent = String(metrics.completedPoints);
   document.getElementById('metricOpen').textContent = String(metrics.openCount);
   document.getElementById('metricSla').textContent = `${metrics.slaCompliance}%`;
   document.getElementById('metricResolution').textContent = `${metrics.averageResolutionHours} h`;
@@ -1992,10 +1998,14 @@ function renderMetrics() {
     const name = document.createElement('td');
     const active = document.createElement('td');
     const resolved = document.createElement('td');
+    const closed = document.createElement('td');
+    const completedPoints = document.createElement('td');
     name.textContent = agent.name;
     active.textContent = String(agent.active);
     resolved.textContent = String(agent.resolved);
-    row.append(name, active, resolved);
+    closed.textContent = String(agent.closed);
+    completedPoints.textContent = String(agent.completedPoints);
+    row.append(name, active, resolved, closed, completedPoints);
     return row;
   });
   body.replaceChildren(...rows);

@@ -760,6 +760,7 @@ test('Supabase adapter maps ticket rows and requests the database audit history'
     workspace_id: 'workspace-id',
     created_at: '2026-10-20T09:00:00.000Z',
     updated_at: '2026-10-20T10:00:00.000Z',
+    complexity_score: 6,
     due_date: null,
     sla_due_at: '2026-10-22T09:00:00.000Z',
     sla_warning_at: '2026-10-22T04:12:00.000Z',
@@ -786,7 +787,8 @@ test('Supabase adapter maps ticket rows and requests the database audit history'
           from_status: 'new',
           to_status: 'open',
           changed_at: '2026-10-20T10:00:00.000Z',
-          changed_by: 'admin-id'
+          changed_by: 'admin-id',
+          assigned_to_at_change: 'agent-id'
         }];
       }
       throw new Error(`Unexpected request: ${path}`);
@@ -800,12 +802,14 @@ test('Supabase adapter maps ticket rows and requests the database audit history'
   assert.equal(ticket.workspaceId, 'workspace-id');
   assert.equal(ticket.slaDueAt, ticketRow.sla_due_at);
   assert.equal(ticket.slaWarningAt, ticketRow.sla_warning_at);
+  assert.equal(ticket.complexityScore, 6);
   assert.deepEqual(ticket.checklist, [{ text: 'Validar integración', completed: true }]);
   assert.deepEqual(ticket.statusHistory, [{
     from: 'new',
     to: 'open',
     changedAt: '2026-10-20T10:00:00.000Z',
-    changedBy: 'admin-id'
+    changedBy: 'admin-id',
+    assignedToAtChange: 'agent-id'
   }]);
   assert.equal(calls.length, 2);
   assert.ok(calls[0].path.startsWith('tickets?select='));
@@ -817,12 +821,14 @@ test('Supabase adapter maps ticket rows and requests the database audit history'
     description: 'Detalle',
     status: 'new',
     priority: 'Media',
+    complexityScore: 8,
     assignedTo: null,
     createdBy: 'client-user-id',
     dueDate: null,
     checklist: [{ text: 'Preparar pruebas', completed: false }]
   });
   assert.equal(calls[2].options.body.id, undefined);
+  assert.equal(calls[2].options.body.complexity_score, 8);
   assert.equal(calls[2].options.body.created_by, undefined);
   assert.deepEqual(calls[2].options.body.checklist, [{ text: 'Preparar pruebas', completed: false }]);
 
@@ -948,6 +954,72 @@ test('ticket categories are validated and saved', async () => {
   }), /categoría no es válida/);
 });
 
+test('ticket complexity is scored by admins and agents and locks on closure', async () => {
+  const { auth, users, ticketService } = createContext();
+  const admin = users.find((user) => user.role === 'Admin');
+  const agent = users.find((user) => user.role === 'Agent');
+  const reporter = users.find((user) => user.role === 'Reporter');
+
+  await auth.login(admin.email, admin.password);
+  const ticket = await ticketService.createTicket({
+    title: 'Trabajo complejo',
+    description: 'Este ticket tiene una estimación inicial.',
+    complexityScore: 8
+  });
+  assert.equal(ticket.complexityScore, 8);
+
+  await auth.login(agent.email, agent.password);
+  await ticketService.updateTicket({
+    id: ticket.id,
+    title: ticket.title,
+    description: ticket.description,
+    priority: ticket.priority,
+    category: ticket.category,
+    complexityScore: 5,
+    assignedTo: null,
+    dueDate: null,
+    checklist: []
+  });
+  assert.equal(ticket.complexityScore, 5);
+  await assert.rejects(() => ticketService.updateTicket({
+    id: ticket.id,
+    title: ticket.title,
+    description: ticket.description,
+    priority: ticket.priority,
+    category: ticket.category,
+    complexityScore: 11,
+    assignedTo: null,
+    dueDate: null,
+    checklist: []
+  }), /entero entre 1 y 10/);
+
+  await auth.login(reporter.email, reporter.password);
+  const reporterTicket = await ticketService.createTicket({
+    title: 'Solicitud del reporter',
+    description: 'Debe iniciar con el puntaje base.'
+  });
+  assert.equal(reporterTicket.complexityScore, 1);
+  await assert.rejects(() => ticketService.createTicket({
+    title: 'Puntaje no autorizado',
+    description: 'El Reporter no puede modificar la complejidad.',
+    complexityScore: 4
+  }), /Solo Admin y Agent/);
+
+  await auth.login(admin.email, admin.password);
+  await ticketService.changeTicketStatus(ticket.id, 'closed');
+  await assert.rejects(() => ticketService.updateTicket({
+    id: ticket.id,
+    title: ticket.title,
+    description: ticket.description,
+    priority: ticket.priority,
+    category: ticket.category,
+    complexityScore: 7,
+    assignedTo: null,
+    dueDate: null,
+    checklist: []
+  }), /no se puede cambiar después de cerrar/);
+});
+
 test('only admins can manage shared categories and categories in use cannot be deleted', async () => {
   const { auth, users, categories, ticketService } = createContext();
   const admin = users.find((user) => user.role === 'Admin');
@@ -1053,13 +1125,38 @@ test('metrics calculate date-bounded volume, SLA, satisfaction, and per-agent lo
   ]);
   assert.equal(metrics.createdCount, 2);
   assert.equal(metrics.resolvedCount, 1);
+  assert.equal(metrics.closedCount, 0);
+  assert.equal(metrics.completedPoints, 0);
   assert.equal(metrics.openCount, 1);
   assert.equal(metrics.slaCompliance, 100);
   assert.equal(metrics.averageResolutionHours, 4);
   assert.equal(metrics.averageSatisfaction, 5);
-  assert.deepEqual(metrics.byAgent, [{ name: 'Ana Agente', active: 1, resolved: 1 }]);
+  assert.deepEqual(metrics.byAgent, [{
+    name: 'Ana Agente',
+    active: 1,
+    resolved: 1,
+    closed: 0,
+    completedPoints: 0
+  }]);
   assert.match(metricsToCsv(metrics), /Ana Agente/);
-  assert.match(metricsToCsv({ ...metrics, byAgent: [{ name: '=2\+2', active: 0, resolved: 0 }] }), /"'=2/);
+  assert.match(metricsToCsv({ ...metrics, byAgent: [{ name: '=2\+2', active: 0, resolved: 0, closed: 0, completedPoints: 0 }] }), /"'=2/);
+  const completedMetrics = calculateTicketMetrics([{
+    id: 'TCK-4',
+    assignedTo: null,
+    complexityScore: 7,
+    status: 'closed',
+    createdAt: '2026-10-01T10:00:00.000Z',
+    statusHistory: [{
+      to: 'closed',
+      changedAt: '2026-10-04T10:00:00.000Z',
+      assignedToAtChange: 'agent-1'
+    }]
+  }], users, '2026-10-01', '2026-10-31');
+  assert.equal(completedMetrics.closedCount, 1);
+  assert.equal(completedMetrics.completedPoints, 7);
+  assert.equal(completedMetrics.byAgent[0].name, 'Ana Agente');
+  assert.equal(completedMetrics.byAgent[0].completedPoints, 7);
+  assert.match(metricsToCsv(completedMetrics), /Puntos de complejidad completados/);
   assert.throws(() => calculateTicketMetrics(tickets, users, '2026-11-01', '2026-10-01'), /rango de fechas/);
 });
 

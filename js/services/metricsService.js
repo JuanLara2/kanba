@@ -18,6 +18,16 @@ function firstResolution(ticket) {
   return resolvedAt;
 }
 
+function finalClosure(ticket) {
+  if (ticket.status !== 'closed') return null;
+  return (ticket.statusHistory || [])
+    .filter((record) => record.to === 'closed')
+    .sort((a, b) => new Date(b.changedAt) - new Date(a.changedAt))[0]
+    || (ticket.createdAt && ticket.status === 'closed'
+      ? { changedAt: ticket.createdAt, assignedToAtChange: ticket.assignedTo }
+      : null);
+}
+
 export function calculateTicketMetrics(tickets, usersMap, start, end, satisfaction = []) {
   const startAt = new Date(`${start}T00:00:00`).getTime();
   const endAt = new Date(`${end}T23:59:59.999`).getTime();
@@ -28,6 +38,8 @@ export function calculateTicketMetrics(tickets, usersMap, start, end, satisfacti
   const created = tickets.filter((ticket) => isWithinRange(ticket.createdAt, startAt, endAt));
   const resolved = tickets.map((ticket) => ({ ticket, resolvedAt: firstResolution(ticket) }))
     .filter(({ resolvedAt }) => resolvedAt && isWithinRange(resolvedAt, startAt, endAt));
+  const closed = tickets.map((ticket) => ({ ticket, closure: finalClosure(ticket) }))
+    .filter(({ closure }) => closure && isWithinRange(closure.changedAt, startAt, endAt));
   const resolutionHours = resolved.map(({ ticket, resolvedAt }) => (
     (new Date(resolvedAt).getTime() - new Date(ticket.createdAt).getTime()) / 3_600_000
   )).filter((hours) => hours >= 0);
@@ -35,20 +47,36 @@ export function calculateTicketMetrics(tickets, usersMap, start, end, satisfacti
     ticket.slaDueAt && new Date(resolvedAt).getTime() <= new Date(ticket.slaDueAt).getTime()
   )).length;
   const agentMetrics = new Map();
+  const getAgentMetric = (userId) => {
+    const user = userId ? usersMap.get(userId) : null;
+    const key = user?.id || userId || '__unassigned_at_close__';
+    if (!agentMetrics.has(key)) {
+      agentMetrics.set(key, {
+        name: user?.fullName || (userId ? 'Usuario no disponible' : 'Sin responsable al cierre'),
+        active: 0,
+        resolved: 0,
+        closed: 0,
+        completedPoints: 0
+      });
+    }
+    return agentMetrics.get(key);
+  };
 
   tickets.forEach((ticket) => {
     const user = usersMap.get(ticket.assignedTo);
     if (!user || !['Agent', 'Admin'].includes(user.role)) return;
-    const current = agentMetrics.get(user.id) || { name: user.fullName, active: 0, resolved: 0 };
+    const current = getAgentMetric(user.id);
     if (!['resolved', 'closed'].includes(ticket.status)) current.active += 1;
-    agentMetrics.set(user.id, current);
   });
   resolved.forEach(({ ticket }) => {
     const user = usersMap.get(ticket.assignedTo);
     if (!user || !['Agent', 'Admin'].includes(user.role)) return;
-    const current = agentMetrics.get(user.id) || { name: user.fullName, active: 0, resolved: 0 };
-    current.resolved += 1;
-    agentMetrics.set(user.id, current);
+    getAgentMetric(user.id).resolved += 1;
+  });
+  closed.forEach(({ ticket, closure }) => {
+    const current = getAgentMetric(closure.assignedToAtChange);
+    current.closed += 1;
+    current.completedPoints += Number.isInteger(ticket.complexityScore) ? ticket.complexityScore : 1;
   });
 
   const periodSatisfaction = satisfaction.filter((item) => isWithinRange(item.createdAt, startAt, endAt));
@@ -56,6 +84,10 @@ export function calculateTicketMetrics(tickets, usersMap, start, end, satisfacti
   return {
     createdCount: created.length,
     resolvedCount: resolved.length,
+    closedCount: closed.length,
+    completedPoints: closed.reduce((sum, { ticket }) => (
+      sum + (Number.isInteger(ticket.complexityScore) ? ticket.complexityScore : 1)
+    ), 0),
     openCount: tickets.filter((ticket) => !['resolved', 'closed'].includes(ticket.status)).length,
     slaCompliance: resolved.length ? Math.round((compliant / resolved.length) * 100) : 0,
     averageResolutionHours: resolutionHours.length
@@ -64,7 +96,11 @@ export function calculateTicketMetrics(tickets, usersMap, start, end, satisfacti
     averageSatisfaction: periodSatisfaction.length
       ? Math.round((periodSatisfaction.reduce((sum, item) => sum + item.rating, 0) / periodSatisfaction.length) * 10) / 10
       : null,
-    byAgent: [...agentMetrics.values()].sort((a, b) => b.resolved - a.resolved || a.name.localeCompare(b.name, 'es'))
+    byAgent: [...agentMetrics.values()].sort((a, b) => (
+      b.completedPoints - a.completedPoints
+      || b.resolved - a.resolved
+      || a.name.localeCompare(b.name, 'es')
+    ))
   };
 }
 
@@ -78,13 +114,15 @@ export function metricsToCsv(metrics) {
     ['Indicador', 'Valor'],
     ['Tickets creados', metrics.createdCount],
     ['Tickets resueltos', metrics.resolvedCount],
+    ['Tickets cerrados en el período', metrics.closedCount],
+    ['Puntos de complejidad completados', metrics.completedPoints],
     ['Tickets abiertos actuales', metrics.openCount],
     ['Cumplimiento SLA (%)', metrics.slaCompliance],
     ['Tiempo promedio resolución (horas)', metrics.averageResolutionHours],
     ['Satisfacción promedio (1–5)', metrics.averageSatisfaction ?? 'Sin datos'],
     [],
-    ['Agente', 'Tickets activos asignados', 'Tickets resueltos'],
-    ...metrics.byAgent.map((agent) => [agent.name, agent.active, agent.resolved])
+    ['Responsable al cierre', 'Tickets activos asignados', 'Tickets resueltos', 'Tickets cerrados', 'Puntos completados'],
+    ...metrics.byAgent.map((agent) => [agent.name, agent.active, agent.resolved, agent.closed, agent.completedPoints])
   ];
   return `\uFEFF${rows.map((row) => row.map(quoteCsv).join(',')).join('\r\n')}`;
 }
