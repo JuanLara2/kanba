@@ -123,14 +123,50 @@
 .user-session-pill {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
+  gap: 0.55rem;
+  min-width: 0;
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.8), rgba(30, 41, 59, 0.72));
+  border: 1px solid rgba(148, 163, 184, 0.2);
   border-radius: 999px;
-  padding: 0.5rem 0.75rem;
+  padding: 0.42rem 0.7rem 0.42rem 0.52rem;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+#sessionUserName {
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+#sessionUserRole {
+  flex: 0 0 auto;
+}
+
+.theme-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.7rem;
+  padding: 0.42rem 0.7rem;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.18);
+  color: var(--text-main);
+}
+
+.theme-picker select {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
 }
 
 .profile-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  min-height: 2.8rem;
+  border-radius: 999px;
   color: var(--text-main);
   font: inherit;
   cursor: pointer;
@@ -138,6 +174,7 @@
 
 .profile-trigger:hover {
   border-color: var(--color-primary-start);
+  box-shadow: 0 8px 16px rgba(139, 92, 246, 0.14);
 }
 
 .header-avatar,
@@ -149,7 +186,7 @@
   place-items: center;
   overflow: hidden;
   border-radius: 50%;
-  background: color-mix(in srgb, var(--color-primary-start) 24%, var(--bg-surface));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--color-primary-start) 22%, var(--bg-surface)), color-mix(in srgb, var(--color-primary-end) 28%, var(--bg-surface)));
   color: var(--text-main);
   font-weight: 700;
 }
@@ -158,6 +195,7 @@
   width: 30px;
   height: 30px;
   font-size: 0.78rem;
+  border: 2px solid rgba(255, 255, 255, 0.3);
 }
 
 .header-avatar img,
@@ -169,11 +207,21 @@
 }
 
 .role-badge {
-  background: rgba(59, 130, 246, 0.2);
+  display: inline-flex;
+  align-items: center;
+  background: rgba(59, 130, 246, 0.16);
   color: #bfdbfe;
   border-radius: 999px;
   padding: 0.2rem 0.5rem;
   font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+#btnNewTicket {
+  border-radius: 999px;
+  padding-inline: 1.15rem;
+  box-shadow: 0 8px 18px rgba(168, 85, 247, 0.2);
 }
 
 #btnNewTicket:disabled {
