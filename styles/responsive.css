@@ -507,17 +507,39 @@
   }
 }
 
-.mobile-filter-trigger,
-.mobile-status-tabs,
-.card-status-menu,
-.mobile-filters-backdrop,
-.mobile-sheet-header,
-.mobile-filter-actions {
-  display: none;
+@media (min-width: 769px) {
+  .mobile-filter-trigger,
+  .mobile-status-tabs,
+  .card-status-menu,
+  .mobile-filters-backdrop,
+  .mobile-sheet-header,
+  .mobile-filter-actions {
+    display: none !important;
+  }
+}
+
+@media (max-width: 768px), (max-height: 600px) and (orientation: landscape) {
+  .mobile-filter-trigger {
+    display: inline-flex !important;
+  }
+
+  .mobile-status-tabs {
+    display: flex !important;
+  }
+
+  .card-status-menu {
+    display: inline-flex !important;
+  }
+
+  .mobile-filters-backdrop,
+  .mobile-sheet-header,
+  .mobile-filter-actions {
+    display: flex !important;
+  }
 }
 
 #mobileFiltersLayer.hidden {
-  display: contents !important;
+  display: none !important;
 }
 
 #mobileFiltersLayer .mobile-filters-sheet,
