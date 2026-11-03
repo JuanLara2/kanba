@@ -487,6 +487,9 @@ async function handleChangePasswordSubmit(event) {
 }
 
 function bindStaticEvents() {
+  const userRoleSelect = document.getElementById('userRole');
+  userRoleSelect.addEventListener('change', updateUserRoleDescription);
+  updateUserRoleDescription();
   document.getElementById('btnManageCategories').addEventListener('click', openCategoriesModal);
   document.getElementById('categoriesModalCloseBtn').addEventListener('click', closeCategoriesModal);
   document.getElementById('categoriesModalCancelBtn').addEventListener('click', closeCategoriesModal);
@@ -1683,6 +1686,16 @@ function setActiveView(view) {
   document.getElementById('boardTab').tabIndex = showCalendar || showMetrics ? -1 : 0;
   document.getElementById('calendarTab').tabIndex = showCalendar ? 0 : -1;
   document.getElementById('metricsTab').tabIndex = showMetrics ? 0 : -1;
+}
+
+function updateUserRoleDescription() {
+  const descriptions = {
+    Reporter: 'Puede crear tickets nuevos, consultar los tickets del equipo, comentar en los que creó y valorar sus tickets al cerrarse. No puede asignar, editar ni cambiar estados.',
+    Agent: 'Puede trabajar tickets abiertos o asignados: editarlos, cambiar su estado, gestionar subtareas, asignar responsables y definir fechas límite. No administra usuarios ni categorías.',
+    Admin: 'Tiene acceso completo a los tickets del equipo. Puede asignar tareas, gestionar usuarios y roles, crear o eliminar categorías y configurar plantillas.'
+  };
+  const role = document.getElementById('userRole').value;
+  document.getElementById('userRoleDescription').textContent = descriptions[role] || '';
 }
 
 async function handleTicketSubmit(event) {

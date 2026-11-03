@@ -582,6 +582,13 @@
   overflow-wrap: anywhere;
 }
 
+.role-description {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
 .user-role-controls {
   display: flex;
   flex: 0 0 auto;

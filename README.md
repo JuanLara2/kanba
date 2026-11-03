@@ -49,6 +49,8 @@ La función de creación de usuarios usa `SUPABASE_SERVICE_ROLE_KEY` solo en el 
 
 El rol Reporter puede crear tickets nuevos, consultar los tickets de su espacio de trabajo, comentar en sus propios tickets y valorar los que haya creado cuando se cierren. No puede cambiar estados, editar tickets, asignar responsables, establecer fechas, gestionar subtareas, usuarios ni categorías.
 
+Al crear una cuenta, la descripción bajo el selector de rol resume los permisos de Reporter, Agent y Admin; se actualiza al cambiar la selección.
+
 ## Recuperación y cambio de contraseña
 
 Los usuarios pueden cambiar su contraseña desde la sesión iniciada o solicitar un enlace desde el inicio de sesión. Para que el enlace regrese a GitHub Pages, agrega `https://juanlara2.github.io/kanba/` en **Authentication → URL Configuration → Redirect URLs** de Supabase.
