@@ -64,4 +64,50 @@ export class SupabaseClient {
   requestRest(path, options = {}) {
     return this.request('rest/v1', path, options);
   }
+
+  async requestStorage(path, { method = 'GET', accessToken, body, file } = {}) {
+    this.requireConfiguration();
+    const headers = {
+      apikey: this.anonKey,
+      Accept: 'application/json',
+      Authorization: `Bearer ${accessToken}`
+    };
+    if (file) headers['Content-Type'] = file.type;
+    else if (body !== undefined) headers['Content-Type'] = 'application/json';
+
+    let response;
+    try {
+      response = await fetch(`${this.url}/storage/v1/${path}`, {
+        method,
+        headers,
+        body: file || (body === undefined ? undefined : JSON.stringify(body))
+      });
+    } catch {
+      throw new Error('No fue posible conectar con el almacenamiento de Supabase.');
+    }
+
+    const text = await response.text();
+    let result = null;
+    if (text) {
+      try {
+        result = JSON.parse(text);
+      } catch {
+        throw new Error('Supabase Storage devolvió una respuesta que no se pudo interpretar.');
+      }
+    }
+
+    if (!response.ok) {
+      const message = result?.message || result?.error || result?.msg;
+      const error = new Error(message || `Solicitud de almacenamiento fallida (${response.status}).`);
+      error.status = response.status;
+      throw error;
+    }
+
+    return result;
+  }
+
+  publicStorageUrl(bucket, objectPath) {
+    const encodedPath = objectPath.split('/').map(encodeURIComponent).join('/');
+    return `${this.url}/storage/v1/object/public/${encodeURIComponent(bucket)}/${encodedPath}`;
+  }
 }

@@ -78,6 +78,7 @@ export class RealtimeService {
           broadcast: { self: false },
           presence: { key: '' },
           postgres_changes: [
+            { event: '*', schema: 'public', table: 'profiles' },
             { event: '*', schema: 'public', table: 'tickets' },
             { event: '*', schema: 'public', table: 'ticket_categories' },
             { event: '*', schema: 'public', table: 'ticket_comments' },

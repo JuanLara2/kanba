@@ -34,7 +34,7 @@ export class BoardView {
             <span class="col-counter">${colTickets.length}</span>
           </div>
         </header>
-        <div class="drop-zone" data-status="${colDef.id}" aria-label="Columna ${colDef.name}"></div>
+        <div class="drop-zone" data-status="${colDef.id}" role="list" aria-dropeffect="none" aria-label="Columna ${colDef.name}"></div>
       `;
 
       const dropZone = colEl.querySelector('.drop-zone');
@@ -43,11 +43,12 @@ export class BoardView {
       if (colTickets.length === 0) {
         const emptyState = document.createElement('div');
         emptyState.className = 'empty-column';
+        emptyState.setAttribute('role', 'presentation');
         emptyState.textContent = 'Sin tickets';
         dropZone.appendChild(emptyState);
       } else {
         colTickets.forEach((ticket) => {
-          const card = this.buildCard(ticket, colDef);
+          const card = this.buildCard(ticket, colDef, canChangeStatus(ticket));
           if (canChangeStatus(ticket)) card.appendChild(this.buildStatusMenuButton(ticket));
           if (mobileSelection.canSelectTicket?.(ticket)) {
             card.appendChild(this.buildSelectionButton(
@@ -115,12 +116,12 @@ export class BoardView {
     return button;
   }
 
-  buildCard(ticket, colDef) {
+  buildCard(ticket, colDef, canMove) {
     const card = document.createElement('article');
     card.className = `ticket-card ${colDef.borderClass}`;
-    card.draggable = true;
     card.tabIndex = 0;
-    card.setAttribute('role', 'group');
+    card.setAttribute('role', 'listitem');
+    card.setAttribute('aria-grabbed', 'false');
     const complexityScore = Number.isInteger(ticket.complexityScore) ? ticket.complexityScore : 1;
     const checklistProgress = getChecklistProgress(ticket.checklist);
     const checklistLabel = checklistProgress.total
@@ -128,6 +129,7 @@ export class BoardView {
       : '';
     card.setAttribute('aria-label', `${ticket.id}: ${ticket.title}. Estado: ${colDef.name}.${checklistLabel} Pulsa Enter para ver detalles.`);
     card.dataset.ticketId = ticket.id;
+    card.dataset.status = ticket.status;
 
     const sla = this.ticketService.evaluateSLA(ticket);
     const assignee = this.usersMap.get(ticket.assignedTo) || { fullName: 'Sin asignar' };
@@ -175,6 +177,28 @@ export class BoardView {
         </div>
       </div>
     `;
+
+    if (assignee.avatarUrl) {
+      const avatar = card.querySelector('.avatar-circle');
+      const image = document.createElement('img');
+      image.alt = '';
+      image.loading = 'lazy';
+      image.addEventListener('error', () => image.remove(), { once: true });
+      image.src = assignee.avatarUrl;
+      avatar.replaceChildren(image);
+    }
+
+    if (canMove) {
+      const dragHandle = document.createElement('button');
+      dragHandle.className = 'card-drag-handle';
+      dragHandle.type = 'button';
+      dragHandle.dataset.dndHandle = '';
+      dragHandle.setAttribute('aria-label', `Mover ${ticket.id}: ${ticket.title}`);
+      dragHandle.setAttribute('aria-keyshortcuts', 'Space Enter ArrowUp ArrowDown ArrowLeft ArrowRight Escape');
+      dragHandle.title = 'Mover con ratón, tacto o teclado';
+      dragHandle.innerHTML = '<span aria-hidden="true">⠿</span>';
+      card.insertBefore(dragHandle, card.firstChild);
+    }
 
     return card;
   }

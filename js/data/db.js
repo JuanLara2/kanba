@@ -1,17 +1,19 @@
-const PROFILE_FIELDS = 'id,full_name,email,role,workspace_id,created_by_admin_id';
+const PROFILE_FIELDS = 'id,full_name,email,role,workspace_id,created_by_admin_id,avatar_path';
 const TICKET_FIELDS = 'id,title,description,status,priority,category,complexity_score,assigned_to,created_by,workspace_id,created_at,updated_at,due_date,sla_due_at,sla_warning_at,checklist';
 const HISTORY_FIELDS = 'id,ticket_id,from_status,to_status,changed_at,changed_by,assigned_to_at_change';
 const COMMENT_FIELDS = 'id,ticket_id,author_id,body,created_at';
 const NOTIFICATION_FIELDS = 'id,user_id,ticket_id,kind,message,created_at,read_at';
 
-function mapProfile(row) {
+function mapProfile(row, client) {
   return {
     id: row.id,
     fullName: row.full_name,
     email: row.email,
     role: row.role,
     workspaceId: row.workspace_id,
-    createdByAdminId: row.created_by_admin_id
+    createdByAdminId: row.created_by_admin_id,
+    avatarPath: row.avatar_path,
+    avatarUrl: row.avatar_path ? client.publicStorageUrl('profile-avatars', row.avatar_path) : null
   };
 }
 
@@ -97,7 +99,7 @@ export class SupabaseAdapter {
     const accessToken = await this.accessToken();
     if (storeName === 'users') {
       const rows = await this.client.requestRest(`profiles?select=${PROFILE_FIELDS}&order=full_name.asc`, { accessToken });
-      return rows.map(mapProfile);
+      return rows.map((row) => mapProfile(row, this.client));
     }
 
     if (storeName === 'tickets') {
@@ -188,7 +190,7 @@ export class SupabaseAdapter {
     const encodedId = encodeURIComponent(id);
     if (storeName === 'users') {
       const rows = await this.client.requestRest(`profiles?select=${PROFILE_FIELDS}&id=eq.${encodedId}`, { accessToken });
-      return rows.length ? mapProfile(rows[0]) : null;
+      return rows.length ? mapProfile(rows[0], this.client) : null;
     }
 
     if (storeName === 'tickets') {
@@ -262,6 +264,91 @@ export class SupabaseAdapter {
     });
     if (updatedRole !== role) throw new Error('Supabase no confirmó el cambio de rol.');
     return updatedRole;
+  }
+
+  async updateProfileAvatar(userId, file) {
+    const accessToken = await this.accessToken();
+    const allowedTypes = new Map([
+      ['image/jpeg', 'jpg'],
+      ['image/png', 'png'],
+      ['image/webp', 'webp']
+    ]);
+    const extension = allowedTypes.get(file?.type);
+    if (!extension) throw new Error('La imagen debe ser JPG, PNG o WebP.');
+    if (file.size > 2 * 1024 * 1024) throw new Error('La imagen no puede superar los 2 MB.');
+
+    const existing = await this.getById('users', userId, accessToken);
+    if (!existing) throw new Error('No se encontró tu perfil.');
+    const objectPath = `${userId}/${crypto.randomUUID()}.${extension}`;
+    const encodedPath = objectPath.split('/').map(encodeURIComponent).join('/');
+    await this.client.requestStorage(`object/profile-avatars/${encodedPath}`, {
+      method: 'POST',
+      accessToken,
+      file
+    });
+
+    let rows;
+    try {
+      rows = await this.client.requestRest(`profiles?id=eq.${encodeURIComponent(userId)}`, {
+        method: 'PATCH',
+        accessToken,
+        prefer: 'return=representation',
+        body: { avatar_path: objectPath }
+      });
+      if (!rows?.[0]) throw new Error('No se pudo actualizar el perfil.');
+    } catch (error) {
+      try {
+        await this.client.requestStorage('object/profile-avatars', {
+          method: 'DELETE',
+          accessToken,
+          body: { prefixes: [objectPath] }
+        });
+      } catch (cleanupError) {
+        throw new Error(`${error.message} Además, no se pudo limpiar la imagen nueva: ${cleanupError.message}`);
+      }
+      throw error;
+    }
+
+    let cleanupError = null;
+    if (existing.avatarPath) {
+      try {
+        await this.client.requestStorage('object/profile-avatars', {
+          method: 'DELETE',
+          accessToken,
+          body: { prefixes: [existing.avatarPath] }
+        });
+      } catch (error) {
+        cleanupError = error;
+      }
+    }
+    return { profile: mapProfile(rows[0], this.client), cleanupError };
+  }
+
+  async removeProfileAvatar(userId) {
+    const accessToken = await this.accessToken();
+    const existing = await this.getById('users', userId, accessToken);
+    if (!existing) throw new Error('No se encontró tu perfil.');
+    if (!existing.avatarPath) return { profile: existing, cleanupError: null };
+
+    const rows = await this.client.requestRest(`profiles?id=eq.${encodeURIComponent(userId)}`, {
+      method: 'PATCH',
+      accessToken,
+      prefer: 'return=representation',
+      body: { avatar_path: null }
+    });
+    if (!rows?.[0]) throw new Error('No se pudo actualizar el perfil.');
+
+    let cleanupError = null;
+    try {
+      await this.client.requestStorage('object/profile-avatars', {
+        method: 'DELETE',
+        accessToken,
+        body: { prefixes: [existing.avatarPath] }
+      });
+    } catch (error) {
+      cleanupError = error;
+    }
+    return { profile: mapProfile(rows[0], this.client), cleanupError };
   }
 
   async getComments(ticketId) {

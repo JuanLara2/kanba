@@ -185,6 +185,22 @@ export class AuthService {
     return this.getCurrentUser();
   }
 
+  async updateProfileAvatar(file) {
+    const user = await this.getCurrentUser();
+    if (!user) throw new Error('Inicia sesión para actualizar tu imagen de perfil.');
+    const result = await this.db.updateProfileAvatar(user.id, file);
+    this.currentUser = result.profile;
+    return result;
+  }
+
+  async removeProfileAvatar() {
+    const user = await this.getCurrentUser();
+    if (!user) throw new Error('Inicia sesión para quitar tu imagen de perfil.');
+    const result = await this.db.removeProfileAvatar(user.id);
+    this.currentUser = result.profile;
+    return result;
+  }
+
   async getCurrentUser() {
     if (this.currentUser) return this.currentUser;
     const session = this.readSession();

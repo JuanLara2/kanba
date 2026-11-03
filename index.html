@@ -8,9 +8,9 @@
     <link rel="apple-touch-icon" sizes="180x180" href="img/apple-touch-icon.png" />
     <link rel="manifest" href="manifest.json" />
     <meta name="theme-color" content="#151a2a" />
-    <link rel="stylesheet" href="styles/base.css" />
+    <link rel="stylesheet" href="styles/base.css?v=pointer-dnd-v1" />
     <link rel="stylesheet" href="styles/layout.css?v=password-recovery-v1" />
-    <link rel="stylesheet" href="styles/components.css?v=admin-categories-v1" />
+    <link rel="stylesheet" href="styles/components.css?v=pointer-dnd-v1" />
     <link rel="stylesheet" href="styles/responsive.css?v=mobile-native-v2" />
     <link rel="stylesheet" href="styles/splash.css" />
   </head>
@@ -65,10 +65,14 @@
             <option value="pink">Rosa</option>
           </select>
         </label>
-        <div id="sessionUserBox" class="user-session-pill">
+        <button id="sessionUserBox" class="user-session-pill profile-trigger" type="button" aria-haspopup="dialog" aria-controls="profileModal" title="Abrir mi perfil">
+          <span class="header-avatar" aria-hidden="true">
+            <img id="sessionUserAvatar" class="hidden" alt="" />
+            <span id="sessionUserInitial">?</span>
+          </span>
           <span id="sessionUserName">Cargando...</span>
           <span id="sessionUserRole" class="role-badge">...</span>
-        </div>
+        </button>
         <button id="btnNewTicket" class="btn btn-primary" type="button" aria-label="Crear ticket"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Crear ticket</button>
         <div class="notification-menu">
           <button id="btnNotifications" class="btn btn-outline" type="button" aria-expanded="false" aria-controls="notificationsPanel">
@@ -162,6 +166,7 @@
           <option value="createdAt">Fecha de creación</option>
           <option value="updatedAt">Última modificación</option>
           <option value="dueDate">Fecha de entrega</option>
+          <option value="manual">Orden manual (sesión actual)</option>
         </select>
         <select id="sortDirection">
           <option value="desc">Descendente</option>
@@ -586,6 +591,38 @@
       </div>
     </div>
 
+    <div id="profileModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="profileHeading">
+      <div class="modal-card profile-modal-card">
+        <header class="modal-header">
+          <h3 id="profileHeading">Mi perfil</h3>
+          <button id="profileCloseBtn" class="close-x" type="button" aria-label="Cerrar">×</button>
+        </header>
+        <form id="profileForm" class="modal-body">
+          <div class="profile-avatar-section">
+            <div class="profile-avatar-preview" aria-hidden="true">
+              <img id="profileAvatarPreview" class="hidden" alt="" />
+              <span id="profileAvatarInitial">?</span>
+            </div>
+            <div class="form-row">
+              <label for="profileAvatarFile">Imagen de perfil</label>
+              <input id="profileAvatarFile" type="file" accept="image/jpeg,image/png,image/webp" />
+              <small>JPG, PNG o WebP; máximo 2 MB. El archivo usa una URL pública para mostrarse en el equipo; no subas imágenes privadas.</small>
+            </div>
+          </div>
+          <div class="profile-details">
+            <p><span>Nombre</span><strong id="profileFullName"></strong></p>
+            <p><span>Correo</span><strong id="profileEmail"></strong></p>
+            <p><span>Rol</span><strong id="profileRole"></strong></p>
+          </div>
+          <footer class="modal-actions">
+            <button id="profileRemoveAvatarBtn" class="btn btn-outline hidden" type="button">Quitar imagen</button>
+            <button id="profileCancelBtn" class="btn btn-outline" type="button">Cerrar</button>
+            <button id="profileSaveBtn" class="btn btn-primary" type="submit" disabled>Guardar imagen</button>
+          </footer>
+        </form>
+      </div>
+    </div>
+
     <div id="usersModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="usersHeading">
       <div class="modal-card">
         <header class="modal-header">
@@ -708,6 +745,6 @@
       </section>
     </main>
 
-    <script type="module" src="js/app.js?v=metrics-charts-v1"></script>
+    <script type="module" src="js/app.js?v=pointer-dnd-v1"></script>
   </body>
 </html>

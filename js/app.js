@@ -1,17 +1,17 @@
-import { SupabaseClient } from './data/supabaseClient.js';
-import { SupabaseAdapter } from './data/db.js?v=complexity-scoring-v1';
-import { AuthService } from './services/authService.js?v=user-role-management-v1';
+import { SupabaseClient } from './data/supabaseClient.js?v=user-profile-avatar-v1';
+import { SupabaseAdapter } from './data/db.js?v=user-profile-avatar-v1';
+import { AuthService } from './services/authService.js?v=user-profile-avatar-v1';
 import { TicketService } from './services/ticketService.js?v=complexity-scoring-v1';
 import { FilterSortService } from './services/filterService.js';
-import { BoardView } from './ui/boardView.js?v=complexity-scoring-v1';
+import { BoardView } from './ui/boardView.js?v=user-profile-avatar-v1';
 import { ModalView } from './ui/modalView.js?v=complexity-scoring-v1';
-import { DragDropController } from './ui/dragDrop.js?v=mobile-native-v1';
+import { KanbanDnd } from './ui/KanbanDnd.js?v=pointer-dnd-v1';
 import { CalendarView, dueDateForCalendarDay } from './ui/calendarView.js';
 import { initializeThemeController } from './ui/themeController.js';
 import { PRIORITY_ORDER, SLA_REFRESH_INTERVAL_MS, STATUS_DEFINITIONS } from './config/constants.js';
 import { calculateTicketMetrics, metricsToCsv } from './services/metricsService.js?v=metrics-charts-v1';
 import { clearMetricsCharts, renderMetricsCharts } from './ui/metricsCharts.js?v=metrics-charts-v1';
-import { RealtimeService } from './services/realtimeService.js?v=realtime-protocol-v2';
+import { RealtimeService } from './services/realtimeService.js?v=user-profile-avatar-v1';
 import { createSplashScreen } from './ui/splashScreen.js';
 import { OutboxService } from './services/outboxService.js';
 import { MutationDispatcher } from './services/mutationDispatcher.js';
@@ -68,6 +68,8 @@ const categoriesModal = document.getElementById('categoriesModal');
 const categoryForm = document.getElementById('categoryForm');
 const usersModal = document.getElementById('usersModal');
 const usersForm = document.getElementById('userForm');
+const profileModal = document.getElementById('profileModal');
+const profileForm = document.getElementById('profileForm');
 const filters = {
   search: document.getElementById('filterSearch'),
   assignedTo: document.getElementById('filterAssignee'),
@@ -112,6 +114,8 @@ let appShortcutHandled = false;
 let lastRealtimeStatus = 'unavailable';
 let connectionRecoveryPromise = null;
 let categoriesModalPreviousFocus = null;
+let profileAvatarObjectUrl = null;
+let selectedProfileAvatar = null;
 const realtimeService = new RealtimeService(client, {
   onChange: handleRealtimeChange,
   onStatus: renderRealtimeStatus
@@ -137,10 +141,18 @@ async function bootstrap() {
     onOverlayClose: trackMobileOverlayClose
   });
 
-  dragDropController = new DragDropController({
+  dragDropController = new KanbanDnd({
     boardEl,
-    onStatusChange: dispatchStatusMutation,
-    onEditRequest: openTicketForEditing
+    statuses: Object.values(STATUS_DEFINITIONS),
+    onTaskMoved: handleTaskMoved,
+    onEditRequest: openTicketForEditing,
+    canMove: (ticketId) => {
+      const ticket = allTickets.find((item) => item.id === ticketId);
+      return Boolean(ticket && auth.canChangeStatus(activeUser, ticket));
+    },
+    canReorder: () => filters.sortField.value === 'manual',
+    onStatusPreview: (status) => boardView.setActiveStatus(status),
+    onError: (error) => showToast(error.message || 'No se pudo mover el ticket.')
   });
 
   calendarView = new CalendarView({
@@ -238,6 +250,138 @@ async function loadUsers(user = activeUser) {
   usersMap.clear();
   users.forEach((user) => usersMap.set(user.id, user));
   populateAssigneeSelect(users, user);
+}
+
+function userInitial(user) {
+  return String(user?.fullName || '?').trim().charAt(0).toUpperCase() || '?';
+}
+
+function renderAvatar(image, fallback, user) {
+  fallback.textContent = userInitial(user);
+  if (user?.avatarUrl) {
+    image.onerror = () => {
+      image.classList.add('hidden');
+      fallback.classList.remove('hidden');
+    };
+    image.src = user.avatarUrl;
+    image.classList.remove('hidden');
+    fallback.classList.add('hidden');
+  } else {
+    image.onerror = null;
+    image.removeAttribute('src');
+    image.classList.add('hidden');
+    fallback.classList.remove('hidden');
+  }
+}
+
+function renderSessionUser(user) {
+  document.getElementById('sessionUserName').textContent = user?.fullName || 'Invitado';
+  document.getElementById('sessionUserRole').textContent = user?.role || 'Sin sesión';
+  renderAvatar(
+    document.getElementById('sessionUserAvatar'),
+    document.getElementById('sessionUserInitial'),
+    user
+  );
+  document.getElementById('sessionUserBox').disabled = !user;
+}
+
+function resetProfileAvatarPreview() {
+  if (profileAvatarObjectUrl) URL.revokeObjectURL(profileAvatarObjectUrl);
+  profileAvatarObjectUrl = null;
+  selectedProfileAvatar = null;
+  document.getElementById('profileAvatarFile').value = '';
+  document.getElementById('profileSaveBtn').disabled = true;
+  renderAvatar(
+    document.getElementById('profileAvatarPreview'),
+    document.getElementById('profileAvatarInitial'),
+    activeUser
+  );
+}
+
+function openProfileModal() {
+  if (!activeUser) return;
+  resetProfileAvatarPreview();
+  document.getElementById('profileFullName').textContent = activeUser.fullName;
+  document.getElementById('profileEmail').textContent = activeUser.email;
+  document.getElementById('profileRole').textContent = activeUser.role;
+  document.getElementById('profileRemoveAvatarBtn').classList.toggle('hidden', !activeUser.avatarPath);
+  profileModal.classList.remove('hidden');
+  trackMobileOverlayOpen('profile');
+  document.getElementById('profileCloseBtn').focus();
+}
+
+function closeProfileModal() {
+  if (profileModal.classList.contains('hidden')) return;
+  profileModal.classList.add('hidden');
+  trackMobileOverlayClose('profile');
+  resetProfileAvatarPreview();
+}
+
+function handleProfileAvatarSelection(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+    resetProfileAvatarPreview();
+    showToast('Selecciona una imagen JPG, PNG o WebP.');
+    return;
+  }
+  if (file.size > 2 * 1024 * 1024) {
+    resetProfileAvatarPreview();
+    showToast('La imagen no puede superar los 2 MB.');
+    return;
+  }
+  if (profileAvatarObjectUrl) URL.revokeObjectURL(profileAvatarObjectUrl);
+  profileAvatarObjectUrl = URL.createObjectURL(file);
+  selectedProfileAvatar = file;
+  const image = document.getElementById('profileAvatarPreview');
+  image.src = profileAvatarObjectUrl;
+  image.classList.remove('hidden');
+  document.getElementById('profileAvatarInitial').classList.add('hidden');
+  document.getElementById('profileSaveBtn').disabled = false;
+}
+
+async function refreshProfileAvatar(profileResult) {
+  activeUser = profileResult;
+  usersMap.set(profileResult.id, profileResult);
+  renderSessionUser(activeUser);
+  renderBoard();
+}
+
+async function handleProfileSubmit(event) {
+  event.preventDefault();
+  if (!activeUser || !selectedProfileAvatar) return;
+  const button = document.getElementById('profileSaveBtn');
+  button.disabled = true;
+  try {
+    const result = await auth.updateProfileAvatar(selectedProfileAvatar);
+    await refreshProfileAvatar(result.profile);
+    closeProfileModal();
+    showToast(result.cleanupError
+      ? `Imagen guardada, pero no se pudo borrar la anterior: ${result.cleanupError.message}`
+      : 'Imagen de perfil actualizada.');
+  } catch (error) {
+    showToast(error.message || 'No se pudo actualizar la imagen de perfil.');
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function handleProfileAvatarRemoval() {
+  if (!activeUser?.avatarPath) return;
+  const button = document.getElementById('profileRemoveAvatarBtn');
+  button.disabled = true;
+  try {
+    const result = await auth.removeProfileAvatar();
+    await refreshProfileAvatar(result.profile);
+    closeProfileModal();
+    showToast(result.cleanupError
+      ? `Imagen quitada, pero no se pudo borrar el archivo anterior: ${result.cleanupError.message}`
+      : 'Imagen de perfil quitada.');
+  } catch (error) {
+    showToast(error.message || 'No se pudo quitar la imagen de perfil.');
+  } finally {
+    button.disabled = false;
+  }
 }
 
 async function loadCategories() {
@@ -491,6 +635,18 @@ function bindStaticEvents() {
   const userRoleSelect = document.getElementById('userRole');
   userRoleSelect.addEventListener('change', updateUserRoleDescription);
   updateUserRoleDescription();
+  document.getElementById('sessionUserBox').addEventListener('click', openProfileModal);
+  document.getElementById('profileCloseBtn').addEventListener('click', closeProfileModal);
+  document.getElementById('profileCancelBtn').addEventListener('click', closeProfileModal);
+  document.getElementById('profileAvatarFile').addEventListener('change', handleProfileAvatarSelection);
+  document.getElementById('profileRemoveAvatarBtn').addEventListener('click', handleProfileAvatarRemoval);
+  profileForm.addEventListener('submit', handleProfileSubmit);
+  profileModal.addEventListener('click', (event) => {
+    if (event.target === profileModal) closeProfileModal();
+  });
+  profileModal.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') closeProfileModal();
+  });
   document.getElementById('btnManageCategories').addEventListener('click', openCategoriesModal);
   document.getElementById('categoriesModalCloseBtn').addEventListener('click', closeCategoriesModal);
   document.getElementById('categoriesModalCancelBtn').addEventListener('click', closeCategoriesModal);
@@ -1931,6 +2087,8 @@ function renderBoard() {
     return;
   }
 
+  if (filters.sortField.value === 'manual') initializeManualOrder();
+
   const criteria = {
     search: filters.search.value,
     assignedTo: filters.assignedTo.value,
@@ -1967,6 +2125,35 @@ function renderBoard() {
     calendarView.render(visibleTickets, auth.canAssignOrSetDue(activeUser));
   }
   renderMetrics();
+}
+
+function initializeManualOrder(sortField) {
+  // Los índices dispersos de sesión evitan reordenar todos los tickets en cada inserción.
+  Object.keys(STATUS_DEFINITIONS).forEach((status) => {
+    let tickets = allTickets.filter((ticket) => ticket.status === status);
+    if (sortField) {
+      tickets = FilterSortService.apply(allTickets, {
+        search: '',
+        assignedTo: 'ALL',
+        status,
+        priority: 'ALL',
+        category: 'ALL',
+        dueFilter: 'ALL',
+        sortField,
+        sortDirection: filters.sortDirection.value
+      }, usersMap);
+    } else {
+      if (!tickets.some((ticket) => !Number.isFinite(ticket.sortOrder))) return;
+      tickets.sort((a, b) => {
+        const orderA = Number.isFinite(a.sortOrder) ? a.sortOrder : Number.POSITIVE_INFINITY;
+        const orderB = Number.isFinite(b.sortOrder) ? b.sortOrder : Number.POSITIVE_INFINITY;
+        return orderA - orderB;
+      });
+    }
+    tickets.forEach((ticket, index) => {
+      ticket.sortOrder = (index + 1) * 1024;
+    });
+  });
 }
 
 function renderMetrics() {
@@ -2077,6 +2264,64 @@ async function dispatchStatusMutation(ticketId, nextStatus) {
     }
   });
   if (result.status === 'synced') showToast('Estado actualizado');
+  return result;
+}
+
+async function handleTaskMoved({ taskId, newStatus, newPosition, beforeTaskId, afterTaskId }) {
+  const ticket = allTickets.find((item) => item.id === taskId);
+  if (!ticket) throw new Error('El ticket ya no está disponible.');
+  if (!Object.prototype.hasOwnProperty.call(STATUS_DEFINITIONS, newStatus)) {
+    throw new Error('El estado de destino no es válido.');
+  }
+
+  const previousStatus = ticket.status;
+  const previousSortField = filters.sortField.value;
+  initializeManualOrder(previousSortField === 'manual' ? undefined : previousSortField);
+  const previousSortOrder = ticket.sortOrder;
+  filters.sortField.value = 'manual';
+  if (previousStatus !== newStatus) filters.status.value = 'ALL';
+
+  const destination = allTickets
+    .filter((item) => item.status === newStatus && item.id !== taskId)
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+  const beforeIndex = destination.findIndex((item) => item.id === beforeTaskId);
+  const afterIndex = destination.findIndex((item) => item.id === afterTaskId);
+  const insertionIndex = beforeIndex >= 0
+    ? beforeIndex + 1
+    : afterIndex >= 0
+      ? afterIndex
+      : Math.max(0, Math.min(newPosition, destination.length));
+  const beforeOrder = insertionIndex > 0 ? destination[insertionIndex - 1].sortOrder : null;
+  const afterOrder = insertionIndex < destination.length ? destination[insertionIndex].sortOrder : null;
+
+  if (beforeOrder !== null && afterOrder !== null && afterOrder - beforeOrder > 1e-8) {
+    ticket.sortOrder = beforeOrder + (afterOrder - beforeOrder) / 2;
+  } else if (beforeOrder !== null && afterOrder === null) {
+    ticket.sortOrder = beforeOrder + 1024;
+  } else if (beforeOrder === null && afterOrder !== null) {
+    ticket.sortOrder = afterOrder - 1024;
+  } else if (destination.length === 0) {
+    ticket.sortOrder = 1024;
+  } else {
+    destination.splice(insertionIndex, 0, ticket);
+    destination.forEach((item, index) => {
+      item.sortOrder = (index + 1) * 1024;
+    });
+  }
+
+  if (previousStatus === newStatus) {
+    renderBoard();
+    showToast('Orden actualizado. Solo se conserva en esta sesión.');
+    return { status: 'local' };
+  }
+
+  // Los cambios de estado usan la cola offline existente; el orden manual no se persiste.
+  const result = await dispatchStatusMutation(taskId, newStatus);
+  if (result.status === 'rejected') {
+    if (previousSortOrder === undefined) delete ticket.sortOrder;
+    else ticket.sortOrder = previousSortOrder;
+    renderBoard();
+  }
   return result;
 }
 
@@ -2314,6 +2559,7 @@ async function syncAuthState() {
       loadResponseTemplates(),
       loadSatisfactionEntries()
     ]);
+    activeUser = usersMap.get(currentUser.id) || currentUser;
     await refreshPendingSyncStatus();
     await initializeSyncCheckpoint();
     await realtimeService.subscribe({
@@ -2328,8 +2574,7 @@ async function syncAuthState() {
     btnNewTicket.style.opacity = '1';
     btnManageUsers.classList.toggle('hidden', !auth.canManageUsers(currentUser));
     btnManageCategories.classList.toggle('hidden', !auth.canManageCategories(currentUser));
-    document.getElementById('sessionUserName').textContent = currentUser.fullName;
-    document.getElementById('sessionUserRole').textContent = currentUser.role;
+    renderSessionUser(activeUser);
   } else {
     realtimeService.stop();
     activeUser = null;
@@ -2339,8 +2584,7 @@ async function syncAuthState() {
     btnNewTicket.style.opacity = '0.5';
     btnManageUsers.classList.add('hidden');
     btnManageCategories.classList.add('hidden');
-    document.getElementById('sessionUserName').textContent = 'Invitado';
-    document.getElementById('sessionUserRole').textContent = 'Sin sesión';
+    renderSessionUser(null);
     usersMap.clear();
     allTickets = [];
     ticketCategories = [];
@@ -2375,11 +2619,14 @@ function handleRealtimeChange() {
     if (!activeUser) return;
     try {
       await Promise.all([
+        loadUsers(activeUser),
         loadTickets(),
         refreshNotificationList(),
         loadResponseTemplates(),
         loadSatisfactionEntries()
       ]);
+      activeUser = usersMap.get(activeUser.id) || activeUser;
+      renderSessionUser(activeUser);
       renderBoard();
       if (modalView.currentTicketId && !modalEl.classList.contains('hidden')) {
         await loadTicketComments(modalView.currentTicketId);

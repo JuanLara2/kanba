@@ -10,7 +10,6 @@ import { calculateTicketMetrics, metricsToCsv } from '../js/services/metricsServ
 import { RealtimeService } from '../js/services/realtimeService.js';
 import { initializeThemeController, THEME_STORAGE_KEY } from '../js/ui/themeController.js';
 import { dueDateForCalendarDay, getMonthGridDates, localDateKey } from '../js/ui/calendarView.js';
-import { DragDropController } from '../js/ui/dragDrop.js';
 
 function createContext() {
   const users = [
@@ -220,96 +219,6 @@ test('theme selector restores, applies, and persists only supported themes', () 
 
   setTheme('unknown');
   assert.equal(documentRef.documentElement.dataset.theme, 'light');
-});
-
-test('drag and drop handlers safely resolve text-node event targets', async () => {
-  const handlers = new Map();
-  const boardEl = {
-    addEventListener(type, handler) {
-      handlers.set(type, handler);
-    }
-  };
-  const card = {
-    nodeType: 1,
-    dataset: { ticketId: 'TCK-1001' },
-    classList: {
-      add() {},
-      remove() {}
-    },
-    closest(selector) {
-      return selector === '.ticket-card' ? this : null;
-    }
-  };
-  const dropZone = {
-    nodeType: 1,
-    dataset: { status: 'open' },
-    closest(selector) {
-      return selector === '.drop-zone' ? this : null;
-    }
-  };
-  const changes = [];
-  new DragDropController({
-    boardEl,
-    onStatusChange: async (...args) => changes.push(args)
-  });
-
-  const textTarget = { nodeType: 3, parentElement: card };
-  const dataTransfer = {
-    effectAllowed: '',
-    dropEffect: '',
-    setData() {},
-    getData() {
-      return 'TCK-1001';
-    }
-  };
-
-  handlers.get('dragstart')({ target: textTarget, dataTransfer });
-  handlers.get('dragend')({ target: textTarget });
-  handlers.get('dragover')({ target: { nodeType: 3, parentElement: dropZone }, preventDefault() {}, dataTransfer });
-  await handlers.get('drop')({
-    target: { nodeType: 3, parentElement: dropZone },
-    preventDefault() {},
-    dataTransfer
-  });
-  handlers.get('click')({ target: textTarget });
-
-  assert.equal(dataTransfer.effectAllowed, 'move');
-  assert.equal(dataTransfer.dropEffect, 'move');
-  assert.deepEqual(changes, [['TCK-1001', 'open']]);
-});
-
-test('ticket status controls do not trigger the card detail click handler', () => {
-  const handlers = new Map();
-  const card = {
-    nodeType: 1,
-    dataset: { ticketId: 'TCK-1001' },
-    closest(selector) {
-      return selector === '.ticket-card' ? this : null;
-    }
-  };
-  const button = {
-    nodeType: 1,
-    closest(selector) {
-      if (selector === '.ticket-card') return card;
-      if (selector.includes('button')) return this;
-      return null;
-    }
-  };
-  const boardEl = {
-    addEventListener(type, handler) {
-      handlers.set(type, handler);
-    }
-  };
-  const openedTickets = [];
-  new DragDropController({
-    boardEl,
-    onEditRequest: (ticketId) => openedTickets.push(ticketId)
-  });
-
-  handlers.get('click')({ target: button });
-  handlers.get('click')({ target: card });
-
-  assert.deepEqual(openedTickets, ['TCK-1001']);
 });
 
 test('Supabase login authenticates each configured role and stores a managed session', async () => {
@@ -747,6 +656,39 @@ test('unconfigured Supabase client refuses network requests with setup instructi
   await assert.rejects(() => client.requestAuth('token?grant_type=password', { method: 'POST' }), /SUPABASE_URL/);
 });
 
+test('Supabase client uploads profile images with the authenticated Storage request', async () => {
+  const originalFetch = globalThis.fetch;
+  const requests = [];
+  globalThis.fetch = async (url, options) => {
+    requests.push({ url, options });
+    return { ok: true, async text() { return ''; } };
+  };
+  try {
+    const client = new SupabaseClient({
+      url: 'https://project.supabase.co/',
+      anonKey: 'public-key'
+    });
+    const image = new Blob(['image-data'], { type: 'image/png' });
+    await client.requestStorage('object/profile-avatars/user-id/avatar.png', {
+      method: 'POST',
+      accessToken: 'access-token',
+      file: image
+    });
+    assert.equal(requests[0].url, 'https://project.supabase.co/storage/v1/object/profile-avatars/user-id/avatar.png');
+    assert.equal(requests[0].options.method, 'POST');
+    assert.equal(requests[0].options.headers.Authorization, 'Bearer access-token');
+    assert.equal(requests[0].options.headers.apikey, 'public-key');
+    assert.equal(requests[0].options.headers['Content-Type'], 'image/png');
+    assert.equal(requests[0].options.body, image);
+    assert.equal(
+      client.publicStorageUrl('profile-avatars', 'user-id/avatar file.png'),
+      'https://project.supabase.co/storage/v1/object/public/profile-avatars/user-id/avatar%20file.png'
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('Supabase adapter maps ticket rows and requests the database audit history', async () => {
   const calls = [];
   const ticketRow = {
@@ -767,6 +709,9 @@ test('Supabase adapter maps ticket rows and requests the database audit history'
     checklist: [{ text: 'Validar integración', completed: true }]
   };
   const client = {
+    publicStorageUrl(bucket, path) {
+      return `https://project.supabase.co/storage/v1/object/public/${bucket}/${path}`;
+    },
     async requestRest(path, options) {
       calls.push({ path, options });
       if (path === 'tickets') return [ticketRow];
@@ -778,7 +723,8 @@ test('Supabase adapter maps ticket rows and requests the database audit history'
           email: 'admin@example.com',
           role: 'Admin',
           workspace_id: 'workspace-id',
-          created_by_admin_id: null
+          created_by_admin_id: null,
+          avatar_path: 'admin-id/avatar.png'
         }];
       }
       if (path.startsWith('ticket_status_history?')) {
@@ -835,6 +781,8 @@ test('Supabase adapter maps ticket rows and requests the database audit history'
   const [profile] = await adapter.getAll('users');
   assert.equal(profile.workspaceId, 'workspace-id');
   assert.equal(profile.createdByAdminId, null);
+  assert.equal(profile.avatarPath, 'admin-id/avatar.png');
+  assert.equal(profile.avatarUrl, 'https://project.supabase.co/storage/v1/object/public/profile-avatars/admin-id/avatar.png');
 
   const [syncIndex] = await adapter.getTicketSyncIndex();
   assert.deepEqual(syncIndex, { id: 'TCK-1001', updatedAt: ticketRow.updated_at });
@@ -889,6 +837,61 @@ test('Supabase adapter changes roles through the authenticated database function
       body: { p_user_id: 'user-123', p_role: 'Agent' }
     }
   }]);
+});
+
+test('Supabase adapter uploads and removes only the signed-in profile avatar', async () => {
+  const calls = [];
+  let profile = {
+    id: 'user-id',
+    full_name: 'Usuario',
+    email: 'user@example.com',
+    role: 'Reporter',
+    workspace_id: 'workspace-id',
+    created_by_admin_id: null,
+    avatar_path: 'user-id/previous.png'
+  };
+  const client = {
+    publicStorageUrl(bucket, path) {
+      return `https://project.supabase.co/storage/v1/object/public/${bucket}/${path}`;
+    },
+    async requestRest(path, options = {}) {
+      calls.push({ type: 'rest', path, options });
+      if (path.startsWith('profiles?select=')) return [profile];
+      if (path.startsWith('profiles?id=') && options.method === 'PATCH') {
+        profile = { ...profile, avatar_path: options.body.avatar_path };
+        return [profile];
+      }
+      throw new Error(`Unexpected REST request: ${path}`);
+    },
+    async requestStorage(path, options) {
+      calls.push({ type: 'storage', path, options });
+      return {};
+    }
+  };
+  const adapter = new SupabaseAdapter(client, async () => 'test-access-token');
+  const file = { type: 'image/png', size: 100, name: 'avatar.png' };
+  const result = await adapter.updateProfileAvatar('user-id', file);
+
+  assert.equal(result.profile.avatarPath, profile.avatar_path);
+  assert.ok(result.profile.avatarUrl.includes('profile-avatars/user-id/'));
+  assert.equal(result.cleanupError, null);
+  assert.equal(calls[1].type, 'storage');
+  assert.equal(calls[1].options.file, file);
+  assert.deepEqual(calls[2].options.body, { avatar_path: profile.avatar_path });
+  assert.deepEqual(calls[3].options.body, { prefixes: ['user-id/previous.png'] });
+
+  const uploadedPath = profile.avatar_path;
+  const removed = await adapter.removeProfileAvatar('user-id');
+  assert.equal(removed.profile.avatarPath, null);
+  assert.deepEqual(calls.at(-1).options.body, { prefixes: [uploadedPath] });
+  await assert.rejects(
+    () => adapter.updateProfileAvatar('user-id', { type: 'image/svg+xml', size: 50 }),
+    /JPG, PNG o WebP/
+  );
+  await assert.rejects(
+    () => adapter.updateProfileAvatar('user-id', { type: 'image/png', size: 3 * 1024 * 1024 }),
+    /2 MB/
+  );
 });
 
 test('SLA filters classify overdue, warning, and future SLA deadlines', () => {
@@ -1271,6 +1274,7 @@ test('Realtime service subscribes workspace tables and forwards database changes
   assert.equal(join[3], 'phx_join');
   assert.equal(join[2], 'realtime:workspace-workspace-1');
   assert.deepEqual(join[4].config.postgres_changes.map((change) => change.table), [
+    'profiles',
     'tickets',
     'ticket_categories',
     'ticket_comments',

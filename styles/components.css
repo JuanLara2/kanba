@@ -130,6 +130,44 @@
   padding: 0.5rem 0.75rem;
 }
 
+.profile-trigger {
+  color: var(--text-main);
+  font: inherit;
+  cursor: pointer;
+}
+
+.profile-trigger:hover {
+  border-color: var(--color-primary-start);
+}
+
+.header-avatar,
+.profile-avatar-preview,
+.avatar-circle {
+  position: relative;
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--color-primary-start) 24%, var(--bg-surface));
+  color: var(--text-main);
+  font-weight: 700;
+}
+
+.header-avatar {
+  width: 30px;
+  height: 30px;
+  font-size: 0.78rem;
+}
+
+.header-avatar img,
+.profile-avatar-preview img,
+.avatar-circle img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .role-badge {
   background: rgba(59, 130, 246, 0.2);
   color: #bfdbfe;
@@ -168,8 +206,70 @@
   transform: translateY(-1px);
 }
 
-.ticket-card.dragging {
-  opacity: 0.5;
+.card-drag-handle {
+  align-self: flex-end;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  min-height: 2rem;
+  margin: -0.3rem -0.3rem -0.55rem 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.45rem;
+  background: var(--bg-card);
+  color: var(--text-muted);
+  cursor: grab;
+  /* Reserva el tacto para arrastrar desde este control; el resto de la tarjeta puede desplazarse. */
+  touch-action: none;
+}
+
+.card-drag-handle:active {
+  cursor: grabbing;
+}
+
+.card-drag-handle:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.ticket-card.is-dnd-source {
+  position: fixed !important;
+  top: 0;
+  left: -10000px;
+  width: 1px !important;
+  height: 1px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+  clip-path: inset(50%);
+}
+
+.kanban-dnd-placeholder {
+  flex: 0 0 auto;
+  border: 2px dashed var(--color-focus);
+  border-radius: var(--radius-card);
+  background: var(--bg-column-header);
+}
+
+.drop-zone.is-dnd-target {
+  background: var(--bg-column-header);
+}
+
+.kanban-dnd-ghost {
+  position: fixed;
+  z-index: 10000;
+  margin: 0;
+  pointer-events: none;
+  opacity: 0.92;
+  box-shadow: var(--shadow-card);
+  will-change: transform;
+}
+
+.kanban-dnd-ghost .card-drag-handle {
+  visibility: hidden;
 }
 
 .ticket-card.sla-warning {
@@ -431,12 +531,7 @@
 .avatar-circle {
   width: 28px;
   height: 28px;
-  border-radius: 50%;
-  background: rgba(148, 163, 184, 0.2);
-  display: grid;
-  place-items: center;
   font-size: 0.8rem;
-  font-weight: 700;
 }
 
 .assignee-text {
@@ -473,6 +568,52 @@
   border: 1px solid var(--border-subtle);
   overflow: hidden;
   overflow-y: auto;
+}
+
+.profile-modal-card {
+  width: min(480px, calc(100% - 2rem));
+}
+
+.profile-avatar-section {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  align-items: center;
+  gap: 1rem;
+}
+
+.profile-avatar-preview {
+  width: 96px;
+  height: 96px;
+  font-size: 2rem;
+}
+
+.profile-avatar-section small {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.profile-details {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.profile-details p {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0;
+  padding-bottom: 0.55rem;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.profile-details span {
+  color: var(--text-muted);
+}
+
+.profile-details strong {
+  overflow-wrap: anywhere;
+  text-align: right;
 }
 
 .modal-header {

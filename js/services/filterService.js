@@ -44,6 +44,13 @@ export class FilterSortService {
         return true;
       })
       .sort((a, b) => {
+        if (sortField === 'manual') {
+          const orderA = Number.isFinite(a.sortOrder) ? a.sortOrder : Number.POSITIVE_INFINITY;
+          const orderB = Number.isFinite(b.sortOrder) ? b.sortOrder : Number.POSITIVE_INFINITY;
+          if (orderA !== orderB) return orderA < orderB ? -1 : 1;
+          return 0;
+        }
+
         let valA = a[sortField];
         let valB = b[sortField];
 
