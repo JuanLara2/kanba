@@ -537,10 +537,10 @@ function openProfileModal() {
   profileAvatarInput.focus();
 }
 
-function closeProfileModal() {
+function closeProfileModal(trackOverlay = true) {
   const wasOpen = !profileModal.classList.contains('hidden');
   profileModal.classList.add('hidden');
-  if (wasOpen) trackMobileOverlayClose('profile');
+  if (wasOpen && trackOverlay) trackMobileOverlayClose('profile');
   if (profileAvatarInput) {
     profileAvatarInput.value = '';
     if (profileFileName) profileFileName.textContent = 'Ningún archivo seleccionado';
@@ -782,12 +782,13 @@ function bindStaticEvents() {
   });
   document.getElementById('btnNewTicket').addEventListener('click', openNewTicketModal);
   document.getElementById('profileManageUsersBtn').addEventListener('click', async () => {
-    const user = await auth.getCurrentUser();
+    const user = activeUser || await auth.getCurrentUser();
     if (!auth.canManageUsers(user)) {
       showToast('Solo un administrador puede administrar usuarios.');
       return;
     }
-    closeProfileModal();
+    const overlayReplaced = replaceMobileOverlay('profile', 'users');
+    closeProfileModal(!overlayReplaced);
     modalView.openUsers([...usersMap.values()], user.id);
   });
   document.getElementById('usersModal').addEventListener('change', (event) => {
@@ -1038,6 +1039,13 @@ function trackMobileOverlayOpen(id) {
   if (!isMobileViewport() || mobileOverlayStack.at(-1) === id) return;
   window.history.pushState({ ...(window.history.state || {}), mobileOverlay: id }, '');
   mobileOverlayStack.push(id);
+}
+
+function replaceMobileOverlay(from, to) {
+  if (!isMobileViewport() || mobileOverlayStack.at(-1) !== from) return false;
+  mobileOverlayStack[mobileOverlayStack.length - 1] = to;
+  window.history.replaceState({ ...(window.history.state || {}), mobileOverlay: to }, '');
+  return true;
 }
 
 function trackMobileOverlayClose(id) {
