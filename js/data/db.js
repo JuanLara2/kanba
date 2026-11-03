@@ -1,8 +1,19 @@
-const PROFILE_FIELDS = 'id,full_name,email,role,workspace_id,created_by_admin_id';
+import { SUPABASE_URL } from '../config/supabase.js';
+
+const PROFILE_FIELDS = 'id,full_name,email,role,workspace_id,created_by_admin_id,avatar_path';
 const TICKET_FIELDS = 'id,title,description,status,priority,category,complexity_score,assigned_to,created_by,workspace_id,created_at,updated_at,due_date,sla_due_at,sla_warning_at,checklist';
 const HISTORY_FIELDS = 'id,ticket_id,from_status,to_status,changed_at,changed_by,assigned_to_at_change';
 const COMMENT_FIELDS = 'id,ticket_id,author_id,body,created_at';
 const NOTIFICATION_FIELDS = 'id,user_id,ticket_id,kind,message,created_at,read_at';
+
+function profileAvatarUrl(avatarPath) {
+  if (!avatarPath) return null;
+  const encodedPath = avatarPath
+    .split('/')
+    .map((segment) => encodeURIComponent(segment))
+    .join('/');
+  return `${SUPABASE_URL}/storage/v1/object/public/profile-avatars/${encodedPath}`;
+}
 
 function mapProfile(row) {
   return {
@@ -11,7 +22,9 @@ function mapProfile(row) {
     email: row.email,
     role: row.role,
     workspaceId: row.workspace_id,
-    createdByAdminId: row.created_by_admin_id
+    createdByAdminId: row.created_by_admin_id,
+    avatarPath: row.avatar_path || null,
+    avatarUrl: profileAvatarUrl(row.avatar_path)
   };
 }
 

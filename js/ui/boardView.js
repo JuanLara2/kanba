@@ -170,7 +170,7 @@ export class BoardView {
       ` : ''}
       <div class="card-footer">
         <div class="card-assignee" title="Asignado a: ${this.escapeHtml(assignee.fullName)}">
-          <span class="avatar-circle">${initial}</span>
+          ${assignee.avatarUrl ? `<span class="avatar-circle avatar-with-image"><img src="${this.escapeHtml(assignee.avatarUrl)}" alt="" loading="lazy" /></span>` : `<span class="avatar-circle">${initial}</span>`}
           <span class="assignee-text">${this.escapeHtml(assignee.fullName)}</span>
         </div>
         <div class="card-dates">

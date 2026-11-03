@@ -5,7 +5,13 @@ create table if not exists public.profiles (
   full_name text not null check (length(trim(full_name)) >= 2),
   email text not null unique,
   role text not null check (role in ('Admin', 'Agent', 'Reporter')),
-  created_at timestamptz not null default now()
+  avatar_path text,
+  created_at timestamptz not null default now(),
+  constraint profiles_avatar_path_owner_prefix
+    check (
+      avatar_path is null
+      or avatar_path like id::text || '/%'
+    )
 );
 
 create table if not exists public.tickets (
