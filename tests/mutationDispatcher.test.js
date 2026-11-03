@@ -136,3 +136,35 @@ test('retains a transient server failure in the outbox without rolling back', as
   assert.equal(state, 'open');
   assert.equal(outbox.actions.length, 1);
 });
+
+test('keeps pending changes visible for a manual retry after a transient failure', async () => {
+  const outbox = new MemoryOutbox();
+  let online = false;
+  let attempts = 0;
+  const dispatcher = new MutationDispatcher({ outbox, isOnline: () => online });
+  dispatcher.setScope({ userId: 'user-1', workspaceId: 'workspace-1' });
+  dispatcher.register('ticket.status.set', {
+    async execute(action) {
+      attempts += 1;
+      if (attempts === 1) {
+        const error = new Error('Servicio temporalmente no disponible.');
+        error.status = 503;
+        throw error;
+      }
+      return { id: action.entityId, status: action.payload.status };
+    }
+  });
+
+  await dispatcher.dispatch({
+    type: 'ticket.status.set',
+    entityId: 'ticket-1',
+    payload: { status: 'open' }
+  });
+  online = true;
+
+  assert.equal(await dispatcher.flush(), 0);
+  assert.equal(outbox.actions.length, 1);
+  assert.equal(await dispatcher.flush(), 1);
+  assert.equal(outbox.actions.length, 0);
+  assert.equal(attempts, 2);
+});

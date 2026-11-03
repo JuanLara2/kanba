@@ -79,6 +79,7 @@ export class RealtimeService {
           presence: { key: '' },
           postgres_changes: [
             { event: '*', schema: 'public', table: 'tickets' },
+            { event: '*', schema: 'public', table: 'ticket_categories' },
             { event: '*', schema: 'public', table: 'ticket_comments' },
             { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${this.userId}` }
           ]

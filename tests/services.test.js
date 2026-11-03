@@ -24,12 +24,37 @@ function createContext() {
   const notifications = [];
   const satisfaction = [];
   const responseTemplates = [];
+  const categories = [
+    'Soporte técnico',
+    'Accesos',
+    'Incidente',
+    'Solicitud de servicio',
+    'Consulta',
+    'Mejora',
+    'Nómina y Pagos'
+  ];
   const stores = { users, tickets };
   const sessions = new Map();
   let createdUserId = 0;
   const db = {
     async getAll(storeName) {
       return stores[storeName].slice();
+    },
+    async getCategories() {
+      return categories.slice();
+    },
+    async createCategory(name) {
+      categories.push(name);
+      return name;
+    },
+    async getCategoryUsage(name) {
+      return tickets.some((ticket) => ticket.category === name);
+    },
+    async deleteCategory(name) {
+      const index = categories.indexOf(name);
+      if (index === -1) throw new Error('La categoría ya no existe.');
+      categories.splice(index, 1);
+      return name;
     },
     async getById(storeName, id) {
       return stores[storeName].find((item) => item.id === id) || null;
@@ -150,7 +175,7 @@ function createContext() {
   };
 
   const auth = new AuthService(client, db);
-  return { users, tickets, db, auth, ticketService: new TicketService(db, auth) };
+  return { users, tickets, categories, db, auth, ticketService: new TicketService(db, auth) };
 }
 
 test('theme selector restores, applies, and persists only supported themes', () => {
@@ -791,6 +816,33 @@ test('Supabase adapter maps ticket rows and requests the database audit history'
   assert.ok(calls.some(({ path }) => path.includes('updated_at=gt.2026-10-20T09%3A30%3A00.000Z')));
 });
 
+test('Supabase adapter reads and manages workspace ticket categories', async () => {
+  const calls = [];
+  const client = {
+    async requestRest(path, options = {}) {
+      calls.push({ path, options });
+      if (path === 'ticket_categories?select=name&order=name.asc') {
+        return [{ name: 'Consulta' }, { name: 'Facturación' }];
+      }
+      if (path === 'ticket_categories') return [{ name: options.body.name }];
+      if (path.startsWith('tickets?select=id&category=')) return [{ id: 'TCK-1001' }];
+      if (path.startsWith('ticket_categories?name=')) return [{ name: 'Facturación' }];
+      throw new Error(`Unexpected request: ${path}`);
+    }
+  };
+  const adapter = new SupabaseAdapter(client, async () => 'test-access-token');
+
+  assert.deepEqual(await adapter.getCategories(), ['Consulta', 'Facturación']);
+  assert.equal(await adapter.createCategory('Facturación'), 'Facturación');
+  assert.equal(await adapter.getCategoryUsage('Facturación'), true);
+  assert.equal(await adapter.deleteCategory('Facturación'), 'Facturación');
+  assert.equal(calls[1].options.method, 'POST');
+  assert.deepEqual(calls[1].options.body, { name: 'Facturación' });
+  assert.equal(calls[2].options.method, undefined);
+  assert.equal(calls[3].options.method, 'DELETE');
+  assert.equal(calls[3].options.prefer, 'return=representation');
+});
+
 test('SLA filters classify overdue, warning, and future SLA deadlines', () => {
   const originalNow = Date.now;
   const fixedNow = Date.parse('2026-10-25T12:00:00.000Z');
@@ -852,6 +904,42 @@ test('ticket categories are validated and saved', async () => {
     description: 'No debe guardar categorías arbitrarias.',
     category: 'Otra'
   }), /categoría no es válida/);
+});
+
+test('only admins can manage shared categories and categories in use cannot be deleted', async () => {
+  const { auth, users, categories, ticketService } = createContext();
+  const admin = users.find((user) => user.role === 'Admin');
+  const agent = users.find((user) => user.role === 'Agent');
+  await auth.login(admin.email, admin.password);
+
+  assert.equal(await ticketService.addCategory('  Facturación  '), 'Facturación');
+  assert.ok(categories.includes('Facturación'));
+  await assert.rejects(() => ticketService.addCategory('facturación'), /Ya existe/);
+  const ticket = await ticketService.createTicket({
+    title: 'Consulta de facturación',
+    description: 'El equipo debe revisar esta nueva categoría.',
+    category: 'Facturación'
+  });
+  await assert.rejects(
+    () => ticketService.deleteCategory('Facturación'),
+    /todavía usan tickets/
+  );
+  await ticketService.updateTicket({
+    id: ticket.id,
+    title: ticket.title,
+    description: ticket.description,
+    priority: ticket.priority,
+    category: 'Consulta',
+    assignedTo: null,
+    dueDate: null,
+    checklist: []
+  });
+  assert.equal(await ticketService.deleteCategory('Facturación'), 'Facturación');
+  assert.ok(!categories.includes('Facturación'));
+
+  await auth.login(agent.email, agent.password);
+  await assert.rejects(() => ticketService.addCategory('Nueva'), /Solo un administrador/);
+  await assert.rejects(() => ticketService.deleteCategory('Mejora'), /Solo un administrador/);
 });
 
 test('only an authorized assignee can reopen a resolved ticket and its creator can rate it when closed', async () => {
@@ -993,6 +1081,7 @@ test('Realtime service subscribes workspace tables and forwards database changes
   assert.equal(join[2], 'realtime:workspace-workspace-1');
   assert.deepEqual(join[4].config.postgres_changes.map((change) => change.table), [
     'tickets',
+    'ticket_categories',
     'ticket_comments',
     'notifications'
   ]);

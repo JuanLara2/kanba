@@ -232,6 +232,10 @@ export class AuthService {
     return Boolean(user && user.role === 'Admin');
   }
 
+  canManageCategories(user) {
+    return Boolean(user && user.role === 'Admin');
+  }
+
   canCommentOnTicket(user, ticket) {
     if (!user || !ticket || ticket.workspaceId !== user.workspaceId) return false;
     return user.role === 'Admin' || user.role === 'Agent'

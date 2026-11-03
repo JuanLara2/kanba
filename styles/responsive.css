@@ -176,6 +176,15 @@
     justify-content: center;
   }
 
+  .header-right > .pending-sync-status {
+    grid-column: 1 / -1;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    padding: 0.35rem 0.5rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+  }
+
   .theme-picker {
     justify-content: space-between;
     padding: 0.45rem 0.55rem;

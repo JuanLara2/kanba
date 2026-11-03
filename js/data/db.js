@@ -111,6 +111,50 @@ export class SupabaseAdapter {
     throw new Error(`Almacén de datos no reconocido: ${storeName}`);
   }
 
+  async getCategories() {
+    const accessToken = await this.accessToken();
+    const rows = await this.client.requestRest(
+      'ticket_categories?select=name&order=name.asc',
+      { accessToken }
+    );
+    return rows.map((row) => row.name);
+  }
+
+  async createCategory(name) {
+    const accessToken = await this.accessToken();
+    const rows = await this.client.requestRest('ticket_categories', {
+      method: 'POST',
+      accessToken,
+      prefer: 'return=representation',
+      body: { name }
+    });
+    if (!rows?.[0]) throw new Error('Supabase no devolvió la categoría creada.');
+    return rows[0].name;
+  }
+
+  async getCategoryUsage(name) {
+    const accessToken = await this.accessToken();
+    const rows = await this.client.requestRest(
+      `tickets?select=id&category=eq.${encodeURIComponent(name)}&limit=1`,
+      { accessToken }
+    );
+    return rows.length > 0;
+  }
+
+  async deleteCategory(name) {
+    const accessToken = await this.accessToken();
+    const rows = await this.client.requestRest(
+      `ticket_categories?name=eq.${encodeURIComponent(name)}`,
+      {
+        method: 'DELETE',
+        accessToken,
+        prefer: 'return=representation'
+      }
+    );
+    if (!rows?.[0]) throw new Error('No se pudo eliminar la categoría o ya no existe.');
+    return rows[0].name;
+  }
+
   async getTicketsUpdatedSince(timestamp) {
     const accessToken = await this.accessToken();
     const rows = await this.client.requestRest(

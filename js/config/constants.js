@@ -10,13 +10,3 @@ export const STATUS_DEFINITIONS = {
 export const SLA_REFRESH_INTERVAL_MS = 60 * 1000;
 
 export const PRIORITY_ORDER = ['Baja', 'Media', 'Alta', 'Urgente'];
-
-export const TICKET_CATEGORIES = [
-  'Soporte técnico',
-  'Accesos',
-  'Incidente',
-  'Solicitud de servicio',
-  'Consulta',
-  'Mejora',
-  'Nómina y Pagos'
-];

@@ -1,5 +1,15 @@
-import { STATUS_DEFINITIONS, PRIORITY_ORDER, TICKET_CATEGORIES } from '../config/constants.js';
+import { STATUS_DEFINITIONS, PRIORITY_ORDER } from '../config/constants.js';
 import { getSlaState } from './slaService.js';
+
+export const CATEGORY_NAME_MAX_LENGTH = 50;
+
+function normalizeCategoryName(value) {
+  const name = String(value ?? '').trim();
+  if (!name || name.length > CATEGORY_NAME_MAX_LENGTH || /[\u0000-\u001f\u007f]/.test(name)) {
+    throw new Error(`El nombre de la categoría debe tener entre 1 y ${CATEGORY_NAME_MAX_LENGTH} caracteres.`);
+  }
+  return name;
+}
 
 export function normalizeChecklist(items) {
   if (!Array.isArray(items) || items.length > 100) {
@@ -38,6 +48,67 @@ export class TicketService {
     return this.db.getAll('tickets');
   }
 
+  async getCategories() {
+    if (typeof this.db.getCategories !== 'function') {
+      throw new Error('La administración de categorías no está disponible.');
+    }
+    const categories = await this.db.getCategories();
+    if (!Array.isArray(categories) || categories.some((name) => (
+      typeof name !== 'string' || !name.trim() || name !== name.trim()
+    ))) {
+      throw new Error('Supabase devolvió una lista de categorías no válida.');
+    }
+    return categories;
+  }
+
+  async addCategory(value) {
+    const user = await this.auth.getCurrentUser();
+    if (!this.auth.canManageCategories(user)) {
+      throw new Error('Solo un administrador puede crear categorías.');
+    }
+    const name = normalizeCategoryName(value);
+    const categories = await this.getCategories();
+    if (categories.some((category) => category.localeCompare(name, 'es', { sensitivity: 'accent' }) === 0)) {
+      throw new Error('Ya existe una categoría con ese nombre.');
+    }
+    if (typeof this.db.createCategory !== 'function') {
+      throw new Error('La creación de categorías no está disponible.');
+    }
+    try {
+      return await this.db.createCategory(name);
+    } catch (error) {
+      if (/unique constraint|duplicate key/i.test(error.message || '')) {
+        throw new Error('Ya existe una categoría con ese nombre.');
+      }
+      throw error;
+    }
+  }
+
+  async deleteCategory(value) {
+    const user = await this.auth.getCurrentUser();
+    if (!this.auth.canManageCategories(user)) {
+      throw new Error('Solo un administrador puede eliminar categorías.');
+    }
+    const name = normalizeCategoryName(value);
+    const categories = await this.getCategories();
+    if (!categories.includes(name)) throw new Error('La categoría ya no existe.');
+    if (categories.length <= 1) throw new Error('Debe permanecer al menos una categoría.');
+    if (typeof this.db.getCategoryUsage !== 'function' || typeof this.db.deleteCategory !== 'function') {
+      throw new Error('La eliminación de categorías no está disponible.');
+    }
+    if (await this.db.getCategoryUsage(name)) {
+      throw new Error('No se puede eliminar una categoría que todavía usan tickets.');
+    }
+    try {
+      return await this.db.deleteCategory(name);
+    } catch (error) {
+      if (/foreign key constraint/i.test(error.message || '')) {
+        throw new Error('No se puede eliminar una categoría que todavía usan tickets.');
+      }
+      throw error;
+    }
+  }
+
   async getTicketsUpdatedSince(timestamp) {
     if (typeof this.db.getTicketsUpdatedSince !== 'function') {
       throw new Error('La sincronización incremental de tickets no está disponible.');
@@ -52,7 +123,7 @@ export class TicketService {
     return this.db.getTicketSyncIndex();
   }
 
-  async createTicket({ title, description, priority = 'Media', category = 'Consulta', initialStatus = 'new', assignedTo = null, dueDate = null, checklist = [] }) {
+  async createTicket({ title, description, priority = 'Media', category = null, initialStatus = 'new', assignedTo = null, dueDate = null, checklist = [] }) {
     const user = await this.auth.getCurrentUser();
     if (!user) throw new Error('Sesión requerida para crear tickets.');
     if (user.role === 'Reporter' && initialStatus !== 'new') {
@@ -332,13 +403,19 @@ export class TicketService {
     return this.db.submitSatisfaction(ticketId, Number(rating), normalizedComment);
   }
 
-  async validateTicketFields({ title, description, priority, category = 'Consulta', initialStatus, assignedTo, dueDate, checklist = [], workspaceId }) {
+  async validateTicketFields({ title, description, priority, category = null, initialStatus, assignedTo, dueDate, checklist = [], workspaceId }) {
     const normalizedTitle = String(title ?? '').trim();
     const normalizedDescription = String(description ?? '').trim();
     if (normalizedTitle.length < 4) throw new Error('El título debe tener al menos 4 caracteres.');
     if (!normalizedDescription) throw new Error('La descripción es obligatoria.');
     if (!PRIORITY_ORDER.includes(priority)) throw new Error('La prioridad no es válida.');
-    if (!TICKET_CATEGORIES.includes(category)) throw new Error('La categoría no es válida.');
+    const categories = await this.getCategories();
+    if (categories.length === 0) throw new Error('No hay categorías disponibles. Solicita a un administrador que cree una.');
+    const requestedCategory = String(category ?? '').trim();
+    const normalizedCategory = categories.find((availableCategory) => (
+      availableCategory.toLocaleLowerCase('es') === requestedCategory.toLocaleLowerCase('es')
+    )) || (requestedCategory ? null : categories.find((item) => item === 'Consulta') || categories[0]);
+    if (!normalizedCategory) throw new Error('La categoría no es válida.');
     if (!Object.prototype.hasOwnProperty.call(STATUS_DEFINITIONS, initialStatus)) throw new Error('El estado no es válido.');
 
     let normalizedDueDate = null;
@@ -362,7 +439,7 @@ export class TicketService {
       title: normalizedTitle,
       description: normalizedDescription,
       priority,
-      category,
+      category: normalizedCategory,
       initialStatus,
       assignedTo: assignedTo || null,
       dueDate: normalizedDueDate,

@@ -100,7 +100,7 @@ export class ModalView {
       document.getElementById('formTitle').value = ticket.title;
       document.getElementById('formDescription').value = ticket.description;
       document.getElementById('formPriority').value = ticket.priority;
-      document.getElementById('formCategory').value = ticket.category || 'Consulta';
+      document.getElementById('formCategory').value = ticket.category;
       document.getElementById('formAssignee').value = ticket.assignedTo || '';
       document.getElementById('formInitialStatus').value = ticket.status;
       document.getElementById('formDueDate').value = ticket.dueDate ? this.toLocalDateTime(ticket.dueDate) : '';
@@ -116,7 +116,6 @@ export class ModalView {
       formTicketId.value = '';
       deleteBtn.classList.add('hidden');
       this.form.reset();
-      document.getElementById('formCategory').value = 'Consulta';
       this.checklistDraft = [];
       statusRow.classList.remove('hidden');
       document.getElementById('ticketHistorySection').classList.add('hidden');

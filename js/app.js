@@ -24,8 +24,14 @@ const ticketService = new TicketService(db, auth);
 const outbox = new OutboxService();
 const mutations = new MutationDispatcher({
   outbox,
-  onError: (error) => showToast(error.message || 'No se pudo guardar el cambio.'),
-  onQueued: () => showToast('Sin conexión: el cambio quedó guardado para sincronizarse.'),
+  onError: (error) => {
+    showToast(error.message || 'No se pudo guardar el cambio.');
+    void refreshPendingSyncStatus();
+  },
+  onQueued: () => {
+    showToast('Sin conexión: el cambio quedó guardado para sincronizarse.');
+    void refreshPendingSyncStatus();
+  },
   onSynced: handleMutationSynced
 });
 mutations.register('ticket.status.set', {
@@ -57,6 +63,8 @@ const loginForm = document.getElementById('loginForm');
 const passwordRecoveryForm = document.getElementById('passwordRecoveryForm');
 const changePasswordModal = document.getElementById('changePasswordModal');
 const changePasswordForm = document.getElementById('changePasswordForm');
+const categoriesModal = document.getElementById('categoriesModal');
+const categoryForm = document.getElementById('categoryForm');
 const usersModal = document.getElementById('usersModal');
 const usersForm = document.getElementById('userForm');
 const filters = {
@@ -71,6 +79,7 @@ const filters = {
 };
 
 let allTickets = [];
+let ticketCategories = [];
 let usersMap = new Map();
 let activeUser = null;
 let notifications = [];
@@ -101,6 +110,7 @@ let mobileRefreshInProgress = false;
 let appShortcutHandled = false;
 let lastRealtimeStatus = 'unavailable';
 let connectionRecoveryPromise = null;
+let categoriesModalPreviousFocus = null;
 const realtimeService = new RealtimeService(client, {
   onChange: handleRealtimeChange,
   onStatus: renderRealtimeStatus
@@ -140,6 +150,7 @@ async function bootstrap() {
 
   bindStaticEvents();
   window.addEventListener('online', handleConnectionRestored);
+  window.addEventListener('offline', refreshPendingSyncStatus);
   splashScreen.setProgress(55, 'Sincronizando tareas...');
   await syncAuthState();
   renderMobileFilterChips();
@@ -226,6 +237,134 @@ async function loadUsers(user = activeUser) {
   usersMap.clear();
   users.forEach((user) => usersMap.set(user.id, user));
   populateAssigneeSelect(users, user);
+}
+
+async function loadCategories() {
+  const user = activeUser;
+  if (!user) return;
+  const categories = await ticketService.getCategories();
+  if (activeUser?.id !== user.id || activeUser?.workspaceId !== user.workspaceId) return;
+  ticketCategories = categories;
+  renderCategoryOptions();
+  if (!categoriesModal.classList.contains('hidden')) renderCategoryManagement();
+}
+
+function renderCategoryOptions() {
+  const filterCategory = filters.category.value;
+  const filterOptions = [new Option('Todas', 'ALL')];
+  ticketCategories.forEach((name) => filterOptions.push(new Option(name, name)));
+  filters.category.replaceChildren(...filterOptions);
+  filters.category.value = ticketCategories.includes(filterCategory) ? filterCategory : 'ALL';
+
+  const formCategory = document.getElementById('formCategory');
+  const selectedCategory = formCategory.value;
+  if (ticketCategories.length === 0) {
+    formCategory.replaceChildren(new Option('No hay categorías configuradas', '', true, true));
+    formCategory.disabled = true;
+    return;
+  }
+
+  formCategory.disabled = false;
+  const defaultCategory = ticketCategories.includes('Consulta') ? 'Consulta' : ticketCategories[0];
+  formCategory.replaceChildren(...ticketCategories.map((name) => (
+    new Option(name, name, name === defaultCategory, name === defaultCategory)
+  )));
+  formCategory.value = ticketCategories.includes(selectedCategory) ? selectedCategory : defaultCategory;
+}
+
+function renderCategoryManagement() {
+  const list = document.getElementById('categoryList');
+  if (!list) return;
+  const categoryCounts = new Map();
+  allTickets.forEach((ticket) => {
+    categoryCounts.set(ticket.category, (categoryCounts.get(ticket.category) || 0) + 1);
+  });
+
+  list.replaceChildren(...ticketCategories.map((name) => {
+    const item = document.createElement('li');
+    const details = document.createElement('div');
+    const label = document.createElement('span');
+    const usage = document.createElement('span');
+    const deleteButton = document.createElement('button');
+    const count = categoryCounts.get(name) || 0;
+
+    label.className = 'category-list-name';
+    label.textContent = name;
+    usage.className = 'category-list-usage';
+    usage.textContent = `${count} ${count === 1 ? 'ticket' : 'tickets'}`;
+    details.append(label, usage);
+    deleteButton.className = 'btn btn-danger';
+    deleteButton.type = 'button';
+    deleteButton.dataset.deleteCategory = name;
+    deleteButton.textContent = 'Eliminar';
+    deleteButton.setAttribute('aria-label', `Eliminar categoría ${name}`);
+    deleteButton.disabled = count > 0 || ticketCategories.length <= 1;
+    deleteButton.title = count > 0
+      ? 'Reasigna los tickets antes de eliminar esta categoría'
+      : ticketCategories.length <= 1
+        ? 'Debe permanecer al menos una categoría'
+        : `Eliminar ${name}`;
+    item.append(details, deleteButton);
+    return item;
+  }));
+}
+
+async function openCategoriesModal() {
+  if (!auth.canManageCategories(activeUser)) {
+    showToast('Solo un administrador puede administrar categorías.');
+    return;
+  }
+  try {
+    await loadCategories();
+    if (!auth.canManageCategories(activeUser)) return;
+    categoriesModalPreviousFocus = document.activeElement;
+    categoriesModal.classList.remove('hidden');
+    renderCategoryManagement();
+    trackMobileOverlayOpen('categories');
+    document.getElementById('categoryName').focus();
+  } catch (error) {
+    showToast(error.message || 'No se pudieron cargar las categorías.');
+  }
+}
+
+function closeCategoriesModal() {
+  const wasOpen = !categoriesModal.classList.contains('hidden');
+  categoriesModal.classList.add('hidden');
+  if (wasOpen) trackMobileOverlayClose('categories');
+  categoryForm.reset();
+  if (wasOpen) categoriesModalPreviousFocus?.focus();
+}
+
+async function handleCategorySubmit(event) {
+  event.preventDefault();
+  const submitButton = categoryForm.querySelector('[type="submit"]');
+  submitButton.disabled = true;
+  try {
+    await ticketService.addCategory(document.getElementById('categoryName').value);
+    categoryForm.reset();
+    await loadCategories();
+    showToast('Categoría agregada para todo el equipo.');
+  } catch (error) {
+    showToast(error.message || 'No se pudo agregar la categoría.');
+  } finally {
+    submitButton.disabled = false;
+  }
+}
+
+async function handleCategoryListClick(event) {
+  const button = event.target.closest('[data-delete-category]');
+  if (!button || button.disabled) return;
+  const name = button.dataset.deleteCategory;
+  if (!window.confirm(`¿Eliminar la categoría "${name}"? Esta acción no se puede deshacer.`)) return;
+  button.disabled = true;
+  try {
+    await ticketService.deleteCategory(name);
+    await loadCategories();
+    showToast('Categoría eliminada.');
+  } catch (error) {
+    showToast(error.message || 'No se pudo eliminar la categoría.');
+    button.disabled = false;
+  }
 }
 
 function populateAssigneeSelect(users, currentUser = activeUser) {
@@ -348,6 +487,33 @@ async function handleChangePasswordSubmit(event) {
 }
 
 function bindStaticEvents() {
+  document.getElementById('btnManageCategories').addEventListener('click', openCategoriesModal);
+  document.getElementById('categoriesModalCloseBtn').addEventListener('click', closeCategoriesModal);
+  document.getElementById('categoriesModalCancelBtn').addEventListener('click', closeCategoriesModal);
+  categoriesModal.addEventListener('click', (event) => {
+    if (event.target === categoriesModal) closeCategoriesModal();
+  });
+  categoriesModal.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      closeCategoriesModal();
+      return;
+    }
+    if (event.key !== 'Tab') return;
+    const focusable = [...categoriesModal.querySelectorAll('button:not(:disabled), input:not(:disabled)')];
+    if (focusable.length === 0) return;
+    if (event.shiftKey && document.activeElement === focusable[0]) {
+      event.preventDefault();
+      focusable.at(-1).focus();
+    } else if (!event.shiftKey && document.activeElement === focusable.at(-1)) {
+      event.preventDefault();
+      focusable[0].focus();
+    }
+  });
+  categoryForm.addEventListener('submit', handleCategorySubmit);
+  document.getElementById('categoryList').addEventListener('click', handleCategoryListClick);
+  document.getElementById('btnRetrySync').addEventListener('click', () => {
+    void handleConnectionRestored();
+  });
   document.getElementById('btnForgotPassword').addEventListener('click', handleForgotPassword);
   passwordRecoveryForm.addEventListener('submit', handlePasswordRecoverySubmit);
   document.getElementById('btnChangePassword').addEventListener('click', () => {
@@ -644,6 +810,7 @@ function closeMobileOverlay(id) {
   const closers = {
     ticket: () => modalView.closeTicket(),
     users: () => modalView.closeUsers(),
+    categories: closeCategoriesModal,
     password: closeChangePasswordModal,
     satisfaction: closeSatisfactionModal,
     filters: closeMobileFilters,
@@ -847,10 +1014,12 @@ async function refreshMobileBoard() {
   try {
     await Promise.all([
       loadTickets(),
+      loadCategories(),
       refreshNotificationList(),
       loadResponseTemplates(),
       loadSatisfactionEntries()
     ]);
+    if (!categoriesModal.classList.contains('hidden')) renderCategoryManagement();
     renderBoard();
     status.textContent = 'Tickets actualizados';
     hapticFeedback();
@@ -1875,6 +2044,58 @@ async function handleMutationSynced(action, ticket) {
     renderBoard();
     renderMobileSearchResults();
   }
+  await refreshPendingSyncStatus();
+}
+
+async function refreshPendingSyncStatus() {
+  const statusEl = document.getElementById('pendingSyncStatus');
+  const messageEl = document.getElementById('pendingSyncMessage');
+  const retryButton = document.getElementById('btnRetrySync');
+  if (!statusEl || !messageEl || !retryButton) return;
+  if (!activeUser) {
+    statusEl.classList.add('hidden');
+    return;
+  }
+
+  const user = activeUser;
+  try {
+    const pending = await outbox.list({
+      userId: user.id,
+      workspaceId: user.workspaceId
+    });
+    if (activeUser?.id !== user.id || activeUser?.workspaceId !== user.workspaceId) {
+      statusEl.classList.add('hidden');
+      return;
+    }
+    if (pending.length === 0) {
+      statusEl.classList.add('hidden');
+      return;
+    }
+
+    statusEl.classList.remove('hidden');
+    if (!navigator.onLine) {
+      messageEl.textContent = `${pending.length} ${pending.length === 1 ? 'cambio pendiente' : 'cambios pendientes'} · Sin conexión`;
+    } else if (connectionRecoveryPromise) {
+      messageEl.textContent = `Sincronizando ${pending.length} ${pending.length === 1 ? 'cambio pendiente' : 'cambios pendientes'}…`;
+    } else {
+      messageEl.textContent = `${pending.length} ${pending.length === 1 ? 'cambio pendiente' : 'cambios pendientes'}`;
+    }
+    retryButton.disabled = !navigator.onLine || Boolean(connectionRecoveryPromise);
+    retryButton.textContent = connectionRecoveryPromise ? 'Sincronizando…' : 'Reintentar';
+    retryButton.title = navigator.onLine
+      ? 'Volver a intentar la sincronización de los cambios pendientes'
+      : 'Conéctate a internet para sincronizar los cambios pendientes';
+  } catch (error) {
+    if (activeUser?.id !== user.id || activeUser?.workspaceId !== user.workspaceId) {
+      statusEl.classList.add('hidden');
+      return;
+    }
+    statusEl.classList.remove('hidden');
+    messageEl.textContent = 'No se pudo consultar la cola de sincronización';
+    retryButton.disabled = !navigator.onLine || Boolean(connectionRecoveryPromise);
+    retryButton.textContent = connectionRecoveryPromise ? 'Sincronizando…' : 'Reintentar';
+    showToast(error.message || 'No se pudo consultar la cola de sincronización.');
+  }
 }
 
 async function recoverRejectedMutation(action) {
@@ -1980,8 +2201,10 @@ function handleConnectionRestored() {
       showToast(error.message || 'No se pudieron recuperar los cambios de Supabase.');
     } finally {
       connectionRecoveryPromise = null;
+      void refreshPendingSyncStatus();
     }
   })();
+  void refreshPendingSyncStatus();
   return connectionRecoveryPromise;
 }
 
@@ -1989,11 +2212,19 @@ async function syncAuthState() {
   const currentUser = await auth.getCurrentUser();
   const btnNewTicket = document.getElementById('btnNewTicket');
   const btnManageUsers = document.getElementById('btnManageUsers');
+  const btnManageCategories = document.getElementById('btnManageCategories');
 
   if (currentUser) {
     activeUser = currentUser;
     mutations.setScope({ userId: currentUser.id, workspaceId: currentUser.workspaceId });
-    await Promise.all([loadUsers(currentUser), loadTickets(), loadResponseTemplates(), loadSatisfactionEntries()]);
+    await Promise.all([
+      loadUsers(currentUser),
+      loadTickets(),
+      loadCategories(),
+      loadResponseTemplates(),
+      loadSatisfactionEntries()
+    ]);
+    await refreshPendingSyncStatus();
     await initializeSyncCheckpoint();
     await realtimeService.subscribe({
       userId: currentUser.id,
@@ -2006,6 +2237,7 @@ async function syncAuthState() {
     btnNewTicket.disabled = false;
     btnNewTicket.style.opacity = '1';
     btnManageUsers.classList.toggle('hidden', !auth.canManageUsers(currentUser));
+    btnManageCategories.classList.toggle('hidden', !auth.canManageCategories(currentUser));
     document.getElementById('sessionUserName').textContent = currentUser.fullName;
     document.getElementById('sessionUserRole').textContent = currentUser.role;
   } else {
@@ -2016,10 +2248,15 @@ async function syncAuthState() {
     btnNewTicket.disabled = true;
     btnNewTicket.style.opacity = '0.5';
     btnManageUsers.classList.add('hidden');
+    btnManageCategories.classList.add('hidden');
     document.getElementById('sessionUserName').textContent = 'Invitado';
     document.getElementById('sessionUserRole').textContent = 'Sin sesión';
     usersMap.clear();
     allTickets = [];
+    ticketCategories = [];
+    renderCategoryOptions();
+    closeCategoriesModal();
+    document.getElementById('categoryList').replaceChildren();
     notifications = [];
     responseTemplates = [];
     satisfactionEntries = [];
@@ -2027,6 +2264,7 @@ async function syncAuthState() {
     document.getElementById('notificationBadge').classList.add('hidden');
     document.getElementById('notificationsPanel').classList.add('hidden');
     document.getElementById('btnNotifications').setAttribute('aria-expanded', 'false');
+    document.getElementById('pendingSyncStatus').classList.add('hidden');
     boardEl.innerHTML = '';
     if (calendarView) calendarView.render([], false);
     populateAssigneeSelect([]);
