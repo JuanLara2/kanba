@@ -176,18 +176,22 @@
   }
 
   .header-right {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
     gap: 0.5rem;
   }
 
-  .header-right {
-    align-items: stretch;
-  }
-
   .header-right > * {
+    width: 100%;
     min-width: 0;
     justify-content: center;
+  }
+
+  .header-right #btnNewTicket {
+    order: 99;
+    width: 100%;
+    min-height: 2.9rem;
   }
 
   .header-right > .pending-sync-status {
@@ -540,11 +544,6 @@
 
 #mobileFiltersLayer.hidden {
   display: none !important;
-}
-
-#mobileFiltersLayer .mobile-filters-sheet,
-#mobileFiltersLayer .mobile-filter-controls {
-  display: contents;
 }
 
 @media (max-width: 768px), (max-height: 600px) and (orientation: landscape) {
