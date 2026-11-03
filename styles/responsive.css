@@ -826,15 +826,6 @@
     transition: top 0.22s ease, transform 0.22s ease;
   }
 
-  .controls-toolbar.is-filter-sheet-open {
-    z-index: 61;
-  }
-
-  .app-shell.is-chrome-hidden .controls-toolbar.is-filter-sheet-open {
-    top: 0;
-    transform: none;
-  }
-
   .app-shell.is-chrome-hidden .app-header {
     transform: translateY(-105%);
   }

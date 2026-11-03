@@ -1219,7 +1219,7 @@ function handleMobileScroll() {
 
 function openMobileFilters() {
   const layer = document.getElementById('mobileFiltersLayer');
-  document.querySelector('.controls-toolbar').classList.add('is-filter-sheet-open');
+  document.body.append(layer);
   trackMobileOverlayOpen('filters');
   layer.classList.remove('hidden');
   document.getElementById('mobileFiltersSheet').setAttribute('role', 'dialog');
@@ -1229,8 +1229,9 @@ function openMobileFilters() {
 }
 
 function closeMobileFilters() {
-  document.getElementById('mobileFiltersLayer').classList.add('hidden');
-  document.querySelector('.controls-toolbar').classList.remove('is-filter-sheet-open');
+  const layer = document.getElementById('mobileFiltersLayer');
+  layer.classList.add('hidden');
+  document.querySelector('.controls-toolbar').append(layer);
   document.getElementById('mobileFiltersSheet').removeAttribute('role');
   document.getElementById('mobileFiltersSheet').removeAttribute('aria-modal');
   document.getElementById('btnOpenMobileFilters').setAttribute('aria-expanded', 'false');
