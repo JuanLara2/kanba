@@ -68,6 +68,9 @@ const categoriesModal = document.getElementById('categoriesModal');
 const categoryForm = document.getElementById('categoryForm');
 const usersModal = document.getElementById('usersModal');
 const usersForm = document.getElementById('userForm');
+const profileModal = document.getElementById('profileModal');
+const profileAvatarInput = document.getElementById('profileAvatarInput');
+const profileFileName = document.getElementById('profileFileName');
 const filters = {
   search: document.getElementById('filterSearch'),
   assignedTo: document.getElementById('filterAssignee'),
@@ -487,6 +490,181 @@ async function handleChangePasswordSubmit(event) {
   }
 }
 
+function renderAvatarFallback(element, user, fallback = 'U') {
+  const target = element;
+  target.replaceChildren();
+  const initials = user?.fullName ? user.fullName.trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase() : fallback;
+  if (user?.avatarUrl) {
+    const image = document.createElement('img');
+    image.src = user.avatarUrl;
+    image.alt = '';
+    image.loading = 'lazy';
+    target.appendChild(image);
+    return;
+  }
+  target.textContent = initials || fallback;
+}
+
+function renderProfileSummary(user = activeUser) {
+  const preview = document.getElementById('profileAvatarPreview');
+  const name = document.getElementById('profileUserName');
+  const email = document.getElementById('profileUserEmail');
+  const role = document.getElementById('profileUserRole');
+  const headerAvatar = document.getElementById('headerUserAvatar');
+
+  renderAvatarFallback(preview, user, 'U');
+  renderAvatarFallback(headerAvatar, user, 'U');
+  name.textContent = user?.fullName || 'Sin nombre';
+  email.textContent = user?.email || 'Sin correo';
+  role.textContent = user?.role || 'Sin rol';
+}
+
+function openProfileModal() {
+  if (!activeUser) return;
+  renderProfileSummary(activeUser);
+  profileModal.classList.remove('hidden');
+  trackMobileOverlayOpen('profile');
+  profileAvatarInput.value = '';
+  profileFileName.textContent = 'Ningún archivo seleccionado';
+  profileAvatarInput.focus();
+}
+
+function closeProfileModal() {
+  const wasOpen = !profileModal.classList.contains('hidden');
+  profileModal.classList.add('hidden');
+  if (wasOpen) trackMobileOverlayClose('profile');
+  if (profileAvatarInput) {
+    profileAvatarInput.value = '';
+    if (profileFileName) profileFileName.textContent = 'Ningún archivo seleccionado';
+  }
+}
+
+async function handleProfileAvatarUpload() {
+  const user = activeUser || await auth.getCurrentUser();
+  if (!user) {
+    showToast('Debes iniciar sesión antes de subir tu avatar.');
+    return;
+  }
+
+  const file = profileAvatarInput.files?.[0];
+  if (!file) {
+    showToast('Selecciona una imagen para tu avatar.');
+    return;
+  }
+  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+    showToast('Solo se aceptan imágenes JPG, PNG o WEBP.');
+    return;
+  }
+  if (file.size > 2 * 1024 * 1024) {
+    showToast('La imagen debe pesar menos de 2 MB.');
+    return;
+  }
+
+  const token = await auth.getAccessToken();
+  if (!token) {
+    showToast('Tu sesión no está activa. Inicia sesión otra vez.');
+    return;
+  }
+
+  const extension = file.name.includes('.') ? file.name.split('.').pop() || 'png' : 'png';
+  const blobName = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}.${extension}`;
+  const objectPath = `${user.id}/${blobName}`;
+  const encodedPath = objectPath.split('/').map((segment) => encodeURIComponent(segment)).join('/');
+  const storageUrl = `${client.url}/storage/v1/object/profile-avatars/${encodedPath}`;
+
+  try {
+    const uploadResponse = await fetch(storageUrl, {
+      method: 'POST',
+      headers: {
+        apikey: client.anonKey,
+        Authorization: `Bearer ${token}`,
+        'Content-Type': file.type || 'application/octet-stream',
+        'x-upsert': 'true'
+      },
+      body: file
+    });
+
+    if (!uploadResponse.ok) {
+      const errorText = await uploadResponse.text();
+      throw new Error(errorText || 'No se pudo subir la imagen del avatar.');
+    }
+
+    const updatedUser = await client.requestRest(`profiles?id=eq.${encodeURIComponent(user.id)}`, {
+      method: 'PATCH',
+      accessToken: token,
+      body: { avatar_path: objectPath }
+    });
+
+    const refreshedUser = await auth.loadProfile(user.id, token);
+    activeUser = refreshedUser || { ...user, avatarPath: objectPath, avatarUrl: `${client.url}/storage/v1/object/public/profile-avatars/${encodedPath}` };
+    auth.currentUser = activeUser;
+    usersMap.set(activeUser.id, activeUser);
+    renderProfileSummary(activeUser);
+    renderBoard();
+    showToast('Avatar actualizado correctamente.');
+    profileAvatarInput.value = '';
+    profileFileName.textContent = 'Ningún archivo seleccionado';
+    if (Array.isArray(updatedUser) && updatedUser.length === 0) {
+      showToast('El perfil se actualizó, pero no se devolvió confirmación del servidor.', 5000);
+    }
+  } catch (error) {
+    showToast(error.message || 'No se pudo guardar tu avatar.', 7000);
+  }
+}
+
+async function handleProfileAvatarRemoval() {
+  const user = activeUser || await auth.getCurrentUser();
+  if (!user) {
+    showToast('Debes iniciar sesión antes de eliminar tu avatar.');
+    return;
+  }
+  if (!user.avatarPath) {
+    showToast('Todavía no tienes un avatar para eliminar.');
+    return;
+  }
+
+  const token = await auth.getAccessToken();
+  if (!token) {
+    showToast('Tu sesión no está activa. Inicia sesión otra vez.');
+    return;
+  }
+
+  const encodedPath = user.avatarPath.split('/').map((segment) => encodeURIComponent(segment)).join('/');
+  const storageUrl = `${client.url}/storage/v1/object/profile-avatars/${encodedPath}`;
+
+  try {
+    const deleteResponse = await fetch(storageUrl, {
+      method: 'DELETE',
+      headers: {
+        apikey: client.anonKey,
+        Authorization: `Bearer ${token}`
+      }
+    });
+
+    if (!deleteResponse.ok) {
+      const errorText = await deleteResponse.text();
+      throw new Error(errorText || 'No se pudo borrar la imagen del avatar.');
+    }
+
+    await client.requestRest(`profiles?id=eq.${encodeURIComponent(user.id)}`, {
+      method: 'PATCH',
+      accessToken: token,
+      body: { avatar_path: null }
+    });
+
+    const refreshedUser = await auth.loadProfile(user.id, token);
+    activeUser = refreshedUser || { ...user, avatarPath: null, avatarUrl: null };
+    auth.currentUser = activeUser;
+    usersMap.set(activeUser.id, activeUser);
+    renderProfileSummary(activeUser);
+    renderBoard();
+    showToast('Avatar eliminado.');
+    profileFileName.textContent = 'Ningún archivo seleccionado';
+  } catch (error) {
+    showToast(error.message || 'No se pudo eliminar el avatar.', 7000);
+  }
+}
+
 function bindStaticEvents() {
   const userRoleSelect = document.getElementById('userRole');
   userRoleSelect.addEventListener('change', updateUserRoleDescription);
@@ -520,6 +698,26 @@ function bindStaticEvents() {
   });
   document.getElementById('btnForgotPassword').addEventListener('click', handleForgotPassword);
   passwordRecoveryForm.addEventListener('submit', handlePasswordRecoverySubmit);
+  document.getElementById('btnOpenProfile').addEventListener('click', openProfileModal);
+  document.getElementById('profileCloseBtn').addEventListener('click', closeProfileModal);
+  document.getElementById('profileCancelBtn').addEventListener('click', closeProfileModal);
+  document.getElementById('profileUploadBtn').addEventListener('click', handleProfileAvatarUpload);
+  document.getElementById('profileRemoveAvatarBtn').addEventListener('click', handleProfileAvatarRemoval);
+  profileAvatarInput.addEventListener('change', () => {
+    const file = profileAvatarInput.files?.[0];
+    profileFileName.textContent = file ? file.name : 'Ningún archivo seleccionado';
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const preview = document.getElementById('profileAvatarPreview');
+      preview.replaceChildren();
+      const image = document.createElement('img');
+      image.src = String(reader.result || '');
+      image.alt = '';
+      preview.appendChild(image);
+    };
+    reader.readAsDataURL(file);
+  });
   document.getElementById('btnChangePassword').addEventListener('click', () => {
     changePasswordModal.classList.remove('hidden');
     trackMobileOverlayOpen('password');
@@ -823,6 +1021,7 @@ function closeMobileOverlay(id) {
   const closers = {
     ticket: () => modalView.closeTicket(),
     users: () => modalView.closeUsers(),
+    profile: closeProfileModal,
     categories: closeCategoriesModal,
     password: closeChangePasswordModal,
     satisfaction: closeSatisfactionModal,
@@ -2330,6 +2529,8 @@ async function syncAuthState() {
     btnManageCategories.classList.toggle('hidden', !auth.canManageCategories(currentUser));
     document.getElementById('sessionUserName').textContent = currentUser.fullName;
     document.getElementById('sessionUserRole').textContent = currentUser.role;
+    renderAvatarFallback(document.getElementById('headerUserAvatar'), currentUser, 'U');
+    if (profileModal && !profileModal.classList.contains('hidden')) renderProfileSummary(currentUser);
   } else {
     realtimeService.stop();
     activeUser = null;
@@ -2341,6 +2542,7 @@ async function syncAuthState() {
     btnManageCategories.classList.add('hidden');
     document.getElementById('sessionUserName').textContent = 'Invitado';
     document.getElementById('sessionUserRole').textContent = 'Sin sesión';
+    renderAvatarFallback(document.getElementById('headerUserAvatar'), null, 'U');
     usersMap.clear();
     allTickets = [];
     ticketCategories = [];

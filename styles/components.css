@@ -620,49 +620,92 @@
 }
 
 .profile-modal-card {
-  width: min(480px, calc(100% - 2rem));
+  width: min(520px, calc(100% - 2rem));
+  border-radius: 18px;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.26);
 }
 
 .profile-avatar-section {
   display: grid;
-  grid-template-columns: 96px minmax(0, 1fr);
+  grid-template-columns: 88px minmax(0, 1fr);
   align-items: center;
   gap: 1rem;
+  padding: 0.35rem 0 0.2rem;
 }
 
 .profile-avatar-preview {
-  width: 96px;
-  height: 96px;
-  font-size: 2rem;
+  width: 88px;
+  height: 88px;
+  font-size: 1.8rem;
+  border: 3px solid rgba(148, 163, 184, 0.35);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
 }
 
-.profile-avatar-section small {
+.profile-meta {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.profile-meta small {
   color: var(--text-muted);
   font-size: 0.75rem;
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
-.profile-details {
-  display: grid;
-  gap: 0.65rem;
-}
-
-.profile-details p {
+.profile-upload-row {
   display: flex;
-  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.profile-file-picker {
+  margin: 0;
+  min-width: 150px;
+}
+
+.profile-file-name {
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-action-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.profile-summary-list {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+}
+
+.profile-summary-list p {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  align-items: center;
   gap: 1rem;
   margin: 0;
-  padding-bottom: 0.55rem;
+  padding: 0.8rem 0;
   border-bottom: 1px solid var(--border-subtle);
 }
 
-.profile-details span {
+.profile-summary-list span {
   color: var(--text-muted);
+  font-size: 0.9rem;
 }
 
-.profile-details strong {
+.profile-summary-list strong {
   overflow-wrap: anywhere;
-  text-align: right;
+  text-align: left;
+  font-size: 0.95rem;
 }
 
 .modal-header {

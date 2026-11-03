@@ -69,6 +69,10 @@
           <span id="sessionUserName">Cargando...</span>
           <span id="sessionUserRole" class="role-badge">...</span>
         </div>
+        <button id="btnOpenProfile" class="btn btn-outline profile-trigger" type="button" aria-label="Abrir perfil del usuario">
+          <span id="headerUserAvatar" class="header-avatar" aria-hidden="true">U</span>
+          <span>Perfil</span>
+        </button>
         <button id="btnNewTicket" class="btn btn-primary" type="button" aria-label="Crear ticket"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Crear ticket</button>
         <div class="notification-menu">
           <button id="btnNotifications" class="btn btn-outline" type="button" aria-expanded="false" aria-controls="notificationsPanel">
@@ -631,6 +635,40 @@
               <button type="submit" class="btn btn-primary">Crear usuario</button>
             </footer>
           </form>
+        </div>
+      </div>
+    </div>
+
+    <div id="profileModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="profileHeading">
+      <div class="modal-card profile-modal-card">
+        <header class="modal-header">
+          <h3 id="profileHeading">Mi perfil</h3>
+          <button id="profileCloseBtn" class="close-x" type="button" aria-label="Cerrar">&times;</button>
+        </header>
+        <div class="modal-body">
+          <div class="profile-avatar-section">
+            <div id="profileAvatarPreview" class="profile-avatar-preview" aria-live="polite">U</div>
+            <div class="profile-meta">
+              <small>Sube una imagen JPG, PNG o WEBP de hasta 2 MB. El avatar aparece en tus tarjetas y en el encabezado.</small>
+              <div class="profile-upload-row">
+                <input id="profileAvatarInput" type="file" accept="image/jpeg,image/png,image/webp" hidden />
+                <label for="profileAvatarInput" class="btn btn-outline profile-file-picker">Seleccionar archivo</label>
+                <span id="profileFileName" class="profile-file-name">Ningún archivo seleccionado</span>
+              </div>
+              <div class="profile-action-row">
+                <button id="profileRemoveAvatarBtn" class="btn btn-outline" type="button">Eliminar avatar</button>
+                <button id="profileUploadBtn" class="btn btn-primary" type="button">Guardar avatar</button>
+              </div>
+            </div>
+          </div>
+          <div class="profile-summary-list">
+            <p><span>Nombre</span> <strong id="profileUserName">-</strong></p>
+            <p><span>Correo</span> <strong id="profileUserEmail">-</strong></p>
+            <p><span>Rol</span> <strong id="profileUserRole">-</strong></p>
+          </div>
+          <footer class="modal-actions">
+            <button id="profileCancelBtn" class="btn btn-outline" type="button">Cerrar</button>
+          </footer>
         </div>
       </div>
     </div>
