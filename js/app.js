@@ -723,6 +723,12 @@ function bindStaticEvents() {
     trackMobileOverlayOpen('password');
     document.getElementById('newAccountPassword').focus();
   });
+  document.getElementById('profileChangePasswordBtn').addEventListener('click', () => {
+    closeProfileModal();
+    changePasswordModal.classList.remove('hidden');
+    trackMobileOverlayOpen('password');
+    document.getElementById('newAccountPassword').focus();
+  });
   document.getElementById('changePasswordCloseBtn').addEventListener('click', closeChangePasswordModal);
   document.getElementById('changePasswordCancelBtn').addEventListener('click', closeChangePasswordModal);
   changePasswordForm.addEventListener('submit', handleChangePasswordSubmit);
@@ -746,12 +752,13 @@ function bindStaticEvents() {
     tabs[nextIndex].focus();
   });
   document.getElementById('btnNewTicket').addEventListener('click', openNewTicketModal);
-  document.getElementById('btnManageUsers').addEventListener('click', async () => {
+  document.getElementById('profileManageUsersBtn').addEventListener('click', async () => {
     const user = await auth.getCurrentUser();
     if (!auth.canManageUsers(user)) {
       showToast('Solo un administrador puede administrar usuarios.');
       return;
     }
+    closeProfileModal();
     modalView.openUsers([...usersMap.values()], user.id);
   });
   document.getElementById('usersModal').addEventListener('change', (event) => {
@@ -2501,6 +2508,7 @@ async function syncAuthState() {
   const currentUser = await auth.getCurrentUser();
   const btnNewTicket = document.getElementById('btnNewTicket');
   const btnManageUsers = document.getElementById('btnManageUsers');
+  const profileManageUsersBtn = document.getElementById('profileManageUsersBtn');
   const btnManageCategories = document.getElementById('btnManageCategories');
 
   if (currentUser) {
@@ -2523,10 +2531,13 @@ async function syncAuthState() {
     await refreshNotificationList();
     modalView.hideLogin();
     window.requestAnimationFrame(updateMobileHeaderHeight);
-    btnNewTicket.disabled = false;
-    btnNewTicket.style.opacity = '1';
-    btnManageUsers.classList.toggle('hidden', !auth.canManageUsers(currentUser));
-    btnManageCategories.classList.toggle('hidden', !auth.canManageCategories(currentUser));
+    if (btnNewTicket) {
+      btnNewTicket.disabled = false;
+      btnNewTicket.style.opacity = '1';
+    }
+    if (btnManageUsers) btnManageUsers.classList.toggle('hidden', !auth.canManageUsers(currentUser));
+    if (profileManageUsersBtn) profileManageUsersBtn.classList.toggle('hidden', !auth.canManageUsers(currentUser));
+    if (btnManageCategories) btnManageCategories.classList.toggle('hidden', !auth.canManageCategories(currentUser));
     document.getElementById('sessionUserName').textContent = currentUser.fullName;
     document.getElementById('sessionUserRole').textContent = currentUser.role;
     renderAvatarFallback(document.getElementById('headerUserAvatar'), currentUser, 'U');
@@ -2536,10 +2547,13 @@ async function syncAuthState() {
     activeUser = null;
     mutations.setScope(null);
     modalView.showLogin();
-    btnNewTicket.disabled = true;
-    btnNewTicket.style.opacity = '0.5';
-    btnManageUsers.classList.add('hidden');
-    btnManageCategories.classList.add('hidden');
+    if (btnNewTicket) {
+      btnNewTicket.disabled = true;
+      btnNewTicket.style.opacity = '0.5';
+    }
+    if (btnManageUsers) btnManageUsers.classList.add('hidden');
+    if (profileManageUsersBtn) profileManageUsersBtn.classList.add('hidden');
+    if (btnManageCategories) btnManageCategories.classList.add('hidden');
     document.getElementById('sessionUserName').textContent = 'Invitado';
     document.getElementById('sessionUserRole').textContent = 'Sin sesión';
     renderAvatarFallback(document.getElementById('headerUserAvatar'), null, 'U');
