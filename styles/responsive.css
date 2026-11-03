@@ -161,8 +161,9 @@
 
   .app-header #btnLogout {
     position: absolute;
-    top: 0.7rem;
-    left: 0.75rem;
+    top: 0.75rem;
+    right: 0.75rem;
+    left: auto;
     z-index: 4;
     box-shadow: 0 10px 24px rgba(15, 23, 42, 0.22);
   }
@@ -189,9 +190,16 @@
   }
 
   .header-right #btnNewTicket {
-    order: 99;
-    width: 100%;
-    min-height: 2.9rem;
+    position: fixed;
+    right: 1rem;
+    bottom: calc(1rem + env(safe-area-inset-bottom));
+    left: auto;
+    z-index: 40;
+    width: auto;
+    min-height: 3.1rem;
+    padding: 0.7rem 1rem;
+    border-radius: 999px;
+    box-shadow: 0 16px 28px rgba(168, 85, 247, 0.3);
   }
 
   .header-right > .pending-sync-status {
