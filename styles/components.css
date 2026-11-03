@@ -248,11 +248,12 @@
 }
 
 #btnNewTicket {
-  position: fixed;
-  right: 2rem;
-  left: auto;
-  bottom: calc(2rem + env(safe-area-inset-bottom));
-  z-index: 40;
+  position: fixed !important;
+  top: auto !important;
+  right: 2rem !important;
+  left: auto !important;
+  bottom: calc(2rem + env(safe-area-inset-bottom, 0px)) !important;
+  z-index: 90 !important;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -703,7 +704,7 @@
   background: color-mix(in srgb, var(--bg-app) 78%, #000);
   display: grid;
   place-items: center;
-  z-index: 20;
+  z-index: 100;
 }
 
 .modal-card {
