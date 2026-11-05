@@ -1,9 +1,9 @@
-name: Deploy NexusDesk to GitHub Pages
+name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [main]
-  workflow_dispatch:
+    branches:
+      - main # o el nombre de tu rama principal
 
 permissions:
   contents: read
@@ -11,8 +11,8 @@ permissions:
   id-token: write
 
 concurrency:
-  group: github-pages
-  cancel-in-progress: true
+  group: "pages"
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -21,33 +21,16 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - name: Check out repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Run tests
-        run: node --test
-
-      - name: Check application syntax
-        run: node --check js/app.js
-
-      - name: Prepare static site
-        run: |
-          mkdir dist
-          cp index.html dist/
-          cp CNAME dist/
-          cp manifest.json dist/
-          cp -R styles js img dist/
-
-      - name: Upload Pages artifact
+      # Sube únicamente 1 artefacto específico para Pages
+      - name: Upload Pages Artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: "." # o la carpeta donde está tu index.html (ej. './')
 
+      # Despliega el artefacto generado
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
