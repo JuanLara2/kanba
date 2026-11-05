@@ -1,3 +1,5 @@
+import { Haptics } from '../utils/haptics.js';
+
 function closestElement(target, selector) {
   const element = target?.nodeType === 1 ? target : target?.parentElement;
   return element?.closest?.(selector) || null;
@@ -57,7 +59,7 @@ export class DragDropController {
       }
     });
 
-    this.boardEl.addEventListener('pointerup', (event) => {
+    this.boardEl.addEventListener('pointerup', async (event) => {
       const drag = this.pointerDrag;
       if (!drag || drag.pointerId !== event.pointerId) return;
       if (drag.ghost) {
@@ -65,10 +67,14 @@ export class DragDropController {
         const target = document.elementFromPoint(event.clientX, event.clientY);
         const dropZone = closestElement(target, '.drop-zone');
         const nextStatus = dropZone?.dataset.status;
+        const sourceStatus = closestElement(drag.card, '.kanban-col')?.dataset.colStatus;
         const ticketId = drag.card.dataset.ticketId;
         this.clearPointerDrag(drag);
         if (ticketId && nextStatus && this.onStatusChange) {
-          this.onStatusChange(ticketId, nextStatus);
+          const result = await this.onStatusChange(ticketId, nextStatus);
+          if (sourceStatus !== nextStatus && result?.status !== 'rejected' && result?.status !== 'unchanged') {
+            Haptics.dropSuccess();
+          }
         }
         return;
       }
@@ -89,6 +95,7 @@ export class DragDropController {
         return;
       }
       card.classList.add('dragging');
+      Haptics.dragStart();
       event.dataTransfer.effectAllowed = 'move';
       event.dataTransfer.setData('text/plain', card.dataset.ticketId);
     });
@@ -114,7 +121,13 @@ export class DragDropController {
       const nextStatus = dropZone.dataset.status;
       const ticketId = event.dataTransfer.getData('text/plain');
       if (ticketId && nextStatus && this.onStatusChange) {
-        await this.onStatusChange(ticketId, nextStatus);
+        const card = [...(this.boardEl.querySelectorAll?.('.ticket-card') || [])]
+          .find((item) => item.dataset.ticketId === ticketId);
+        const sourceStatus = card && closestElement(card, '.kanban-col')?.dataset.colStatus;
+        const result = await this.onStatusChange(ticketId, nextStatus);
+        if (sourceStatus !== nextStatus && result?.status !== 'rejected' && result?.status !== 'unchanged') {
+          Haptics.dropSuccess();
+        }
       }
     });
 
@@ -147,6 +160,7 @@ export class DragDropController {
     drag.ghost = ghost;
     drag.card.classList.add('dragging');
     drag.handle.classList.add('is-dragging');
+    Haptics.dragStart();
   }
 
   clearPointerDrag(drag) {

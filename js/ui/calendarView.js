@@ -1,4 +1,5 @@
 import { getChecklistProgress } from '../services/ticketService.js';
+import { Haptics } from '../utils/haptics.js';
 
 const WEEKDAY_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 
@@ -117,6 +118,7 @@ export class CalendarView {
         drag.active = true;
         drag.ticket.classList.add('dragging');
         drag.ticket.setPointerCapture(event.pointerId);
+        Haptics.dragStart();
       }
 
       event.preventDefault();
@@ -170,7 +172,8 @@ export class CalendarView {
       || (day && localDateKey(ticket.dueDate) === day.dataset.calendarDate)
       || (unscheduled && !ticket.dueDate)) return;
 
-    await this.onDateChange(drag.ticketId, day?.dataset.calendarDate || null);
+    const changed = await this.onDateChange(drag.ticketId, day?.dataset.calendarDate || null);
+    if (changed !== false) Haptics.dropSuccess();
   }
 
   cancelPointerDrag(event) {

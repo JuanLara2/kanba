@@ -15,6 +15,7 @@ import { RealtimeService } from './services/realtimeService.js?v=realtime-protoc
 import { createSplashScreen } from './ui/splashScreen.js';
 import { OutboxService } from './services/outboxService.js';
 import { MutationDispatcher } from './services/mutationDispatcher.js';
+import { Haptics } from './utils/haptics.js?v=haptics-v1';
 
 const splashScreen = createSplashScreen();
 const client = new SupabaseClient();
@@ -820,6 +821,7 @@ function bindStaticEvents() {
         : (currentIndex + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
     const nextView = tabs[nextIndex].id === 'calendarTab' ? 'calendar' : 'board';
     const resolvedView = tabs[nextIndex].id === 'metricsTab' ? 'metrics' : nextView;
+    if (tabs[nextIndex] !== tabs[currentIndex]) Haptics.tabSwitch();
     setActiveView(resolvedView);
     tabs[nextIndex].focus();
   });
@@ -916,6 +918,7 @@ function bindStaticEvents() {
     try {
       if (!window.confirm(`¿Eliminar el ticket ${ticketId}? Esta acción no se puede deshacer.`)) return;
       await ticketService.deleteTicket(ticketId);
+      Haptics.destructive();
       await loadTickets();
       modalView.closeTicket();
       renderBoard();
@@ -1038,12 +1041,11 @@ function navigateBottomTab(view) {
   const activeTab = document.querySelector('.view-tab.is-active');
   if (activeTab?.id === `${view}Tab`) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
-    hapticFeedback();
     return;
   }
+  Haptics.tabSwitch();
   setActiveView(view);
   window.scrollTo({ top: 0, behavior: 'smooth' });
-  hapticFeedback();
 }
 
 async function openNewTicketModal() {
@@ -1101,10 +1103,6 @@ function selectFirstVisibleStatus() {
   const visibleTickets = FilterSortService.apply(allTickets, criteria, usersMap);
   const nextStatus = Object.keys(STATUS_DEFINITIONS).find((status) => visibleTickets.some((ticket) => ticket.status === status));
   if (nextStatus) boardView.setActiveStatus(nextStatus);
-}
-
-function hapticFeedback() {
-  if (typeof navigator.vibrate === 'function') navigator.vibrate(15);
 }
 
 function isMobileViewport() {
@@ -1216,7 +1214,7 @@ function handleMobileBoardTouchEnd(event) {
     block: 'nearest',
     inline: 'center'
   });
-  hapticFeedback();
+  Haptics.actionSuccess();
 }
 
 function handleMobileCardTouchStart(event) {
@@ -1240,7 +1238,6 @@ function handleMobileCardTouchStart(event) {
     if (!mobileCardTouchStart || mobileCardTouchStart.ticketId !== ticketId) return;
     mobileCardTouchStart.longPressTriggered = true;
     startMobileSelection(ticketId, true);
-    hapticFeedback();
   }, 400);
 }
 
@@ -1309,7 +1306,7 @@ async function resolveTicketFromSwipe(ticketId) {
     await ticketService.changeTicketStatus(ticketId, 'resolved');
     await loadTickets();
     renderBoard();
-    hapticFeedback();
+    Haptics.actionSuccess();
     showToast('Ticket marcado como resuelto.');
   } catch (error) {
     showToast(error.message || 'No se pudo resolver el ticket.');
@@ -1354,7 +1351,7 @@ async function refreshMobileBoard() {
     if (!categoriesModal.classList.contains('hidden')) renderCategoryManagement();
     renderBoard();
     status.textContent = 'Tickets actualizados';
-    hapticFeedback();
+    Haptics.actionSuccess();
   } catch (error) {
     showToast(error.message || 'No se pudieron actualizar los tickets.');
     status.textContent = 'No se pudo actualizar';
@@ -1526,7 +1523,7 @@ function handleMobileQuickFilter(event) {
   setActiveView('board');
   renderBoard();
   selectFirstVisibleStatus();
-  hapticFeedback();
+  Haptics.actionSuccess();
   closeMobileSearch();
 }
 
@@ -1619,7 +1616,7 @@ async function handleMobileStatusSelection(event) {
   options.forEach((button) => { button.disabled = true; });
   try {
     await ticketService.changeTicketStatus(ticketId, nextStatus);
-    hapticFeedback();
+    Haptics.actionSuccess();
     closeMobileStatusSheet();
     await loadTickets();
     renderBoard();
@@ -1646,6 +1643,7 @@ function startMobileSelection(ticketId = null, preserveTouchTarget = false) {
   selectionButton.textContent = 'Cancelar';
   if (ticketId && canSelectMobileTicket(allTickets.find((ticket) => ticket.id === ticketId))) {
     selectedMobileTicketIds.add(ticketId);
+    Haptics.selectionTick();
   }
   document.getElementById('boardPanel').classList.add('is-selection-mode');
   renderMobileBatchToolbar();
@@ -1659,6 +1657,7 @@ function toggleMobileTicketSelection(ticketId) {
   if (!canSelectMobileTicket(ticket)) return;
   if (selectedMobileTicketIds.has(ticketId)) selectedMobileTicketIds.delete(ticketId);
   else selectedMobileTicketIds.add(ticketId);
+  Haptics.selectionTick();
   renderMobileBatchToolbar();
   renderBoard();
 }
@@ -1789,7 +1788,7 @@ async function runMobileBatchAction(successMessage, action) {
       await loadTickets();
       ticketIds.filter((ticketId) => !failed.some((item) => item.ticketId === ticketId))
         .forEach((ticketId) => selectedMobileTicketIds.delete(ticketId));
-      hapticFeedback();
+      Haptics.actionSuccess();
     }
     renderBoard();
     renderMobileBatchToolbar();
@@ -1891,7 +1890,7 @@ async function saveMobileTicketActions() {
     await loadTickets();
     closeMobileTicketActions();
     renderBoard();
-    hapticFeedback();
+    Haptics.actionSuccess();
     showToast('Acciones guardadas correctamente.');
   } catch (error) {
     showToast(error.message || 'No se pudieron guardar los cambios.');
@@ -1912,11 +1911,11 @@ async function deleteMobileTicket() {
   deleteButton.disabled = true;
   try {
     await ticketService.deleteTicket(ticket.id);
+    Haptics.destructive();
     selectedMobileTicketIds.delete(ticket.id);
     await loadTickets();
     closeMobileTicketActions();
     renderBoard();
-    hapticFeedback();
     showToast('Ticket eliminado correctamente.');
   } catch (error) {
     showToast(error.message || 'No se pudo eliminar el ticket.');
@@ -1986,7 +1985,7 @@ async function loadTicketComments(ticketId) {
 
 async function handleCalendarDateChange(ticketId, dateKey) {
   const ticket = allTickets.find((item) => item.id === ticketId);
-  if (!ticket) return;
+  if (!ticket) return false;
 
   try {
     const dueDate = dateKey
@@ -1996,9 +1995,11 @@ async function handleCalendarDateChange(ticketId, dateKey) {
     await loadTickets();
     renderBoard();
     showToast(dateKey ? 'Fecha límite actualizada' : 'Fecha límite quitada');
+    return true;
   } catch (error) {
     showToast(error.message || 'No se pudo cambiar la fecha límite');
     renderBoard();
+    return false;
   }
 }
 

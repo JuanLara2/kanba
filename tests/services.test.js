@@ -11,6 +11,50 @@ import { RealtimeService } from '../js/services/realtimeService.js';
 import { initializeThemeController, THEME_STORAGE_KEY } from '../js/ui/themeController.js';
 import { CalendarView, dueDateForCalendarDay, getMonthGridDates, localDateKey } from '../js/ui/calendarView.js';
 import { DragDropController } from '../js/ui/dragDrop.js';
+import { Haptics } from '../js/utils/haptics.js';
+
+test('haptics emit semantic patterns only when the device is supported and active', () => {
+  const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+  const originalDocument = Object.getOwnPropertyDescriptor(globalThis, 'document');
+  const patterns = [];
+  Object.defineProperty(globalThis, 'navigator', {
+    configurable: true,
+    value: {
+      userActivation: { isActive: false, hasBeenActive: true },
+      vibrate(pattern) {
+        patterns.push(pattern);
+        return true;
+      }
+    }
+  });
+  Object.defineProperty(globalThis, 'document', {
+    configurable: true,
+    value: { visibilityState: 'visible' }
+  });
+
+  try {
+    assert.equal(Haptics.isSupported, true);
+    Haptics.dragStart();
+    Haptics.dropSuccess();
+    Haptics.selectionTick();
+    Haptics.tabSwitch();
+    Haptics.destructive();
+    assert.deepEqual(patterns, [35, [20, 40, 20], 15, 10, [40, 60, 60]]);
+
+    globalThis.navigator.userActivation = { isActive: false, hasBeenActive: false };
+    assert.equal(Haptics.selectionTick(), false);
+    assert.equal(patterns.length, 5);
+
+    globalThis.navigator.userActivation = { isActive: true, hasBeenActive: true };
+    globalThis.navigator.vibrate = () => { throw new Error('Vibration unavailable'); };
+    assert.equal(Haptics.destructive(), false);
+  } finally {
+    if (originalNavigator) Object.defineProperty(globalThis, 'navigator', originalNavigator);
+    else delete globalThis.navigator;
+    if (originalDocument) Object.defineProperty(globalThis, 'document', originalDocument);
+    else delete globalThis.document;
+  }
+});
 
 function createContext() {
   const users = [
