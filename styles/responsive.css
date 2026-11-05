@@ -391,6 +391,14 @@
     touch-action: pan-x pan-y;
   }
 
+  #calendarPanel .calendar-drag-handle,
+  #calendarPanel [data-drag-handle],
+  #calendarPanel .ticket-grip {
+    touch-action: none !important;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
   .kanban-grid {
     display: grid;
     grid-auto-columns: 84vw;

@@ -483,6 +483,12 @@
   box-shadow: inset 0 0 0 2px var(--color-primary-start);
 }
 
+.calendar-day.drop-target-active {
+  outline: 2px solid #8b5cf6;
+  outline-offset: -2px;
+  background-color: rgba(139, 92, 246, 0.12);
+}
+
 .calendar-day-number {
   display: grid;
   place-items: center;
@@ -502,6 +508,11 @@ html[data-theme="light"] .calendar-weekday {
 
 html[data-theme="light"] .calendar-day {
   border-color: #cbd5e1;
+}
+
+html[data-theme="light"] .calendar-day.drop-target-active {
+  outline-color: #7c3aed;
+  background-color: rgba(124, 58, 237, 0.08);
 }
 
 html[data-theme="light"] .calendar-day-number {

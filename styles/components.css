@@ -170,7 +170,9 @@ html[data-theme="pink"] .ui-button--destructive-ghost:hover { background: rgba(2
   border-radius: 0.4rem;
   color: var(--text-muted);
   cursor: grab;
-  touch-action: none;
+  touch-action: none !important;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .calendar-drag-handle svg {
@@ -184,6 +186,7 @@ html[data-theme="pink"] .ui-button--destructive-ghost:hover { background: rgba(2
 
 .calendar-ticket.dragging {
   opacity: 0.45;
+  pointer-events: none;
 }
 
 .calendar-ticket-id {

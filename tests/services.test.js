@@ -761,6 +761,7 @@ test('calendar ticket touch captures the pointer only after drag movement starts
     },
   };
   let captures = 0;
+  let releases = 0;
   let preventions = 0;
   const ticket = {
     dataset: { ticketId: 'TCK-1001' },
@@ -768,9 +769,11 @@ test('calendar ticket touch captures the pointer only after drag movement starts
       add() {},
       remove() {},
     },
-    setPointerCapture() {
-      captures += 1;
-    }
+    isConnected: true,
+    setAttribute() {},
+    getBoundingClientRect() {
+      return { width: 100, height: 50 };
+    },
   };
   const handle = {
     nodeType: 1,
@@ -778,6 +781,15 @@ test('calendar ticket touch captures the pointer only after drag movement starts
       if (selector === '.calendar-drag-handle') return this;
       if (selector === '[data-calendar-ticket].can-drag') return ticket;
       return null;
+    },
+    setPointerCapture() {
+      captures += 1;
+    },
+    hasPointerCapture() {
+      return captures > releases;
+    },
+    releasePointerCapture() {
+      releases += 1;
     }
   };
   const ticketTarget = {
@@ -809,7 +821,8 @@ test('calendar ticket touch captures the pointer only after drag movement starts
       clientX: 10,
       clientY: 10
     });
-    assert.equal(captures, 0);
+    assert.equal(captures, 1);
+    assert.equal(releases, 0);
 
     const pointerMove = (clientX) => handlers.get('pointermove')({
       pointerId: 2,
@@ -820,16 +833,56 @@ test('calendar ticket touch captures the pointer only after drag movement starts
       },
     });
     pointerMove(14);
-    assert.equal(captures, 0);
+    assert.equal(captures, 1);
     assert.equal(preventions, 0);
 
     pointerMove(16);
     assert.equal(captures, 1);
     assert.equal(preventions, 1);
+    handlers.get('pointercancel')({ pointerId: 2 });
+    assert.equal(releases, 1);
+    assert.equal(calendar.pointerDrag, null);
   } finally {
     if (originalDocument === undefined) delete globalThis.document;
     else globalThis.document = originalDocument;
   }
+});
+
+test('calendar drag highlights the active date cell and clears it when the target changes', () => {
+  const handlers = new Map();
+  const container = {
+    addEventListener(type, handler) {
+      handlers.set(type, handler);
+    },
+    contains(target) {
+      return target === firstDay || target === secondDay;
+    },
+  };
+  const classes = new Set();
+  const makeDay = (date) => ({
+    dataset: { calendarDate: date },
+    matches(selector) {
+      return selector === '.calendar-day' || selector === '[data-calendar-date]';
+    },
+    classList: {
+      add(name) { classes.add(`${date}:${name}`); },
+      remove(name) { classes.delete(`${date}:${name}`); },
+    },
+  });
+  const firstDay = makeDay('2026-11-05');
+  const secondDay = makeDay('2026-11-06');
+  const calendar = new CalendarView({ container, onDateChange() {}, canReschedule: true });
+  calendar.pointerDrag = { dropTarget: null };
+
+  calendar.setPointerDropTarget(firstDay);
+  assert.equal(classes.has('2026-11-05:drop-target-active'), true);
+
+  calendar.setPointerDropTarget(secondDay);
+  assert.equal(classes.has('2026-11-05:drop-target-active'), false);
+  assert.equal(classes.has('2026-11-06:drop-target-active'), true);
+
+  calendar.setPointerDropTarget(null);
+  assert.equal(classes.has('2026-11-06:drop-target-active'), false);
 });
 
 test('calendar empty days open ticket creation for that date with keyboard and click', () => {

@@ -93,12 +93,15 @@ export class CalendarView {
     });
 
     this.container.addEventListener('pointerdown', (event) => {
-      if (!closestElement(event.target, '.calendar-drag-handle')) return;
+      const handle = closestElement(event.target, '.calendar-drag-handle');
+      if (!handle) return;
       const ticket = closestElement(event.target, '[data-calendar-ticket].can-drag');
       if (!ticket || !this.canReschedule || !this.onDateChange || !event.isPrimary || event.button !== 0) return;
 
+      handle.setPointerCapture(event.pointerId);
       this.pointerDrag = {
         pointerId: event.pointerId,
+        handle,
         ticketId: ticket.dataset.ticketId,
         ticket,
         startX: event.clientX,
@@ -117,13 +120,13 @@ export class CalendarView {
         if (distance <= 5) return;
         drag.active = true;
         drag.ticket.classList.add('dragging');
-        drag.ticket.setPointerCapture(event.pointerId);
         Haptics.dragStart();
       }
 
       event.preventDefault();
       const element = document.elementFromPoint(event.clientX, event.clientY);
-      const dropTarget = closestElement(element, '[data-calendar-date], [data-calendar-unscheduled]');
+      const dropTarget = closestElement(element, '.calendar-day')
+        || closestElement(element, '[data-calendar-unscheduled]');
       this.setPointerDropTarget(dropTarget && this.container.contains(dropTarget) ? dropTarget : null);
     });
 
@@ -142,9 +145,18 @@ export class CalendarView {
 
   setPointerDropTarget(dropTarget) {
     if (this.pointerDrag?.dropTarget === dropTarget) return;
-    this.pointerDrag?.dropTarget?.classList.remove('is-drop-target');
+    const previousTarget = this.pointerDrag?.dropTarget;
+    if (previousTarget?.matches('.calendar-day')) {
+      previousTarget.classList.remove('drop-target-active');
+    } else {
+      previousTarget?.classList.remove('is-drop-target');
+    }
     this.pointerDrag.dropTarget = dropTarget;
-    dropTarget?.classList.add('is-drop-target');
+    if (dropTarget?.matches('.calendar-day')) {
+      dropTarget.classList.add('drop-target-active');
+    } else {
+      dropTarget?.classList.add('is-drop-target');
+    }
   }
 
   async finishPointerDrag(event) {
@@ -153,7 +165,8 @@ export class CalendarView {
 
     if (drag.active) {
       const element = document.elementFromPoint(event.clientX, event.clientY);
-      const dropTarget = closestElement(element, '[data-calendar-date], [data-calendar-unscheduled]');
+      const dropTarget = closestElement(element, '.calendar-day')
+        || closestElement(element, '[data-calendar-unscheduled]');
       this.setPointerDropTarget(dropTarget && this.container.contains(dropTarget) ? dropTarget : null);
     }
     const dropTarget = drag.active ? drag.dropTarget : null;
@@ -182,9 +195,14 @@ export class CalendarView {
   }
 
   clearPointerDrag() {
-    this.pointerDrag?.ticket.classList.remove('dragging');
+    const drag = this.pointerDrag;
+    if (!drag) return;
+    drag.ticket.classList.remove('dragging');
     this.setPointerDropTarget(null);
     this.pointerDrag = null;
+    if (drag.handle.hasPointerCapture?.(drag.pointerId)) {
+      drag.handle.releasePointerCapture(drag.pointerId);
+    }
   }
 
   render(tickets, canReschedule = this.canReschedule) {
