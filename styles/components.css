@@ -1789,6 +1789,7 @@ html[data-theme="pink"] .btn-danger { color: #b91c1c; }
 }
 
 .metrics-panel {
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 1rem;
@@ -1799,6 +1800,7 @@ html[data-theme="pink"] .btn-danger { color: #b91c1c; }
 }
 
 .metrics-header {
+  min-width: 0;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -1861,12 +1863,13 @@ html[data-theme="pink"] .btn-danger { color: #b91c1c; }
 
 .metrics-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr));
   gap: 0.7rem;
 }
 
 .metrics-card {
   display: flex;
+  min-width: 0;
   min-height: 95px;
   flex-direction: column;
   justify-content: space-between;
@@ -1877,19 +1880,27 @@ html[data-theme="pink"] .btn-danger { color: #b91c1c; }
   background: var(--bg-surface);
 }
 
-.metrics-card span {
+.metrics-card-label {
+  display: block;
+  min-width: 0;
   color: var(--text-muted);
   font-size: 0.78rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
-.metrics-card strong {
+.metrics-card-value {
+  min-width: 0;
+  max-width: 100%;
   font-size: 1.35rem;
   font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
 }
 
 .metrics-charts-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  min-width: 0;
   gap: 0.8rem;
 }
 
@@ -1914,14 +1925,20 @@ html[data-theme="pink"] .btn-danger { color: #b91c1c; }
 }
 
 .metrics-chart-canvas {
-  min-height: 170px;
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  min-height: 14rem;
   overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .metrics-chart-canvas svg {
   display: block;
   width: 100%;
   min-width: 520px;
+  max-width: none;
   height: auto;
   overflow: visible;
 }
@@ -2144,6 +2161,24 @@ html[data-theme="pink"] .btn-danger { color: #b91c1c; }
 
   .metrics-controls label {
     flex: 1;
+    min-width: 0;
+  }
+
+  .metrics-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.625rem;
+  }
+
+  .metrics-card {
+    padding: 0.75rem;
+  }
+
+  .metrics-card-value {
+    font-size: clamp(1.05rem, 5vw, 1.35rem);
+  }
+
+  .metrics-charts-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 

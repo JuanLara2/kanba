@@ -9,9 +9,9 @@
     <link rel="manifest" href="manifest.json" />
     <meta name="theme-color" content="#151a2a" />
     <link rel="stylesheet" href="styles/base.css" />
-    <link rel="stylesheet" href="styles/layout.css?v=calendar-drag-v1" />
-    <link rel="stylesheet" href="styles/components.css?v=calendar-drag-v1" />
-    <link rel="stylesheet" href="styles/responsive.css?v=calendar-drag-v1" />
+    <link rel="stylesheet" href="styles/layout.css?v=metrics-audit-v1" />
+    <link rel="stylesheet" href="styles/components.css?v=metrics-audit-v1" />
+    <link rel="stylesheet" href="styles/responsive.css?v=metrics-audit-v1" />
     <link rel="stylesheet" href="styles/splash.css" />
   </head>
   <body>
@@ -273,14 +273,14 @@
         </header>
         <p id="metricsError" class="metrics-error hidden" role="alert"></p>
         <div class="metrics-cards">
-          <article class="metrics-card"><span>Tickets creados</span><strong id="metricCreated">0</strong></article>
-          <article class="metrics-card"><span>Tickets resueltos</span><strong id="metricResolved">0</strong></article>
-          <article class="metrics-card"><span>Tickets cerrados</span><strong id="metricClosed">0</strong></article>
-          <article class="metrics-card"><span>Puntos completados</span><strong id="metricCompletedPoints">0</strong></article>
-          <article class="metrics-card"><span>Abiertos actualmente</span><strong id="metricOpen">0</strong></article>
-          <article class="metrics-card"><span>Cumplimiento SLA</span><strong id="metricSla">0%</strong></article>
-          <article class="metrics-card"><span>Resolución promedio</span><strong id="metricResolution">0 h</strong></article>
-          <article class="metrics-card"><span>Satisfacción promedio</span><strong id="metricSatisfaction">Sin datos</strong></article>
+          <article class="metrics-card kpi-card"><span class="metrics-card-label">Tickets creados</span><strong class="metrics-card-value" id="metricCreated">0</strong></article>
+          <article class="metrics-card kpi-card"><span class="metrics-card-label">Tickets resueltos</span><strong class="metrics-card-value" id="metricResolved">0</strong></article>
+          <article class="metrics-card kpi-card"><span class="metrics-card-label">Tickets cerrados</span><strong class="metrics-card-value" id="metricClosed">0</strong></article>
+          <article class="metrics-card kpi-card"><span class="metrics-card-label">Puntos completados</span><strong class="metrics-card-value" id="metricCompletedPoints">0</strong></article>
+          <article class="metrics-card kpi-card"><span class="metrics-card-label">Abiertos actualmente</span><strong class="metrics-card-value" id="metricOpen">0</strong></article>
+          <article class="metrics-card kpi-card"><span class="metrics-card-label">Cumplimiento SLA</span><strong class="metrics-card-value" id="metricSla">0%</strong></article>
+          <article class="metrics-card kpi-card"><span class="metrics-card-label">Resolución promedio</span><strong class="metrics-card-value" id="metricResolution">0 h</strong></article>
+          <article class="metrics-card kpi-card"><span class="metrics-card-label">Satisfacción promedio</span><strong class="metrics-card-value" id="metricSatisfaction">Sin datos</strong></article>
         </div>
         <div class="metrics-charts-grid">
           <section class="metrics-chart-card" aria-labelledby="ticketVolumeChartHeading">
@@ -780,6 +780,6 @@
       </section>
     </main>
 
-    <script type="module" src="js/app.js?v=haptics-v1"></script>
+    <script type="module" src="js/app.js?v=metrics-audit-v1"></script>
   </body>
 </html>

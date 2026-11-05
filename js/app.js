@@ -16,6 +16,7 @@ import { createSplashScreen } from './ui/splashScreen.js';
 import { OutboxService } from './services/outboxService.js';
 import { MutationDispatcher } from './services/mutationDispatcher.js';
 import { Haptics } from './utils/haptics.js?v=haptics-v1';
+import './ui/metricsDiagnostics.js?v=metrics-audit-v1';
 
 const splashScreen = createSplashScreen();
 const client = new SupabaseClient();

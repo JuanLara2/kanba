@@ -2050,7 +2050,7 @@
     max-height: 100%;
     overflow-x: hidden !important;
     overflow-y: auto !important;
-    padding: 0.5rem 0.75rem 2.5rem;
+    padding: 0.5rem 0.75rem calc(5.5rem + env(safe-area-inset-bottom, 0px));
     touch-action: pan-y !important;
     -webkit-overflow-scrolling: touch;
   }
