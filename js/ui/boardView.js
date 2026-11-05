@@ -93,13 +93,13 @@ export class BoardView {
 
   buildSelectionButton(ticket, selected, selectionMode) {
     const button = document.createElement('button');
-    button.className = 'card-selection-toggle';
+    button.className = 'card-selection-toggle ticket-select-circle';
     button.type = 'button';
     button.dataset.selectTicket = ticket.id;
     button.setAttribute('aria-pressed', String(selected));
     button.setAttribute('aria-label', `${selected ? 'Quitar' : 'Seleccionar'} ticket ${ticket.id}`);
     button.classList.toggle('is-visible', selectionMode);
-    button.innerHTML = `<span aria-hidden="true">${selected ? '✓' : ''}</span>`;
+    button.innerHTML = `<svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="m4 10 4 4 8-8"/></svg>`;
     return button;
   }
 

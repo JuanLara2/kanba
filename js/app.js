@@ -3,7 +3,7 @@ import { SupabaseAdapter } from './data/db.js?v=complexity-scoring-v1';
 import { AuthService } from './services/authService.js?v=user-role-management-v1';
 import { TicketService } from './services/ticketService.js?v=complexity-scoring-v1';
 import { FilterSortService } from './services/filterService.js';
-import { BoardView } from './ui/boardView.js?v=ticket-card-compact-v1';
+import { BoardView } from './ui/boardView.js?v=selection-action-bar-v1';
 import { ModalView } from './ui/modalView.js?v=complexity-scoring-v1';
 import { DragDropController } from './ui/dragDrop.js?v=pointer-grip-v1';
 import { CalendarView, dueDateForCalendarDay } from './ui/calendarView.js';
@@ -947,6 +947,10 @@ function bindStaticEvents() {
     const card = event.target.closest('.ticket-card');
     if (!card) return;
     event.preventDefault();
+    if (mobileSelectionMode) {
+      toggleMobileTicketSelection(card.dataset.ticketId);
+      return;
+    }
     dragDropController.onEditRequest(card.dataset.ticketId);
   });
   boardEl.addEventListener('click', (event) => {
@@ -957,6 +961,15 @@ function bindStaticEvents() {
       event.stopImmediatePropagation();
       toggleMobileTicketSelection(selectionButton.dataset.selectTicket);
       return;
+    }
+    if (mobileSelectionMode) {
+      const card = target?.closest('.ticket-card');
+      if (card && !target.closest('button, a, input, select, textarea')) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        toggleMobileTicketSelection(card.dataset.ticketId);
+        return;
+      }
     }
     if (!suppressBoardClick) return;
     event.preventDefault();
@@ -1652,6 +1665,7 @@ function renderMobileBatchToolbar() {
   const selectedCount = selectedMobileTicketIds.size;
   selectionButton.classList.toggle('hidden', mobileSelectionMode || !activeUser);
   toolbar.classList.toggle('hidden', !mobileSelectionMode);
+  toolbar.setAttribute('aria-hidden', String(!mobileSelectionMode));
   document.getElementById('mobileBatchSelectionCount').textContent =
     `${selectedCount} ${selectedCount === 1 ? 'seleccionado' : 'seleccionados'}`;
   document.getElementById('mobileBatchHint').classList.toggle('hidden', selectedCount > 0);
@@ -1704,7 +1718,6 @@ function syncMobileCardSelectionButtons() {
     button.classList.add('is-visible');
     button.setAttribute('aria-pressed', String(selected));
     button.setAttribute('aria-label', `${selected ? 'Quitar' : 'Seleccionar'} ticket ${button.dataset.selectTicket}`);
-    button.querySelector('span').textContent = selected ? '✓' : '';
   });
 }
 
