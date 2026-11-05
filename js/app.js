@@ -6,7 +6,7 @@ import { FilterSortService } from './services/filterService.js';
 import { BoardView } from './ui/boardView.js?v=selection-action-bar-v1';
 import { ModalView } from './ui/modalView.js?v=complexity-scoring-v1';
 import { DragDropController } from './ui/dragDrop.js?v=pointer-grip-v1';
-import { CalendarView, dueDateForCalendarDay } from './ui/calendarView.js?v=calendar-mobile-height-v4';
+import { CalendarView, dueDateForCalendarDay } from './ui/calendarView.js?v=calendar-ux-v5';
 import { initializeThemeController } from './ui/themeController.js';
 import { PRIORITY_ORDER, SLA_REFRESH_INTERVAL_MS, STATUS_DEFINITIONS } from './config/constants.js';
 import { calculateTicketMetrics, metricsToCsv } from './services/metricsService.js?v=metrics-charts-v1';
@@ -149,7 +149,9 @@ async function bootstrap() {
   calendarView = new CalendarView({
     container: document.getElementById('ticketCalendar'),
     onDateChange: handleCalendarDateChange,
-    onTicketClick: openTicketForEditing
+    onTicketClick: openTicketForEditing,
+    onCreateForDate: openNewTicketForDate,
+    onSearch: focusCalendarSearch
   });
 
   bindStaticEvents();
@@ -1051,6 +1053,20 @@ async function openNewTicketModal() {
     canManageChecklist: auth.canAssignOrSetDue(user),
     canManageComplexity: auth.canAssignOrSetDue(user)
   });
+}
+
+async function openNewTicketForDate(dateKey) {
+  await openNewTicketModal();
+  const date = dueDateForCalendarDay(new Date(`${dateKey}T12:00:00`));
+  document.getElementById('formDueDate').value = modalView.toLocalDateTime(date);
+}
+
+function focusCalendarSearch() {
+  if (isMobileViewport()) {
+    openMobileSearch();
+    return;
+  }
+  filters.search.focus();
 }
 
 function handleAppShortcut() {
@@ -1989,6 +2005,7 @@ async function handleCalendarDateChange(ticketId, dateKey) {
 function setActiveView(view) {
   const showCalendar = view === 'calendar';
   const showMetrics = view === 'metrics';
+  document.getElementById('appShell').classList.toggle('is-calendar-view', showCalendar);
   document.querySelector('.mobile-selection-entry').classList.toggle('hidden', showCalendar || showMetrics);
   document.getElementById('boardPanel').classList.toggle('hidden', showCalendar || showMetrics);
   document.getElementById('calendarPanel').classList.toggle('hidden', !showCalendar);

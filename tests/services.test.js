@@ -788,6 +788,47 @@ test('calendar ticket touch captures the pointer only after drag movement starts
   }
 });
 
+test('calendar empty days open ticket creation for that date with keyboard and click', () => {
+  const handlers = new Map();
+  const container = {
+    innerHTML: '',
+    addEventListener(type, handler) {
+      handlers.set(type, handler);
+    }
+  };
+  const createdDates = [];
+  const emptyDate = {
+    nodeType: 1,
+    dataset: { calendarCreateDate: '2026-11-16' },
+    closest(selector) {
+      return selector === '[data-calendar-create-date]' ? this : null;
+    }
+  };
+  const calendar = new CalendarView({
+    container,
+    onCreateForDate(dateKey) {
+      createdDates.push(dateKey);
+    }
+  });
+  calendar.render([], false);
+
+  assert.match(container.innerHTML, /role="button" tabindex="0"/);
+  assert.match(container.innerHTML, /calendar-search-button/);
+
+  handlers.get('click')({ target: emptyDate });
+  let prevented = false;
+  handlers.get('keydown')({
+    target: emptyDate,
+    key: 'Enter',
+    preventDefault() {
+      prevented = true;
+    }
+  });
+
+  assert.deepEqual(createdDates, ['2026-11-16', '2026-11-16']);
+  assert.equal(prevented, true);
+});
+
 test('only administrators delete tickets and invalid ticket fields are rejected', async () => {
   const { auth, users, tickets, ticketService } = createContext();
   const admin = users.find((user) => user.role === 'Admin');

@@ -421,6 +421,15 @@ html[data-theme="pink"] .ui-button--destructive-ghost:hover { background: rgba(2
   box-shadow: 0 14px 28px rgba(168, 85, 247, 0.22);
 }
 
+@media (max-width: 768px) {
+  #btnNewTicket {
+    right: 1rem !important;
+    bottom: calc(5rem + env(safe-area-inset-bottom, 16px)) !important;
+    z-index: 20 !important;
+    box-shadow: 0 10px 24px rgba(99, 102, 241, 0.3);
+  }
+}
+
 #btnNewTicket:hover {
   transform: translateY(-1px);
   box-shadow: 0 16px 32px rgba(168, 85, 247, 0.26);

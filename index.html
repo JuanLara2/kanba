@@ -9,9 +9,9 @@
     <link rel="manifest" href="manifest.json" />
     <meta name="theme-color" content="#151a2a" />
     <link rel="stylesheet" href="styles/base.css" />
-    <link rel="stylesheet" href="styles/layout.css?v=calendar-mobile-height-v4" />
-    <link rel="stylesheet" href="styles/components.css?v=calendar-mobile-height-v4" />
-    <link rel="stylesheet" href="styles/responsive.css?v=calendar-mobile-height-v4" />
+    <link rel="stylesheet" href="styles/layout.css?v=mobile-landscape-v7" />
+    <link rel="stylesheet" href="styles/components.css?v=mobile-landscape-v7" />
+    <link rel="stylesheet" href="styles/responsive.css?v=mobile-landscape-v8" />
     <link rel="stylesheet" href="styles/splash.css" />
   </head>
   <body>
@@ -109,7 +109,10 @@
         Filtros
       </button>
       <div class="mobile-selection-entry">
-        <button id="btnStartBatchSelection" class="btn btn-outline" type="button" aria-pressed="false" aria-label="Seleccionar tickets">Seleccionar</button>
+        <button id="btnStartBatchSelection" class="btn btn-outline" type="button" aria-pressed="false" aria-label="Seleccionar tickets">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="m8 12 2.5 2.5L16 9"/></svg>
+          <span>Seleccionar</span>
+        </button>
       </div>
       <div id="mobileFiltersLayer" class="mobile-filters-layer hidden">
         <button id="mobileFiltersBackdrop" class="mobile-filters-backdrop" type="button" aria-label="Cerrar filtros"></button>
@@ -206,17 +209,17 @@
         <p class="sla-schedule-note">L–V, 08:00–17:00 · America/Bogota (Urgente: 24/7)</p>
       </section>
       <nav class="view-tabs" role="tablist" aria-label="Vistas de tickets">
-        <button id="boardTab" class="view-tab is-active" type="button" role="tab" tabindex="0" aria-selected="true" aria-controls="boardPanel">
+        <button id="boardTab" class="view-tab is-active" type="button" role="tab" tabindex="0" aria-label="Tablero" aria-selected="true" aria-controls="boardPanel">
           <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="5" height="16" rx="1"/><rect x="10" y="4" width="5" height="11" rx="1"/><rect x="17" y="4" width="4" height="13" rx="1"/></svg>
-          Tablero
+          <span>Tablero</span>
         </button>
-        <button id="calendarTab" class="view-tab" type="button" role="tab" tabindex="-1" aria-selected="false" aria-controls="calendarPanel">
+        <button id="calendarTab" class="view-tab" type="button" role="tab" tabindex="-1" aria-label="Calendario" aria-selected="false" aria-controls="calendarPanel">
           <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18M8 14h2M14 14h2M8 17h2"/></svg>
-          Calendario
+          <span>Calendario</span>
         </button>
-        <button id="metricsTab" class="view-tab" type="button" role="tab" tabindex="-1" aria-selected="false" aria-controls="metricsPanel">
+        <button id="metricsTab" class="view-tab" type="button" role="tab" tabindex="-1" aria-label="Métricas" aria-selected="false" aria-controls="metricsPanel">
           <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V5m0 14h16M8 16v-5m4 5V7m4 9v-3m4 3V9"/></svg>
-          Métricas
+          <span>Métricas</span>
         </button>
       </nav>
       <section id="boardPanel" role="tabpanel" aria-labelledby="boardTab">
@@ -777,6 +780,6 @@
       </section>
     </main>
 
-    <script type="module" src="js/app.js?v=calendar-mobile-height-v4"></script>
+    <script type="module" src="js/app.js?v=mobile-landscape-v6"></script>
   </body>
 </html>

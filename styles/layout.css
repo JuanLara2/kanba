@@ -361,6 +361,25 @@
   margin-bottom: 1rem;
 }
 
+.calendar-search-button {
+  display: none;
+  width: 2.75rem;
+  min-width: 2.75rem;
+  height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 0.65rem;
+  background: transparent;
+  color: var(--text-main);
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.calendar-search-button:hover,
+.calendar-search-button:focus-visible {
+  background: var(--bg-toolbar);
+}
+
 .calendar-month-title {
   text-transform: capitalize;
   font-size: 1.25rem;
@@ -429,6 +448,22 @@
   transition: background-color 0.15s ease, box-shadow 0.15s ease;
 }
 
+.calendar-day.is-empty {
+  cursor: pointer;
+  transition: background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.calendar-day.is-empty:active {
+  background: color-mix(in srgb, var(--color-primary-start) 14%, var(--bg-app));
+}
+
+.calendar-day.is-empty:focus-visible {
+  position: relative;
+  z-index: 1;
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
+}
+
 .calendar-day.outside-month {
   background: var(--bg-toolbar);
 }
@@ -457,6 +492,74 @@
   border-radius: 50%;
   font-size: 0.78rem;
   font-weight: 700;
+}
+
+html[data-theme="light"] .calendar-weekday {
+  color: #334155;
+  font-weight: 700;
+  border-color: #cbd5e1;
+}
+
+html[data-theme="light"] .calendar-day {
+  border-color: #cbd5e1;
+}
+
+html[data-theme="light"] .calendar-day-number {
+  color: #0f172a;
+  font-weight: 600;
+}
+
+html[data-theme="light"] .calendar-day.outside-month .calendar-day-number {
+  color: #475569;
+  opacity: 1;
+}
+
+html[data-theme="light"] .calendar-day.is-today .calendar-day-number {
+  color: #fff;
+}
+
+html[data-theme="light"] .calendar-ticket-status {
+  width: fit-content;
+  padding: 0.1rem 0.35rem;
+  border: 1px solid;
+  border-radius: 999px;
+  font-weight: 650;
+}
+
+html[data-theme="light"] .calendar-ticket-status.status-new {
+  border-color: #93c5fd;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+html[data-theme="light"] .calendar-ticket-status.status-open {
+  border-color: #6ee7b7;
+  background: #ecfdf5;
+  color: #047857;
+}
+
+html[data-theme="light"] .calendar-ticket-status.status-in_progress {
+  border-color: #93c5fd;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+html[data-theme="light"] .calendar-ticket-status.status-resolved {
+  border-color: #6ee7b7;
+  background: #ecfdf5;
+  color: #047857;
+}
+
+html[data-theme="light"] .calendar-ticket-status.status-closed {
+  border-color: #cbd5e1;
+  background: #f1f5f9;
+  color: #334155;
+}
+
+html[data-theme="light"] .calendar-ticket-status.status-blocked {
+  border-color: #fca5a5;
+  background: #fef2f2;
+  color: #b91c1c;
 }
 
 .calendar-day-tickets,

@@ -34,10 +34,12 @@ export function dueDateForCalendarDay(day, previousDueDate = null) {
 }
 
 export class CalendarView {
-  constructor({ container, onDateChange, onTicketClick, canReschedule = false }) {
+  constructor({ container, onDateChange, onTicketClick, onCreateForDate, onSearch, canReschedule = false }) {
     this.container = container;
     this.onDateChange = onDateChange;
     this.onTicketClick = onTicketClick;
+    this.onCreateForDate = onCreateForDate;
+    this.onSearch = onSearch;
     this.canReschedule = canReschedule;
     this.month = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
     this.tickets = [];
@@ -62,6 +64,11 @@ export class CalendarView {
         return;
       }
 
+      if (closestElement(event.target, '[data-calendar-search]')) {
+        this.onSearch?.();
+        return;
+      }
+
       if (closestElement(event.target, '.calendar-drag-handle')) return;
       const ticket = closestElement(event.target, '[data-calendar-ticket]');
       if (ticket && this.suppressTicketClick) {
@@ -70,6 +77,18 @@ export class CalendarView {
         return;
       }
       if (ticket && this.onTicketClick) this.onTicketClick(ticket.dataset.ticketId);
+      if (ticket) return;
+
+      const emptyDate = closestElement(event.target, '[data-calendar-create-date]');
+      if (emptyDate) this.onCreateForDate?.(emptyDate.dataset.calendarCreateDate);
+    });
+
+    this.container.addEventListener('keydown', (event) => {
+      if (!['Enter', ' '].includes(event.key)) return;
+      const emptyDate = closestElement(event.target, '[data-calendar-create-date]');
+      if (!emptyDate || event.target !== emptyDate) return;
+      event.preventDefault();
+      this.onCreateForDate?.(emptyDate.dataset.calendarCreateDate);
     });
 
     this.container.addEventListener('pointerdown', (event) => {
@@ -182,9 +201,11 @@ export class CalendarView {
       const isCurrentMonth = day.getMonth() === this.month.getMonth();
       const isToday = key === localDateKey(new Date());
       const dayTickets = ticketByDate.get(key) || [];
+      const isEmpty = dayTickets.length === 0;
+      const accessibleDate = day.toLocaleDateString('es', { dateStyle: 'full' });
       return `
-        <section class="calendar-day${isCurrentMonth ? '' : ' outside-month'}${isToday ? ' is-today' : ''}"
-          data-calendar-date="${key}" aria-label="${day.toLocaleDateString('es', { dateStyle: 'full' })}">
+        <section class="calendar-day${isCurrentMonth ? '' : ' outside-month'}${isToday ? ' is-today' : ''}${isEmpty ? ' is-empty' : ''}"
+          data-calendar-date="${key}"${isEmpty ? ` data-calendar-create-date="${key}" role="button" tabindex="0" aria-label="Crear ticket para ${accessibleDate}"` : ` aria-label="${accessibleDate}"`}>
           <span class="calendar-day-number">${day.getDate()}</span>
           <div class="calendar-day-tickets">
             ${dayTickets.map((ticket) => this.ticketMarkup(ticket)).join('')}
@@ -207,6 +228,9 @@ export class CalendarView {
               <p class="calendar-help">${this.canReschedule ? 'Arrastra un ticket a otro día para cambiar su fecha límite.' : 'Consulta los tickets agrupados por fecha límite.'}</p>
             </div>
             <div class="calendar-navigation">
+              <button class="calendar-search-button" type="button" data-calendar-search aria-label="Buscar tickets" title="Buscar tickets">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+              </button>
               <button class="btn btn-outline calendar-nav-button" type="button" data-calendar-month="-1" aria-label="Mes anterior">‹</button>
               <button class="btn btn-outline" type="button" data-calendar-today>Hoy</button>
               <button class="btn btn-outline calendar-nav-button" type="button" data-calendar-month="1" aria-label="Mes siguiente">›</button>
@@ -234,6 +258,9 @@ export class CalendarView {
   ticketMarkup(ticket) {
     const canDrag = this.canReschedule;
     const progress = getChecklistProgress(ticket.checklist);
+    const statusClass = ['new', 'open', 'in_progress', 'resolved', 'closed', 'blocked'].includes(ticket.status)
+      ? ` status-${ticket.status}`
+      : '';
     return `
       <button class="calendar-ticket${canDrag ? ' can-drag' : ''}" type="button"
         data-calendar-ticket data-ticket-id="${this.escapeHtml(ticket.id)}"
@@ -241,7 +268,7 @@ export class CalendarView {
         ${canDrag ? '<span class="calendar-drag-handle" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><circle cx="9" cy="5" r="1.5" fill="currentColor"/><circle cx="15" cy="5" r="1.5" fill="currentColor"/><circle cx="9" cy="12" r="1.5" fill="currentColor"/><circle cx="15" cy="12" r="1.5" fill="currentColor"/><circle cx="9" cy="19" r="1.5" fill="currentColor"/><circle cx="15" cy="19" r="1.5" fill="currentColor"/></svg></span>' : ''}
         <span class="calendar-ticket-id">${this.escapeHtml(ticket.id)}</span>
         <span class="calendar-ticket-title">${this.escapeHtml(ticket.title)}</span>
-        <span class="calendar-ticket-status">${this.escapeHtml(ticket.status.replace('_', ' '))}</span>
+        <span class="calendar-ticket-status${statusClass}">${this.escapeHtml(ticket.status.replace('_', ' '))}</span>
         ${progress.total ? `<span class="calendar-ticket-progress">${progress.completed}/${progress.total} subtareas · ${progress.percentage}%</span>` : ''}
       </button>
     `;
