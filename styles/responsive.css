@@ -336,7 +336,8 @@
   }
 
   #boardPanel,
-  #calendarPanel {
+  #calendarPanel,
+  #metricsPanel {
     min-width: 0;
   }
 
@@ -351,6 +352,21 @@
     overflow-y: scroll !important;
     overscroll-behavior-y: contain;
     padding-bottom: calc(10rem + env(safe-area-inset-bottom, 16px));
+    touch-action: pan-y !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  #metricsPanel {
+    box-sizing: border-box;
+    min-width: 0;
+    min-height: 0;
+    flex: 1 1 0;
+    height: auto !important;
+    max-height: 100%;
+    overflow-x: hidden;
+    overflow-y: auto !important;
+    overscroll-behavior-y: contain;
+    padding: 0.75rem 0.75rem calc(8.5rem + env(safe-area-inset-bottom, 16px));
     touch-action: pan-y !important;
     -webkit-overflow-scrolling: touch;
   }
@@ -1688,11 +1704,13 @@
 }
 
 @media (max-width: 768px) {
-  .app-shell.is-calendar-view .controls-toolbar {
+  .app-shell.is-calendar-view .controls-toolbar,
+  .app-shell.is-metrics-view .controls-toolbar {
     display: none;
   }
 
-  .app-shell.is-calendar-view .mobile-view-container {
+  .app-shell.is-calendar-view .mobile-view-container,
+  .app-shell.is-metrics-view .mobile-view-container {
     padding-top: 0;
   }
 
@@ -1758,6 +1776,10 @@
 }
 
 @media (orientation: landscape) and (max-height: 500px) {
+  .app-shell.is-metrics-view > .controls-toolbar {
+    display: none !important;
+  }
+
   .app-shell {
     display: grid;
     grid-template-columns: minmax(6.75rem, auto) minmax(7.5rem, 1fr) auto auto auto auto;
@@ -2008,6 +2030,21 @@
 
   #boardPanel .mobile-active-filters {
     display: none;
+  }
+
+  #metricsPanel {
+    display: flex;
+    min-width: 0;
+    min-height: 0;
+    flex: 1 1 0;
+    flex-direction: column;
+    height: calc(100dvh - 2.75rem) !important;
+    max-height: 100%;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    padding: 0.5rem 0.75rem 2.5rem;
+    touch-action: pan-y !important;
+    -webkit-overflow-scrolling: touch;
   }
 
   #kanbanBoard {
