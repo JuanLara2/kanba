@@ -9,9 +9,9 @@
     <link rel="manifest" href="manifest.json" />
     <meta name="theme-color" content="#151a2a" />
     <link rel="stylesheet" href="styles/base.css" />
-    <link rel="stylesheet" href="styles/layout.css?v=password-recovery-v1" />
-    <link rel="stylesheet" href="styles/components.css?v=calendar-native-scroll-v1" />
-    <link rel="stylesheet" href="styles/responsive.css?v=calendar-native-scroll-v1" />
+    <link rel="stylesheet" href="styles/layout.css?v=calendar-split-scroll-v3" />
+    <link rel="stylesheet" href="styles/components.css?v=calendar-split-scroll-v3" />
+    <link rel="stylesheet" href="styles/responsive.css?v=calendar-split-scroll-v3" />
     <link rel="stylesheet" href="styles/splash.css" />
   </head>
   <body>
@@ -40,8 +40,8 @@
       </div>
     </div>
 
-    <div id="appShell" class="app-shell hidden">
-    <header class="app-header">
+    <div id="appShell" class="app-shell mobile-app-shell hidden">
+    <header class="app-header mobile-app-header">
       <div class="header-left">
         <div class="logo-mark">VT</div>
         <div class="header-brand-copy">
@@ -189,7 +189,7 @@
       </div>
     </nav>
 
-    <main class="board-wrapper">
+    <main class="board-wrapper mobile-view-container">
       <section id="slaOverview" class="sla-overview" aria-label="Resumen de acuerdos de nivel de servicio">
         <article class="sla-metric">
           <span class="sla-metric-label">Tickets activos</span>
@@ -246,7 +246,7 @@
         <div id="mobileActiveFilters" class="mobile-active-filters" aria-label="Filtros activos"></div>
         <div id="kanbanBoard" class="kanban-grid" role="region" aria-label="Tablero Kanban"></div>
       </section>
-      <section id="calendarPanel" class="hidden" role="tabpanel" aria-labelledby="calendarTab">
+      <section id="calendarPanel" class="mobile-calendar-panel hidden" role="tabpanel" aria-labelledby="calendarTab">
         <div id="ticketCalendar"></div>
       </section>
       <section id="metricsPanel" class="hidden metrics-panel" role="tabpanel" aria-labelledby="metricsTab">
@@ -777,6 +777,6 @@
       </section>
     </main>
 
-    <script type="module" src="js/app.js?v=calendar-native-scroll-v1"></script>
+    <script type="module" src="js/app.js?v=calendar-split-scroll-v3"></script>
   </body>
 </html>

@@ -390,10 +390,17 @@
   display: grid;
   grid-template-columns: repeat(7, minmax(100px, 1fr));
   min-width: 700px;
-  overflow: hidden;
   border-top: 1px solid var(--border-subtle);
   border-left: 1px solid var(--border-subtle);
   border-radius: 8px;
+}
+
+.calendar-grid-scroll {
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .calendar-weekday {

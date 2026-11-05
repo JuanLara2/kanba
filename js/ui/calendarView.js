@@ -212,9 +212,11 @@ export class CalendarView {
               <button class="btn btn-outline calendar-nav-button" type="button" data-calendar-month="1" aria-label="Mes siguiente">›</button>
             </div>
           </header>
-          <div class="calendar-grid" aria-label="${title}">
-            ${weekdays}
-            ${days}
+          <div class="calendar-grid-scroll">
+            <div class="calendar-grid" aria-label="${title}">
+              ${weekdays}
+              ${days}
+            </div>
           </div>
         </section>
         <aside class="calendar-unscheduled${this.canReschedule ? ' can-drop' : ''}" data-calendar-unscheduled aria-label="Tickets sin fecha límite">
