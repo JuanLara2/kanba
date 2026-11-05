@@ -47,8 +47,7 @@ export class BoardView {
         dropZone.appendChild(emptyState);
       } else {
         colTickets.forEach((ticket) => {
-          const card = this.buildCard(ticket, colDef);
-          if (canChangeStatus(ticket)) card.appendChild(this.buildStatusMenuButton(ticket));
+          const card = this.buildCard(ticket, colDef, canChangeStatus(ticket));
           if (mobileSelection.canSelectTicket?.(ticket)) {
             card.appendChild(this.buildSelectionButton(
               ticket,
@@ -92,17 +91,6 @@ export class BoardView {
     });
   }
 
-  buildStatusMenuButton(ticket) {
-    const button = document.createElement('button');
-    button.className = 'card-status-menu';
-    button.type = 'button';
-    button.dataset.ticketStatusMenu = ticket.id;
-    button.setAttribute('aria-label', `Cambiar estado de ${ticket.id}`);
-    button.setAttribute('aria-expanded', 'false');
-    button.innerHTML = '<span aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" focusable="false"><path fill="currentColor" fill-rule="evenodd" d="M8 3a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Zm8 0a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM8 10.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Zm8 0a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM8 18a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Zm8 0a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Z"/></svg></span>';
-    return button;
-  }
-
   buildSelectionButton(ticket, selected, selectionMode) {
     const button = document.createElement('button');
     button.className = 'card-selection-toggle';
@@ -115,9 +103,16 @@ export class BoardView {
     return button;
   }
 
-  buildCard(ticket, colDef) {
+  buildCard(ticket, colDef, canChangeStatus) {
     const card = document.createElement('article');
-    card.className = `ticket-card ${colDef.borderClass}`;
+    const priority = String(ticket.priority || 'Media').toLowerCase();
+    const priorityClass = ({
+      baja: 'priority-low',
+      media: 'priority-medium',
+      alta: 'priority-high',
+      urgente: 'priority-high',
+    })[priority] || 'priority-medium';
+    card.className = `ticket-card ${colDef.borderClass} ${priorityClass}`;
     card.draggable = true;
     card.tabIndex = 0;
     card.setAttribute('role', 'group');
@@ -126,13 +121,16 @@ export class BoardView {
     const checklistLabel = checklistProgress.total
       ? ` Subtareas: ${checklistProgress.completed} de ${checklistProgress.total}, ${checklistProgress.percentage}% completado.`
       : '';
-    card.setAttribute('aria-label', `${ticket.id}: ${ticket.title}. Estado: ${colDef.name}.${checklistLabel} Pulsa Enter para ver detalles.`);
+    card.setAttribute('aria-label', `${ticket.id}: ${ticket.title}. Prioridad: ${ticket.priority || 'Media'}. Estado: ${colDef.name}.${checklistLabel} Pulsa Enter para ver detalles.`);
     card.dataset.ticketId = ticket.id;
 
     const sla = this.ticketService.evaluateSLA(ticket);
     const assignee = this.usersMap.get(ticket.assignedTo) || { fullName: 'Sin asignar' };
     const initial = assignee.fullName.charAt(0).toUpperCase();
     const assigneeAccent = this.getAssigneeAccent(assignee.fullName);
+    const dueDateLabel = ticket.dueDate
+      ? new Date(ticket.dueDate).toLocaleDateString('es', { day: 'numeric', month: 'short' }).replace('.', '')
+      : 'Sin fecha';
 
     if (sla.state === 'overdue') {
       card.classList.add('sla-overdue');
@@ -145,13 +143,36 @@ export class BoardView {
 
     card.innerHTML = `
       <div class="card-top">
-        <span class="card-id">${ticket.id}</span>
-        <div class="badges-row">
-          <span class="priority-pill priority-${ticket.priority.toLowerCase()}">${ticket.priority}</span>
-          <span class="category-pill">${this.escapeHtml(ticket.category || 'Consulta')}</span>
-          <span class="complexity-pill" aria-label="Complejidad ${complexityScore} de 10">Complejidad ${complexityScore}/10</span>
-          ${sla.state === 'overdue' ? '<span class="sla-pill overdue">⚠️ SLA vencido</span>' : ''}
-          ${sla.state === 'warning' ? `<span class="sla-pill warning">⏳ SLA ${formatSlaRemaining(sla.remainingMs)}</span>` : ''}
+        <div class="card-identity">
+          <span class="card-id">#${this.escapeHtml(ticket.id)}</span>
+          <span class="category-pill" title="${this.escapeHtml(ticket.category || 'Consulta')}">${this.escapeHtml(ticket.category || 'Consulta')}</span>
+        </div>
+        <button class="card-drag-handle" type="button" draggable="true"
+          aria-label="Arrastrar ticket"
+          title="Arrastrar ticket ${this.escapeHtml(ticket.id)}">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <circle cx="9" cy="5" r="1.5" fill="currentColor"/>
+            <circle cx="15" cy="5" r="1.5" fill="currentColor"/>
+            <circle cx="9" cy="12" r="1.5" fill="currentColor"/>
+            <circle cx="15" cy="12" r="1.5" fill="currentColor"/>
+            <circle cx="9" cy="19" r="1.5" fill="currentColor"/>
+            <circle cx="15" cy="19" r="1.5" fill="currentColor"/>
+          </svg>
+        </button>
+        <div class="card-sla">
+          ${canChangeStatus
+            ? `<button class="btn-change-status" type="button" data-ticket-id="${this.escapeHtml(ticket.id)}"
+                aria-label="Cambiar estado de ${this.escapeHtml(ticket.id)}. Estado actual: ${this.escapeHtml(colDef.name)}"
+              aria-haspopup="dialog" aria-controls="ticketStatusSheet"
+              aria-expanded="false" style="--status-color: ${colDef.colorHex}">
+                <span>${this.escapeHtml(colDef.name)}</span>
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="m7 10 5 5 5-5"/>
+                </svg>
+              </button>`
+            : `<span class="ticket-status-label" style="--status-color: ${colDef.colorHex}">${this.escapeHtml(colDef.name)}</span>`}
+          ${sla.state === 'overdue' ? '<span class="sla-pill overdue">SLA vencido</span>' : ''}
+          ${sla.state === 'warning' ? `<span class="sla-pill warning">SLA ${formatSlaRemaining(sla.remainingMs)}</span>` : ''}
           ${sla.state === 'normal' ? `<span class="sla-pill normal">SLA ${formatSlaRemaining(sla.remainingMs)}</span>` : ''}
         </div>
       </div>
@@ -173,9 +194,12 @@ export class BoardView {
           ${assignee.avatarUrl ? `<span class="avatar-circle avatar-with-image"><img src="${this.escapeHtml(assignee.avatarUrl)}" alt="" loading="lazy" /></span>` : `<span class="avatar-circle">${initial}</span>`}
           <span class="assignee-text">${this.escapeHtml(assignee.fullName)}</span>
         </div>
-        <div class="card-dates">
-          <span>Cre: ${new Date(ticket.createdAt).toLocaleDateString()}</span>
-          <span>Venc: ${ticket.dueDate ? new Date(ticket.dueDate).toLocaleDateString() : 'Sin fecha'}</span>
+        <div class="card-compact-meta">
+          <span class="complexity-pill" aria-label="Complejidad ${complexityScore} de 10"><span aria-hidden="true">⚡</span> ${complexityScore}/10</span>
+          <span class="card-due-date" aria-label="Fecha límite: ${this.escapeHtml(dueDateLabel)}">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
+            ${this.escapeHtml(dueDateLabel)}
+          </span>
         </div>
       </div>
     `;

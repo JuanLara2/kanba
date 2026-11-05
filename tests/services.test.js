@@ -260,7 +260,16 @@ test('drag and drop handlers safely resolve text-node event targets', async () =
     onStatusChange: async (...args) => changes.push(args)
   });
 
-  const textTarget = { nodeType: 3, parentElement: card };
+  const handle = {
+    nodeType: 1,
+    closest(selector) {
+      if (selector === '.card-drag-handle') return this;
+      if (selector === '.ticket-card') return card;
+      if (selector.includes('button')) return this;
+      return null;
+    }
+  };
+  const textTarget = { nodeType: 3, parentElement: handle };
   const dataTransfer = {
     effectAllowed: '',
     dropEffect: '',
@@ -270,7 +279,13 @@ test('drag and drop handlers safely resolve text-node event targets', async () =
     }
   };
 
-  handlers.get('dragstart')({ target: textTarget, dataTransfer });
+  let backgroundDragPrevented = false;
+  handlers.get('dragstart')({
+    target: card,
+    dataTransfer,
+    preventDefault() { backgroundDragPrevented = true; }
+  });
+  handlers.get('dragstart')({ target: textTarget, dataTransfer, preventDefault() {} });
   handlers.get('dragend')({ target: textTarget });
   handlers.get('dragover')({ target: { nodeType: 3, parentElement: dropZone }, preventDefault() {}, dataTransfer });
   await handlers.get('drop')({
@@ -280,6 +295,7 @@ test('drag and drop handlers safely resolve text-node event targets', async () =
   });
   handlers.get('click')({ target: textTarget });
 
+  assert.equal(backgroundDragPrevented, true);
   assert.equal(dataTransfer.effectAllowed, 'move');
   assert.equal(dataTransfer.dropEffect, 'move');
   assert.deepEqual(changes, [['TCK-1001', 'open']]);

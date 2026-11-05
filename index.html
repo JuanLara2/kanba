@@ -2,7 +2,7 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Vortex Task</title>
     <link rel="icon" type="image/png" href="img/icono.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="img/apple-touch-icon.png" />
@@ -10,8 +10,8 @@
     <meta name="theme-color" content="#151a2a" />
     <link rel="stylesheet" href="styles/base.css" />
     <link rel="stylesheet" href="styles/layout.css?v=password-recovery-v1" />
-    <link rel="stylesheet" href="styles/components.css?v=fab-bottom-v1" />
-    <link rel="stylesheet" href="styles/responsive.css?v=fab-bottom-v1" />
+    <link rel="stylesheet" href="styles/components.css?v=ticket-card-compact-v1" />
+    <link rel="stylesheet" href="styles/responsive.css?v=ticket-card-mobile-v1" />
     <link rel="stylesheet" href="styles/splash.css" />
   </head>
   <body>
@@ -44,42 +44,19 @@
     <header class="app-header">
       <div class="header-left">
         <div class="logo-mark">VT</div>
-        <div>
-          <h1 class="app-title">Vortex Task</h1>
+        <div class="header-brand-copy">
+          <h1 class="app-title">VortexTask</h1>
           <p class="app-subtitle">Acelera tu flujo de trabajo</p>
         </div>
+        <span id="realtimeStatus" class="realtime-status is-connecting" role="status">Conectando…</span>
       </div>
 
       <div class="header-right">
-        <div class="header-status-group">
-          <span id="realtimeStatus" class="realtime-status" role="status">Conectando…</span>
-          <button id="btnLogout" class="btn btn-outline icon-only" type="button" aria-label="Salir" title="Salir"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 17l5-5-5-5M15 12H3M21 19V5a2 2 0 0 0-2-2h-6"/></svg></button>
-        </div>
-        <div id="pendingSyncStatus" class="pending-sync-status hidden" role="status" aria-live="polite">
-          <span id="pendingSyncMessage"></span>
-          <button id="btnRetrySync" class="btn btn-outline" type="button">Reintentar</button>
-        </div>
-        <label class="theme-picker" for="themeSelect">
-          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18h1.2a2.3 2.3 0 0 0 1.7-3.8 1.2 1.2 0 0 1 .9-2h1.7A3.5 3.5 0 0 0 21 11.7 8.8 8.8 0 0 0 12 3Z"/><path d="M7.5 11.5h.01M10 7.5h.01M14 7.5h.01M16.5 11h.01"/></svg>
-          <span>Tema</span>
-          <select id="themeSelect" aria-label="Seleccionar tema">
-            <option value="dark">Oscuro</option>
-            <option value="light">Claro</option>
-            <option value="pink">Rosa</option>
-          </select>
-        </label>
-        <div id="sessionUserBox" class="user-session-pill">
-          <span id="sessionUserName">Cargando...</span>
-          <span id="sessionUserRole" class="role-badge">...</span>
-        </div>
-        <button id="btnOpenProfile" class="btn btn-outline profile-trigger" type="button" aria-label="Abrir perfil del usuario">
-          <span id="headerUserAvatar" class="header-avatar" aria-hidden="true">U</span>
-          <span>Perfil</span>
-        </button>
         <div class="notification-menu">
-          <button id="btnNotifications" class="btn btn-outline" type="button" aria-expanded="false" aria-controls="notificationsPanel">
+          <button id="btnNotifications" class="btn btn-outline header-icon-button" type="button" aria-label="Avisos" aria-expanded="false" aria-controls="notificationsPanel">
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg>
-            Avisos <span id="notificationBadge" class="notification-badge hidden" aria-label="Notificaciones sin leer">0</span>
+            <span class="header-action-label">Avisos</span>
+            <span id="notificationBadge" class="notification-badge hidden" aria-label="Notificaciones sin leer">0</span>
           </button>
           <section id="notificationsPanel" class="notification-panel hidden" aria-labelledby="notificationsHeading">
             <header class="notification-panel-header">
@@ -89,12 +66,40 @@
             <ul id="notificationList" class="notification-list"></ul>
           </section>
         </div>
-        <button id="btnManageCategories" class="btn btn-outline hidden" type="button"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16M4 12h16M4 19h10M18 16v6M15 19h6"/></svg>Administrar categorías</button>
-        <button id="btnChangePassword" class="btn btn-outline hidden" type="button" aria-label="Cambiar contraseña" title="Cambiar contraseña"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M17 6l3 3M14 9l3 3"/></svg></button>
+        <div id="profileMenu" class="profile-menu">
+          <button id="btnOpenProfile" class="btn btn-outline profile-trigger header-icon-button" type="button" aria-label="Abrir menú de perfil" aria-expanded="false" aria-controls="profileMenuPanel">
+            <span id="headerUserAvatar" class="header-avatar" aria-hidden="true">U</span>
+            <span class="header-action-label">Perfil</span>
+          </button>
+          <section id="profileMenuPanel" class="profile-menu-panel hidden" aria-label="Opciones de perfil">
+            <div id="sessionUserBox" class="user-session-pill profile-menu-user">
+              <span id="sessionUserName">Cargando...</span>
+              <span id="sessionUserRole" class="role-badge">...</span>
+            </div>
+            <label class="theme-picker profile-menu-theme" for="themeSelect">
+              <span>Tema</span>
+              <select id="themeSelect" aria-label="Seleccionar tema">
+                <option value="dark">Oscuro</option>
+                <option value="light">Claro</option>
+                <option value="pink">Rosa</option>
+              </select>
+            </label>
+            <button id="btnManageCategories" class="btn btn-outline hidden" type="button"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16M4 12h16M4 19h10M18 16v6M15 19h6"/></svg>Administrar categorías</button>
+            <button id="btnChangePassword" class="btn btn-outline" type="button">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M17 6l3 3M14 9l3 3"/></svg>
+              Cambiar contraseña
+            </button>
+            <button id="btnProfileMenuOpenProfile" class="btn btn-outline" type="button">Mi perfil</button>
+          </section>
+        </div>
       </div>
     </header>
 
     <nav class="controls-toolbar" aria-label="Filtros del tablero">
+      <div id="pendingSyncStatus" class="pending-sync-status hidden" role="status" aria-live="polite">
+        <span id="pendingSyncMessage"></span>
+        <button id="btnRetrySync" class="btn btn-outline" type="button">Reintentar</button>
+      </div>
       <div class="search-box">
         <svg class="icon search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
         <input type="text" id="filterSearch" placeholder="Buscar por palabra clave, ID o asignado..." />
@@ -103,6 +108,9 @@
         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M7 12h10m-7 6h4"/></svg>
         Filtros
       </button>
+      <div class="mobile-selection-entry">
+        <button id="btnStartBatchSelection" class="btn btn-outline" type="button" aria-pressed="false" aria-label="Seleccionar tickets">Seleccionar</button>
+      </div>
       <div id="mobileFiltersLayer" class="mobile-filters-layer hidden">
         <button id="mobileFiltersBackdrop" class="mobile-filters-backdrop" type="button" aria-label="Cerrar filtros"></button>
         <section id="mobileFiltersSheet" class="mobile-filters-sheet" aria-labelledby="mobileFiltersHeading">
@@ -213,9 +221,6 @@
       </nav>
       <section id="boardPanel" role="tabpanel" aria-labelledby="boardTab">
         <p id="mobileRefreshStatus" class="mobile-refresh-status" role="status" aria-live="polite"></p>
-        <div class="mobile-selection-entry">
-          <button id="btnStartBatchSelection" class="btn btn-outline" type="button">Seleccionar tickets</button>
-        </div>
         <section id="mobileBatchToolbar" class="mobile-batch-toolbar hidden" aria-label="Acciones para tickets seleccionados">
           <header class="mobile-batch-header">
             <strong id="mobileBatchSelectionCount" aria-live="polite">0 seleccionados</strong>
@@ -234,7 +239,10 @@
             <button id="btnMobileBatchAssign" class="btn btn-outline" type="button">Asignar seleccionados</button>
           </div>
         </section>
-        <nav id="mobileStatusTabs" class="mobile-status-tabs" aria-label="Filtrar por estado"></nav>
+        <div class="mobile-status-nav">
+          <nav id="mobileStatusTabs" class="mobile-status-tabs no-scrollbar" aria-label="Filtrar por estado"></nav>
+          <span class="mobile-status-fade" aria-hidden="true"></span>
+        </div>
         <div id="mobileActiveFilters" class="mobile-active-filters" aria-label="Filtros activos"></div>
         <div id="kanbanBoard" class="kanban-grid" role="region" aria-label="Tablero Kanban"></div>
       </section>
@@ -381,7 +389,7 @@
       <div class="modal-card">
         <header class="modal-header">
           <h3 id="modalHeading">Crear nueva solicitud</h3>
-          <button id="modalCloseBtn" class="close-x" type="button" aria-label="Cerrar">&times;</button>
+          <button id="modalCloseBtn" class="close-x ui-button ui-button--ghost ui-button--sm ui-button--icon" type="button" aria-label="Cerrar">&times;</button>
         </header>
 
         <form id="ticketForm" class="modal-body">
@@ -523,10 +531,10 @@
           </section>
 
           <footer class="modal-actions">
-            <button type="button" id="btnReopenTicket" class="btn btn-outline hidden">Reabrir ticket</button>
-            <button type="button" id="btnDeleteTicket" class="btn btn-danger hidden">Eliminar ticket</button>
-            <button type="button" id="btnCancelModal" class="btn btn-outline">Cancelar</button>
-            <button type="submit" class="btn btn-primary">Guardar solicitud</button>
+            <button type="button" id="btnReopenTicket" class="btn ui-button ui-button--secondary ui-button--md hidden">Reabrir ticket</button>
+            <button type="button" id="btnDeleteTicket" class="btn ui-button ui-button--destructive-ghost ui-button--md hidden">Eliminar ticket</button>
+            <button type="button" id="btnCancelModal" class="btn ui-button ui-button--secondary ui-button--md">Cancelar</button>
+            <button type="submit" class="btn ui-button ui-button--default ui-button--md">Crear solicitud</button>
           </footer>
         </form>
       </div>
@@ -684,6 +692,10 @@
             <p><span>Rol</span> <strong id="profileUserRole">-</strong></p>
           </div>
           <footer class="modal-actions">
+            <button id="btnLogout" class="btn ui-button ui-button--destructive-ghost ui-button--md" type="button">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 17l5-5-5-5M15 12H3M21 19V5a2 2 0 0 0-2-2h-6"/></svg>
+              Cerrar sesión
+            </button>
             <button id="profileCancelBtn" class="btn btn-outline" type="button">Cerrar</button>
           </footer>
         </div>

@@ -83,6 +83,12 @@ export class ModalView {
   }
 
   openTicket(ticket = null, permissions = {}) {
+    window.clearTimeout(this.closeTicketTimeout);
+    if (this.closeTicketAnimationHandler) {
+      this.modalEl.querySelector('.modal-card').removeEventListener('animationend', this.closeTicketAnimationHandler);
+      this.closeTicketAnimationHandler = null;
+    }
+    this.modalEl.classList.remove('modal-closing');
     this.previousFocus = document.activeElement;
     const heading = document.getElementById('modalHeading');
     const formTicketId = document.getElementById('formTicketId');
@@ -95,6 +101,7 @@ export class ModalView {
 
     if (ticket) {
       heading.textContent = 'Editar solicitud';
+      saveBtn.textContent = 'Guardar cambios';
       formTicketId.value = ticket.id;
       deleteBtn.classList.toggle('hidden', !permissions.canDelete);
       document.getElementById('formTitle').value = ticket.title;
@@ -114,6 +121,7 @@ export class ModalView {
       this.renderComments([]);
     } else {
       heading.textContent = 'Crear nueva solicitud';
+      saveBtn.textContent = 'Crear solicitud';
       formTicketId.value = '';
       deleteBtn.classList.add('hidden');
       this.form.reset();
@@ -143,10 +151,38 @@ export class ModalView {
 
   closeTicket() {
     const wasOpen = !this.modalEl.classList.contains('hidden');
-    this.modalEl.classList.add('hidden');
+    if (!wasOpen || this.modalEl.classList.contains('modal-closing')) return;
+
+    this.modalEl.classList.add('modal-closing');
     if (wasOpen) this.onOverlayClose?.('ticket');
+    const finishClose = () => {
+      if (!this.modalEl.classList.contains('modal-closing')) return;
+      window.clearTimeout(this.closeTicketTimeout);
+      this.modalEl.querySelector('.modal-card').removeEventListener('animationend', this.closeTicketAnimationHandler);
+      this.closeTicketAnimationHandler = null;
+      this.modalEl.classList.add('hidden');
+      this.modalEl.classList.remove('modal-closing');
+      this.resetTicketForm();
+    };
+
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      finishClose();
+      return;
+    }
+
+    this.closeTicketAnimationHandler = (event) => {
+      if (event.target === this.modalEl.querySelector('.modal-card') && event.animationName.endsWith('-exit')) {
+        finishClose();
+      }
+    };
+    this.modalEl.querySelector('.modal-card').addEventListener('animationend', this.closeTicketAnimationHandler);
+    this.closeTicketTimeout = window.setTimeout(finishClose, 350);
+  }
+
+  resetTicketForm() {
     this.form.reset();
     document.getElementById('modalHeading').textContent = 'Crear nueva solicitud';
+    this.form.querySelector('[type="submit"]').textContent = 'Crear solicitud';
     document.getElementById('formTicketId').value = '';
     document.getElementById('btnDeleteTicket').classList.add('hidden');
     document.getElementById('btnReopenTicket').classList.add('hidden');

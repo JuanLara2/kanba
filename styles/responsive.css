@@ -146,7 +146,7 @@
   .app-header {
     position: relative;
     gap: 0.9rem;
-    padding: 3.3rem 1rem 0.85rem;
+    padding: max(0.85rem, env(safe-area-inset-top, 0px)) 1rem 0.85rem;
   }
 
   .header-left,
@@ -159,17 +159,23 @@
     z-index: 1;
   }
 
-  .app-header #btnLogout {
-    position: absolute;
-    top: 0.75rem;
-    right: 0.75rem;
-    left: auto;
-    z-index: 4;
-    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.22);
-  }
-
   .header-left {
     gap: 0.7rem;
+    padding-right: 7.5rem;
+    box-sizing: border-box;
+    min-height: 42px;
+  }
+
+  .app-header #btnOpenProfile {
+    position: absolute;
+    top: max(0.85rem, env(safe-area-inset-top, 0px));
+    right: 1rem;
+    z-index: 4;
+    width: auto;
+    min-width: 2.8rem;
+    height: 42px;
+    padding: 0 0.85rem;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.22);
   }
 
   .app-title {
@@ -401,7 +407,26 @@
   }
 
   .app-header {
-    padding: 0.75rem;
+    padding: max(0.75rem, env(safe-area-inset-top, 0px)) 0.75rem 0.85rem;
+  }
+
+  .header-left {
+    padding-right: 7rem;
+    min-height: 36px;
+  }
+
+  .app-header #btnOpenProfile {
+    top: max(0.75rem, env(safe-area-inset-top, 0px));
+    right: 0.75rem;
+    height: 36px;
+    padding: 0 0.65rem;
+    font-size: 0.85rem;
+  }
+
+  .app-header #btnOpenProfile .header-avatar {
+    width: 32px;
+    height: 32px;
+    font-size: 0.82rem;
   }
 
   .header-right {
@@ -445,8 +470,17 @@
   }
 
   .card-footer {
-    align-items: flex-start;
-    flex-direction: column;
+    align-items: center;
+    flex-direction: row;
+    gap: 0.4rem;
+  }
+
+  .card-assignee {
+    max-width: 46%;
+  }
+
+  .card-compact-meta {
+    gap: 0.35rem;
   }
 
   .card-dates {
@@ -466,6 +500,31 @@
     max-height: 92dvh;
     border-radius: 18px 18px 0 0;
     padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  #ticketModal:not(.hidden) .modal-card {
+    animation-name: ticket-modal-sheet-enter;
+  }
+
+  #ticketModal.modal-closing .modal-card {
+    animation-name: ticket-modal-sheet-exit;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    #ticketModal:not(.hidden) .modal-card,
+    #ticketModal.modal-closing .modal-card {
+      animation: none;
+    }
+  }
+
+  @keyframes ticket-modal-sheet-enter {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+
+  @keyframes ticket-modal-sheet-exit {
+    from { transform: translateY(0); }
+    to { transform: translateY(100%); }
   }
 
   .modal-body {
@@ -542,7 +601,6 @@
 @media (min-width: 769px) {
   .mobile-filter-trigger,
   .mobile-status-tabs,
-  .card-status-menu,
   .mobile-filters-backdrop,
   .mobile-sheet-header,
   .mobile-filter-actions {
@@ -557,10 +615,6 @@
 
   .mobile-status-tabs {
     display: flex !important;
-  }
-
-  .card-status-menu {
-    display: inline-flex !important;
   }
 
   .mobile-filters-backdrop,
@@ -610,6 +664,15 @@
     display: grid;
     align-items: end;
     padding: 0;
+  }
+
+  #ticketStatusLayer .status-sheet {
+    width: 100%;
+    max-height: min(86dvh, 760px);
+    padding: 1rem 1rem calc(1rem + env(safe-area-inset-bottom));
+    border-bottom: 0;
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -18px 48px rgba(2, 6, 23, 0.24);
   }
 
   .mobile-filters-backdrop {
@@ -770,67 +833,11 @@
     touch-action: pan-y;
   }
 
-  .card-status-menu {
-    position: absolute;
-    z-index: 1;
-    top: 0.35rem;
-    right: 0.35rem;
-    display: grid;
-    width: 2.5rem;
-    height: 2.5rem;
-    padding: 0;
-    align-items: center;
-    justify-content: center;
-    place-items: center;
-    border: 1px solid var(--border-subtle);
-    border-radius: 50%;
-    background: var(--bg-surface);
-    color: var(--text-main);
-    font-size: 1.4rem;
-    line-height: 1;
-    box-shadow: var(--shadow-card);
-  }
-
-  .card-status-menu > span {
-    display: block;
-    width: 1.35rem;
-    height: 1.35rem;
-  }
-
-  .card-status-menu svg {
-    display: block;
-    width: 100%;
-    height: 100%;
-  }
-
-  .ticket-card .card-top {
-    padding-right: 2.5rem;
-  }
-
-  .ticket-status-options {
-    display: grid;
-    gap: 0.55rem;
-  }
-
-  .ticket-status-option {
-    min-height: 3.2rem;
-    padding: 0.65rem 0.85rem;
-    border: 1px solid var(--border-subtle);
-    border-left: 4px solid var(--status-color);
-    border-radius: 10px;
-    background: var(--bg-card);
-    color: var(--text-main);
-    font-weight: 650;
-    text-align: left;
-  }
-
-  .ticket-status-option[aria-pressed="true"] {
-    background: color-mix(in srgb, var(--status-color) 18%, var(--bg-card));
-  }
-
-  .ticket-status-option:disabled {
-    cursor: default;
-    opacity: 0.72;
+  .card-drag-handle {
+    width: 2.75rem;
+    min-width: 2.75rem;
+    height: 2.75rem;
+    min-height: 2.75rem;
   }
 
   .mobile-sheet-eyebrow {
@@ -1309,5 +1316,301 @@
 
   .board-wrapper {
     padding-top: 0.45rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .app-header {
+    position: relative;
+    display: flex;
+    box-sizing: border-box;
+    height: calc(3.5rem + env(safe-area-inset-top, 0px));
+    min-height: calc(3.5rem + env(safe-area-inset-top, 0px));
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: env(safe-area-inset-top, 0px) 0.75rem 0;
+    transform: none !important;
+  }
+
+  .header-left {
+    width: auto;
+    min-width: 0;
+    flex: 1 1 auto;
+    gap: 0.55rem;
+    padding: 0;
+  }
+
+  .header-left .logo-mark {
+    width: 2rem;
+    height: 2rem;
+    flex: 0 0 auto;
+    border-radius: 0.65rem;
+    font-size: 0.78rem;
+  }
+
+  .header-brand-copy {
+    min-width: 0;
+  }
+
+  .header-left .app-title {
+    overflow: hidden;
+    font-size: 0.98rem;
+    line-height: 1.15;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .header-left .app-subtitle {
+    display: none;
+  }
+
+  .header-left .realtime-status {
+    width: 0.5rem;
+    height: 0.5rem;
+    flex: 0 0 auto;
+    overflow: hidden;
+    font-size: 0;
+  }
+
+  .header-left .realtime-status::before {
+    width: 0.5rem;
+    height: 0.5rem;
+    animation: none;
+  }
+
+  .header-left .realtime-status.is-connected::before {
+    animation: live-status-pulse 1.8s ease-out infinite;
+  }
+
+  .header-right {
+    display: flex;
+    width: auto;
+    min-width: 0;
+    flex: 0 0 auto;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  .header-right > * {
+    width: auto;
+    min-width: 0;
+  }
+
+  .app-header #btnOpenProfile {
+    position: static;
+    width: 2.5rem;
+    min-width: 2.5rem;
+    height: 2.5rem;
+    min-height: 2.5rem;
+    justify-content: center;
+    padding: 0;
+    box-shadow: none;
+  }
+
+  .header-icon-button {
+    width: 2.5rem;
+    min-width: 2.5rem;
+    height: 2.5rem;
+    min-height: 2.5rem;
+    padding: 0;
+  }
+
+  .header-right .header-icon-button {
+    min-height: 2.5rem;
+  }
+
+  .header-action-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    clip-path: inset(50%);
+  }
+
+  .profile-menu-panel {
+    right: -0.5rem;
+  }
+
+  .controls-toolbar {
+    position: relative;
+    top: auto;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.55rem 0.75rem;
+    transform: none !important;
+  }
+
+  .controls-toolbar .pending-sync-status {
+    grid-column: 1 / -1;
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    padding: 0.35rem 0.5rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+  }
+
+  .controls-toolbar .search-box {
+    grid-column: auto;
+    min-width: 0;
+  }
+
+  .controls-toolbar .search-box input {
+    min-height: 2.65rem;
+    padding-right: 0.5rem;
+    font-size: 0.82rem;
+  }
+
+  .controls-toolbar .mobile-filter-trigger {
+    min-height: 2.65rem;
+    padding: 0.45rem 0.6rem;
+    font-size: 0.78rem;
+  }
+
+  .mobile-selection-entry {
+    display: flex;
+    justify-content: flex-end;
+    padding: 0;
+  }
+
+  .mobile-selection-entry .btn {
+    min-height: 2.65rem;
+    padding: 0.45rem 0.55rem;
+    font-size: 0.74rem;
+    white-space: nowrap;
+  }
+
+  #slaOverview {
+    display: none;
+  }
+
+  .board-wrapper {
+    min-width: 0;
+    padding: 0 0 calc(5rem + env(safe-area-inset-bottom, 16px));
+    overscroll-behavior-y: contain;
+  }
+
+  .view-tabs {
+    z-index: 30;
+    min-height: 3.8rem;
+    padding-bottom: max(0.35rem, env(safe-area-inset-bottom, 16px));
+  }
+
+  .mobile-status-nav {
+    position: sticky;
+    z-index: 22;
+    top: 0;
+    display: block;
+    overflow: hidden;
+    background: color-mix(in srgb, var(--bg-app) 95%, transparent);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  .mobile-status-fade {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 1.75rem;
+    background: linear-gradient(90deg, transparent, var(--bg-app));
+    pointer-events: none;
+  }
+
+  .mobile-status-tabs {
+    position: relative;
+    z-index: 0;
+    gap: 0.4rem;
+    overflow-x: auto;
+    padding: 0.45rem 0.75rem;
+    white-space: nowrap;
+  }
+
+  .kanban-grid .kanban-col {
+    height: max(16rem, calc(100dvh - 16rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+    min-height: 0;
+    flex-direction: column;
+  }
+
+  #kanbanBoard[data-active-status="new"] .kanban-col[data-col-status="new"],
+  #kanbanBoard[data-active-status="open"] .kanban-col[data-col-status="open"],
+  #kanbanBoard[data-active-status="in_progress"] .kanban-col[data-col-status="in_progress"],
+  #kanbanBoard[data-active-status="resolved"] .kanban-col[data-col-status="resolved"],
+  #kanbanBoard[data-active-status="closed"] .kanban-col[data-col-status="closed"],
+  #kanbanBoard[data-active-status="blocked"] .kanban-col[data-col-status="blocked"] {
+    display: flex;
+  }
+
+  .kanban-col-header {
+    flex: 0 0 auto;
+  }
+
+  .kanban-grid .drop-zone {
+    min-height: 0;
+    flex: 1 1 auto;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    touch-action: pan-y;
+  }
+
+  .mobile-status-tab {
+    min-height: 2.4rem;
+    padding: 0.35rem 0.6rem;
+    font-size: 0.76rem;
+  }
+
+  .mobile-active-filters {
+    top: 2.8rem;
+  }
+
+  #boardPanel {
+    padding-top: 0;
+  }
+
+  #kanbanBoard {
+    padding-top: 0.25rem;
+  }
+
+  .mobile-refresh-status:empty {
+    display: none;
+  }
+
+  #btnNewTicket {
+    z-index: 20 !important;
+    bottom: calc(5rem + env(safe-area-inset-bottom, 16px)) !important;
+  }
+}
+
+@media (min-width: 641px) {
+  .mobile-status-nav {
+    display: contents;
+  }
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+@keyframes live-status-pulse {
+  0% { box-shadow: 0 0 0 0 currentColor; }
+  70% { box-shadow: 0 0 0 0.3rem transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .header-left .realtime-status::before {
+    animation: none;
   }
 }

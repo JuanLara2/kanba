@@ -3,9 +3,9 @@ import { SupabaseAdapter } from './data/db.js?v=complexity-scoring-v1';
 import { AuthService } from './services/authService.js?v=user-role-management-v1';
 import { TicketService } from './services/ticketService.js?v=complexity-scoring-v1';
 import { FilterSortService } from './services/filterService.js';
-import { BoardView } from './ui/boardView.js?v=complexity-scoring-v1';
+import { BoardView } from './ui/boardView.js?v=ticket-card-compact-v1';
 import { ModalView } from './ui/modalView.js?v=complexity-scoring-v1';
-import { DragDropController } from './ui/dragDrop.js?v=mobile-native-v1';
+import { DragDropController } from './ui/dragDrop.js?v=pointer-grip-v1';
 import { CalendarView, dueDateForCalendarDay } from './ui/calendarView.js';
 import { initializeThemeController } from './ui/themeController.js';
 import { PRIORITY_ORDER, SLA_REFRESH_INTERVAL_MS, STATUS_DEFINITIONS } from './config/constants.js';
@@ -524,6 +524,19 @@ function renderProfileSummary(user = activeUser) {
   role.textContent = user?.role || 'Sin rol';
 }
 
+function setProfileMenuOpen(isOpen, restoreFocus = false) {
+  const trigger = document.getElementById('btnOpenProfile');
+  const panel = document.getElementById('profileMenuPanel');
+  panel.classList.toggle('hidden', !isOpen);
+  trigger.setAttribute('aria-expanded', String(isOpen));
+  if (!isOpen && restoreFocus) trigger.focus();
+}
+
+function toggleProfileMenu() {
+  const isOpen = document.getElementById('btnOpenProfile').getAttribute('aria-expanded') === 'true';
+  setProfileMenuOpen(!isOpen);
+}
+
 function openProfileModal() {
   if (!activeUser) return;
   renderProfileSummary(activeUser);
@@ -534,7 +547,7 @@ function openProfileModal() {
   const avatarStatus = document.getElementById('profileAvatarStatus');
   avatarStatus.textContent = '';
   avatarStatus.classList.remove('is-error');
-  profileAvatarInput.focus();
+  document.getElementById('profileCloseBtn').focus();
 }
 
 function closeProfileModal(trackOverlay = true) {
@@ -691,7 +704,10 @@ function bindStaticEvents() {
   });
   syncNewWorkspaceForm();
   updateUserRoleDescription();
-  document.getElementById('btnManageCategories').addEventListener('click', openCategoriesModal);
+  document.getElementById('btnManageCategories').addEventListener('click', () => {
+    setProfileMenuOpen(false);
+    openCategoriesModal();
+  });
   document.getElementById('categoriesModalCloseBtn').addEventListener('click', closeCategoriesModal);
   document.getElementById('categoriesModalCancelBtn').addEventListener('click', closeCategoriesModal);
   categoriesModal.addEventListener('click', (event) => {
@@ -720,7 +736,31 @@ function bindStaticEvents() {
   });
   document.getElementById('btnForgotPassword').addEventListener('click', handleForgotPassword);
   passwordRecoveryForm.addEventListener('submit', handlePasswordRecoverySubmit);
-  document.getElementById('btnOpenProfile').addEventListener('click', openProfileModal);
+  document.getElementById('btnOpenProfile').addEventListener('click', toggleProfileMenu);
+  document.getElementById('btnProfileMenuOpenProfile').addEventListener('click', () => {
+    setProfileMenuOpen(false);
+    openProfileModal();
+  });
+  document.getElementById('profileMenu').addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      setProfileMenuOpen(false, true);
+      return;
+    }
+    if (event.key !== 'Tab') return;
+    const focusable = [...document.querySelectorAll('#profileMenuPanel button:not(:disabled), #profileMenuPanel select:not(:disabled)')]
+      .filter((element) => !element.closest('.hidden'));
+    if (event.shiftKey && focusable[0] === document.activeElement) {
+      setProfileMenuOpen(false);
+      return;
+    }
+    if (focusable.at(-1) === document.activeElement) setProfileMenuOpen(false);
+  });
+  document.addEventListener('pointerdown', (event) => {
+    const profileMenu = document.getElementById('profileMenu');
+    const isOpen = document.getElementById('btnOpenProfile').getAttribute('aria-expanded') === 'true';
+    if (!isOpen || profileMenu.contains(event.target)) return;
+    setProfileMenuOpen(false);
+  });
   document.getElementById('profileCloseBtn').addEventListener('click', closeProfileModal);
   document.getElementById('profileCancelBtn').addEventListener('click', closeProfileModal);
   document.getElementById('profileUploadBtn').addEventListener('click', handleProfileAvatarUpload);
@@ -748,6 +788,7 @@ function bindStaticEvents() {
     reader.readAsDataURL(file);
   });
   document.getElementById('btnChangePassword').addEventListener('click', () => {
+    setProfileMenuOpen(false);
     changePasswordModal.classList.remove('hidden');
     trackMobileOverlayOpen('password');
     document.getElementById('newAccountPassword').focus();
@@ -816,7 +857,10 @@ function bindStaticEvents() {
   document.getElementById('satisfactionCloseBtn').addEventListener('click', closeSatisfactionModal);
   document.getElementById('satisfactionCancelBtn').addEventListener('click', closeSatisfactionModal);
   document.getElementById('satisfactionForm').addEventListener('submit', handleSatisfactionSubmit);
-  document.getElementById('btnStartBatchSelection').addEventListener('click', () => startMobileSelection());
+  document.getElementById('btnStartBatchSelection').addEventListener('click', () => {
+    if (mobileSelectionMode) exitMobileSelection();
+    else startMobileSelection();
+  });
   document.getElementById('btnExitBatchSelection').addEventListener('click', exitMobileSelection);
   document.getElementById('btnMobileBatchMove').addEventListener('click', () => {
     applyMobileBatchStatus(document.getElementById('mobileBatchStatus').value);
@@ -950,8 +994,11 @@ function bindStaticEvents() {
   document.getElementById('btnCloseTicketStatus').addEventListener('click', closeMobileStatusSheet);
   document.getElementById('ticketStatusOptions').addEventListener('click', handleMobileStatusSelection);
   boardEl.addEventListener('click', (event) => {
-    const button = event.target.closest('[data-ticket-status-menu]');
-    if (button) openMobileStatusSheet(button.dataset.ticketStatusMenu, button);
+    const target = event.target instanceof Element ? event.target : event.target?.parentElement;
+    const button = target?.closest('.btn-change-status');
+    if (!button) return;
+    event.stopPropagation();
+    openMobileStatusSheet(button.dataset.ticketId, button);
   });
   [document.getElementById('mobileFiltersSheet'), document.getElementById('ticketStatusSheet')].forEach((sheet) => {
     sheet.addEventListener('keydown', handleBottomSheetKeydown);
@@ -1526,8 +1573,8 @@ function openMobileStatusSheet(ticketId, trigger) {
 
 function closeMobileStatusSheet() {
   document.getElementById('ticketStatusLayer').classList.add('hidden');
-  [...boardEl.querySelectorAll('[data-ticket-status-menu]')]
-    .find((button) => button.dataset.ticketStatusMenu === mobileStatusTicketId)
+  [...boardEl.querySelectorAll('.btn-change-status')]
+    .find((button) => button.dataset.ticketId === mobileStatusTicketId)
     ?.setAttribute('aria-expanded', 'false');
   trackMobileOverlayClose('status');
   mobileStatusTicketId = null;
@@ -1564,6 +1611,10 @@ function canSelectMobileTicket(ticket) {
 function startMobileSelection(ticketId = null, preserveTouchTarget = false) {
   if (!isMobileViewport()) return;
   mobileSelectionMode = true;
+  const selectionButton = document.getElementById('btnStartBatchSelection');
+  selectionButton.setAttribute('aria-pressed', 'true');
+  selectionButton.setAttribute('aria-label', 'Salir de la selección de tickets');
+  selectionButton.textContent = 'Cancelar';
   if (ticketId && canSelectMobileTicket(allTickets.find((ticket) => ticket.id === ticketId))) {
     selectedMobileTicketIds.add(ticketId);
   }
@@ -1585,6 +1636,10 @@ function toggleMobileTicketSelection(ticketId) {
 
 function exitMobileSelection() {
   mobileSelectionMode = false;
+  const selectionButton = document.getElementById('btnStartBatchSelection');
+  selectionButton.setAttribute('aria-pressed', 'false');
+  selectionButton.setAttribute('aria-label', 'Seleccionar tickets');
+  selectionButton.textContent = 'Seleccionar';
   selectedMobileTicketIds.clear();
   document.getElementById('boardPanel').classList.remove('is-selection-mode');
   renderMobileBatchToolbar();
@@ -1921,6 +1976,7 @@ async function handleCalendarDateChange(ticketId, dateKey) {
 function setActiveView(view) {
   const showCalendar = view === 'calendar';
   const showMetrics = view === 'metrics';
+  document.querySelector('.mobile-selection-entry').classList.toggle('hidden', showCalendar || showMetrics);
   document.getElementById('boardPanel').classList.toggle('hidden', showCalendar || showMetrics);
   document.getElementById('calendarPanel').classList.toggle('hidden', !showCalendar);
   document.getElementById('metricsPanel').classList.toggle('hidden', !showMetrics);

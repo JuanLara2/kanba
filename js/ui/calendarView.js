@@ -2,6 +2,11 @@ import { getChecklistProgress } from '../services/ticketService.js';
 
 const WEEKDAY_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 
+function closestElement(target, selector) {
+  const element = target?.nodeType === 1 ? target : target?.parentElement;
+  return element?.closest?.(selector) || null;
+}
+
 export function localDateKey(value) {
   if (value == null || value === '') return '';
   const date = value instanceof Date ? value : new Date(value);
@@ -36,71 +41,126 @@ export class CalendarView {
     this.canReschedule = canReschedule;
     this.month = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
     this.tickets = [];
+    this.pointerDrag = null;
+    this.suppressTicketClick = false;
     this.bindEvents();
   }
 
   bindEvents() {
     this.container.addEventListener('click', (event) => {
-      const monthButton = event.target.closest('[data-calendar-month]');
+      const monthButton = closestElement(event.target, '[data-calendar-month]');
       if (monthButton) {
         this.month = new Date(this.month.getFullYear(), this.month.getMonth() + Number(monthButton.dataset.calendarMonth), 1);
         this.render(this.tickets, this.canReschedule);
         return;
       }
 
-      if (event.target.closest('[data-calendar-today]')) {
+      if (closestElement(event.target, '[data-calendar-today]')) {
         const today = new Date();
         this.month = new Date(today.getFullYear(), today.getMonth(), 1);
         this.render(this.tickets, this.canReschedule);
         return;
       }
 
-      const ticket = event.target.closest('[data-calendar-ticket]');
+      const ticket = closestElement(event.target, '[data-calendar-ticket]');
+      if (ticket && this.suppressTicketClick) {
+        event.preventDefault();
+        this.suppressTicketClick = false;
+        return;
+      }
       if (ticket && this.onTicketClick) this.onTicketClick(ticket.dataset.ticketId);
     });
 
-    this.container.addEventListener('dragstart', (event) => {
-      const ticket = event.target.closest('[data-calendar-ticket]');
-      if (!ticket || !this.canReschedule) return;
-      event.dataTransfer.effectAllowed = 'move';
-      event.dataTransfer.setData('text/plain', ticket.dataset.ticketId);
-      ticket.classList.add('dragging');
+    this.container.addEventListener('pointerdown', (event) => {
+      const ticket = closestElement(event.target, '[data-calendar-ticket].can-drag');
+      if (!ticket || !this.canReschedule || !this.onDateChange || !event.isPrimary || event.button !== 0) return;
+
+      this.pointerDrag = {
+        pointerId: event.pointerId,
+        ticketId: ticket.dataset.ticketId,
+        ticket,
+        startX: event.clientX,
+        startY: event.clientY,
+        active: false,
+        dropTarget: null,
+      };
+      ticket.setPointerCapture(event.pointerId);
     });
 
-    this.container.addEventListener('dragend', (event) => {
-      event.target.closest('[data-calendar-ticket]')?.classList.remove('dragging');
-      this.container.querySelectorAll('.calendar-day.is-drop-target, .calendar-unscheduled.is-drop-target')
-        .forEach((target) => target.classList.remove('is-drop-target'));
-    });
+    this.container.addEventListener('pointermove', (event) => {
+      const drag = this.pointerDrag;
+      if (!drag || drag.pointerId !== event.pointerId) return;
 
-    this.container.addEventListener('dragover', (event) => {
-      const dropTarget = event.target.closest('[data-calendar-date], [data-calendar-unscheduled]');
-      if (!dropTarget || !this.canReschedule) return;
-      event.preventDefault();
-      event.dataTransfer.dropEffect = 'move';
-      dropTarget.classList.add('is-drop-target');
-    });
-
-    this.container.addEventListener('dragleave', (event) => {
-      const dropTarget = event.target.closest('[data-calendar-date], [data-calendar-unscheduled]');
-      if (dropTarget && !dropTarget.contains(event.relatedTarget)) {
-        dropTarget.classList.remove('is-drop-target');
+      if (!drag.active) {
+        const distance = Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY);
+        if (distance < 8) return;
+        drag.active = true;
+        drag.ticket.classList.add('dragging');
       }
+
+      event.preventDefault();
+      const element = document.elementFromPoint(event.clientX, event.clientY);
+      const dropTarget = closestElement(element, '[data-calendar-date], [data-calendar-unscheduled]');
+      this.setPointerDropTarget(dropTarget && this.container.contains(dropTarget) ? dropTarget : null);
     });
 
-    this.container.addEventListener('drop', async (event) => {
-      const day = event.target.closest('[data-calendar-date]');
-      const unscheduled = event.target.closest('[data-calendar-unscheduled]');
-      const dropTarget = day || unscheduled;
-      const ticketId = event.dataTransfer.getData('text/plain');
-      if (!dropTarget || !ticketId || !this.canReschedule || !this.onDateChange) return;
-      event.preventDefault();
-      dropTarget.classList.remove('is-drop-target');
-      const ticket = this.tickets.find((item) => item.id === ticketId);
-      if (!ticket || (day && localDateKey(ticket.dueDate) === day.dataset.calendarDate)
-        || (unscheduled && !ticket.dueDate)) return;
-      await this.onDateChange(ticketId, day?.dataset.calendarDate || null);
+    this.container.addEventListener('pointerup', (event) => {
+      this.finishPointerDrag(event);
     });
+
+    this.container.addEventListener('pointercancel', (event) => {
+      this.cancelPointerDrag(event);
+    });
+
+    this.container.addEventListener('lostpointercapture', (event) => {
+      this.cancelPointerDrag(event);
+    });
+  }
+
+  setPointerDropTarget(dropTarget) {
+    if (this.pointerDrag?.dropTarget === dropTarget) return;
+    this.pointerDrag?.dropTarget?.classList.remove('is-drop-target');
+    this.pointerDrag.dropTarget = dropTarget;
+    dropTarget?.classList.add('is-drop-target');
+  }
+
+  async finishPointerDrag(event) {
+    const drag = this.pointerDrag;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+
+    if (drag.active) {
+      const element = document.elementFromPoint(event.clientX, event.clientY);
+      const dropTarget = closestElement(element, '[data-calendar-date], [data-calendar-unscheduled]');
+      this.setPointerDropTarget(dropTarget && this.container.contains(dropTarget) ? dropTarget : null);
+    }
+    const dropTarget = drag.active ? drag.dropTarget : null;
+    this.clearPointerDrag();
+    if (!drag.active) return;
+
+    this.suppressTicketClick = true;
+    window.setTimeout(() => {
+      this.suppressTicketClick = false;
+    }, 0);
+
+    const day = dropTarget?.matches('[data-calendar-date]') ? dropTarget : null;
+    const unscheduled = dropTarget?.matches('[data-calendar-unscheduled]') ? dropTarget : null;
+    const ticket = this.tickets.find((item) => item.id === drag.ticketId);
+    if (!dropTarget || !ticket || !this.canReschedule || !this.onDateChange
+      || (day && localDateKey(ticket.dueDate) === day.dataset.calendarDate)
+      || (unscheduled && !ticket.dueDate)) return;
+
+    await this.onDateChange(drag.ticketId, day?.dataset.calendarDate || null);
+  }
+
+  cancelPointerDrag(event) {
+    if (this.pointerDrag?.pointerId !== event.pointerId) return;
+    this.clearPointerDrag();
+  }
+
+  clearPointerDrag() {
+    this.pointerDrag?.ticket.classList.remove('dragging');
+    this.setPointerDropTarget(null);
+    this.pointerDrag = null;
   }
 
   render(tickets, canReschedule = this.canReschedule) {
@@ -172,7 +232,6 @@ export class CalendarView {
     return `
       <button class="calendar-ticket${canDrag ? ' can-drag' : ''}" type="button"
         data-calendar-ticket data-ticket-id="${this.escapeHtml(ticket.id)}"
-        ${canDrag ? 'draggable="true"' : ''}
         title="${this.escapeHtml(ticket.id)} · ${this.escapeHtml(ticket.title)}">
         <span class="calendar-ticket-id">${this.escapeHtml(ticket.id)}</span>
         <span class="calendar-ticket-title">${this.escapeHtml(ticket.title)}</span>
