@@ -350,7 +350,7 @@
     overflow-x: hidden;
     overflow-y: scroll !important;
     overscroll-behavior-y: contain;
-    padding-bottom: calc(7rem + env(safe-area-inset-bottom, 16px));
+    padding-bottom: calc(10rem + env(safe-area-inset-bottom, 16px));
     touch-action: pan-y !important;
     -webkit-overflow-scrolling: touch;
   }
@@ -367,6 +367,11 @@
 
   #calendarPanel .calendar-grid-scroll {
     width: 100%;
+    touch-action: pan-x pan-y;
+  }
+
+  #calendarPanel .calendar-day {
+    min-height: 125px !important;
     touch-action: pan-x pan-y;
   }
 

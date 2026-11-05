@@ -227,6 +227,7 @@ export class CalendarView {
           </div>
         </aside>
       </div>
+      <div class="calendar-bottom-spacer" aria-hidden="true"></div>
     `;
   }
 

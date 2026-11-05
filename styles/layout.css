@@ -398,9 +398,14 @@
 .calendar-grid-scroll {
   min-width: 0;
   overflow-x: auto;
-  overflow-y: hidden;
+  overflow-y: visible;
   overscroll-behavior-x: contain;
   -webkit-overflow-scrolling: touch;
+}
+
+.calendar-bottom-spacer {
+  height: 7rem;
+  flex: 0 0 7rem;
 }
 
 .calendar-weekday {
