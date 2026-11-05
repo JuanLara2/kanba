@@ -86,7 +86,6 @@ export class CalendarView {
         active: false,
         dropTarget: null,
       };
-      ticket.setPointerCapture(event.pointerId);
     });
 
     this.container.addEventListener('pointermove', (event) => {
@@ -95,9 +94,10 @@ export class CalendarView {
 
       if (!drag.active) {
         const distance = Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY);
-        if (distance < 8) return;
+        if (distance <= 5) return;
         drag.active = true;
         drag.ticket.classList.add('dragging');
+        drag.ticket.setPointerCapture(event.pointerId);
       }
 
       event.preventDefault();

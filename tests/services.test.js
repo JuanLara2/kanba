@@ -706,16 +706,24 @@ test('calendar date helpers build Monday-first month grids and preserve the due 
   assert.equal(newlyScheduledDate.getMinutes(), 0);
 });
 
-test('calendar ticket touch starts dragging only from its drag handle', () => {
+test('calendar ticket touch captures the pointer only after drag movement starts on its handle', () => {
   const handlers = new Map();
   const container = {
     addEventListener(type, handler) {
       handlers.set(type, handler);
-    }
+    },
+    contains() {
+      return false;
+    },
   };
   let captures = 0;
+  let preventions = 0;
   const ticket = {
     dataset: { ticketId: 'TCK-1001' },
+    classList: {
+      add() {},
+      remove() {},
+    },
     setPointerCapture() {
       captures += 1;
     }
@@ -734,27 +742,50 @@ test('calendar ticket touch starts dragging only from its drag handle', () => {
       return selector === '[data-calendar-ticket].can-drag' ? ticket : null;
     }
   };
-  new CalendarView({ container, onDateChange() {}, canReschedule: true });
+  const originalDocument = globalThis.document;
+  globalThis.document = { elementFromPoint: () => null };
+  const calendar = new CalendarView({ container, onDateChange() {}, canReschedule: true });
 
-  handlers.get('pointerdown')({
-    target: ticketTarget,
-    isPrimary: true,
-    button: 0,
-    pointerId: 1,
-    clientX: 10,
-    clientY: 10
-  });
-  assert.equal(captures, 0);
+  try {
+    handlers.get('pointerdown')({
+      target: ticketTarget,
+      isPrimary: true,
+      button: 0,
+      pointerId: 1,
+      clientX: 10,
+      clientY: 10
+    });
+    assert.equal(calendar.pointerDrag, null);
 
-  handlers.get('pointerdown')({
-    target: handle,
-    isPrimary: true,
-    button: 0,
-    pointerId: 2,
-    clientX: 10,
-    clientY: 10
-  });
-  assert.equal(captures, 1);
+    handlers.get('pointerdown')({
+      target: handle,
+      isPrimary: true,
+      button: 0,
+      pointerId: 2,
+      clientX: 10,
+      clientY: 10
+    });
+    assert.equal(captures, 0);
+
+    const pointerMove = (clientX) => handlers.get('pointermove')({
+      pointerId: 2,
+      clientX,
+      clientY: 10,
+      preventDefault() {
+        preventions += 1;
+      },
+    });
+    pointerMove(14);
+    assert.equal(captures, 0);
+    assert.equal(preventions, 0);
+
+    pointerMove(16);
+    assert.equal(captures, 1);
+    assert.equal(preventions, 1);
+  } finally {
+    if (originalDocument === undefined) delete globalThis.document;
+    else globalThis.document = originalDocument;
+  }
 });
 
 test('only administrators delete tickets and invalid ticket fields are rejected', async () => {
