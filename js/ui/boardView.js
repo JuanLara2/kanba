@@ -125,6 +125,9 @@ export class BoardView {
     card.dataset.ticketId = ticket.id;
 
     const sla = this.ticketService.evaluateSLA(ticket);
+    if (['normal', 'warning', 'overdue'].includes(sla.state)) {
+      card.classList.add(`sla-${sla.state}`);
+    }
     const assignee = this.usersMap.get(ticket.assignedTo) || { fullName: 'Sin asignar' };
     const initial = assignee.fullName.charAt(0).toUpperCase();
     const assigneeAccent = this.getAssigneeAccent(assignee.fullName);

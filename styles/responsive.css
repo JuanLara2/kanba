@@ -563,6 +563,10 @@
     padding-bottom: env(safe-area-inset-bottom);
   }
 
+  #ticketModal .modal-card {
+    padding-bottom: 0;
+  }
+
   #ticketModal:not(.hidden) .modal-card {
     animation-name: ticket-modal-sheet-enter;
   }
@@ -591,6 +595,10 @@
   .modal-body {
     gap: 0.85rem;
     padding: 0.9rem 1rem;
+  }
+
+  .ticket-form-field-pair {
+    gap: 0.65rem;
   }
 
   .modal-actions {
@@ -2053,6 +2061,11 @@
     padding: 0.5rem 0.75rem calc(5.5rem + env(safe-area-inset-bottom, 0px));
     touch-action: pan-y !important;
     -webkit-overflow-scrolling: touch;
+  }
+
+  .metrics-chart-canvas {
+    height: 12rem;
+    min-height: 12rem;
   }
 
   #kanbanBoard {

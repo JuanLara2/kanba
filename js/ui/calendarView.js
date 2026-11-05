@@ -1,4 +1,5 @@
 import { getChecklistProgress } from '../services/ticketService.js';
+import { getSlaState } from '../services/slaService.js';
 import { Haptics } from '../utils/haptics.js';
 
 const WEEKDAY_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
@@ -282,14 +283,18 @@ export class CalendarView {
     const statusClass = ['new', 'open', 'in_progress', 'resolved', 'closed', 'blocked'].includes(ticket.status)
       ? ` status-${ticket.status}`
       : '';
+    const slaState = getSlaState(ticket).state;
+    const slaClass = ['normal', 'warning', 'overdue'].includes(slaState)
+      ? ` sla-${slaState}`
+      : '';
     return `
-      <button class="calendar-ticket${canDrag ? ' can-drag' : ''}" type="button"
+      <button class="calendar-ticket${canDrag ? ' can-drag' : ''}${statusClass}${slaClass}" type="button"
         data-calendar-ticket data-ticket-id="${this.escapeHtml(ticket.id)}"
         title="${this.escapeHtml(ticket.id)} · ${this.escapeHtml(ticket.title)}">
         ${canDrag ? '<span class="calendar-drag-handle" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><circle cx="9" cy="5" r="1.5" fill="currentColor"/><circle cx="15" cy="5" r="1.5" fill="currentColor"/><circle cx="9" cy="12" r="1.5" fill="currentColor"/><circle cx="15" cy="12" r="1.5" fill="currentColor"/><circle cx="9" cy="19" r="1.5" fill="currentColor"/><circle cx="15" cy="19" r="1.5" fill="currentColor"/></svg></span>' : ''}
         <span class="calendar-ticket-id">${this.escapeHtml(ticket.id)}</span>
         <span class="calendar-ticket-title">${this.escapeHtml(ticket.title)}</span>
-        <span class="calendar-ticket-status${statusClass}">${this.escapeHtml(ticket.status.replace('_', ' '))}</span>
+        <span class="calendar-ticket-status">${this.escapeHtml(ticket.status.replace('_', ' '))}</span>
         ${progress.total ? `<span class="calendar-ticket-progress">${progress.completed}/${progress.total} subtareas · ${progress.percentage}%</span>` : ''}
       </button>
     `;

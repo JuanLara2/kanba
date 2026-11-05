@@ -10,8 +10,8 @@
     <meta name="theme-color" content="#151a2a" />
     <link rel="stylesheet" href="styles/base.css" />
     <link rel="stylesheet" href="styles/layout.css?v=metrics-audit-v1" />
-    <link rel="stylesheet" href="styles/components.css?v=metrics-audit-v1" />
-    <link rel="stylesheet" href="styles/responsive.css?v=metrics-audit-v1" />
+    <link rel="stylesheet" href="styles/components.css?v=ui-polish-v1" />
+    <link rel="stylesheet" href="styles/responsive.css?v=ui-polish-v1" />
     <link rel="stylesheet" href="styles/splash.css" />
   </head>
   <body>
@@ -395,149 +395,160 @@
           <button id="modalCloseBtn" class="close-x ui-button ui-button--ghost ui-button--sm ui-button--icon" type="button" aria-label="Cerrar">&times;</button>
         </header>
 
-        <form id="ticketForm" class="modal-body">
-          <input type="hidden" id="formTicketId" />
+        <form id="ticketForm" class="modal-body ticket-form">
+          <div class="ticket-form-scroll">
+            <input type="hidden" id="formTicketId" />
 
-          <div class="form-row">
-            <label for="formTitle">Título del requerimiento *</label>
-            <input type="text" id="formTitle" required minlength="4" placeholder="Ej: Error en procesamiento de pagos" />
-          </div>
+            <div class="form-row ticket-form-field ticket-form-title">
+              <label for="formTitle" class="ticket-form-label">Título del requerimiento *</label>
+              <input class="ticket-form-control" type="text" id="formTitle" required minlength="4" placeholder="Ej: Error en procesamiento de pagos" />
+            </div>
 
-          <div class="form-row grid-3">
-            <div id="formStatusField">
-              <label for="formInitialStatus">Estado inicial</label>
-              <select id="formInitialStatus" aria-describedby="formStatusHelp">
-                <option value="new">Nuevo</option>
-                <option value="open">Abierto</option>
-                <option value="in_progress">En Progreso</option>
-                <option value="resolved">Resuelto</option>
-                <option value="closed">Cerrado</option>
-                <option value="blocked">Bloqueado</option>
-              </select>
-              <small id="formStatusHelp">El estado solo se define al crear; luego se cambia desde el tablero.</small>
-            </div>
-            <div>
-              <label for="formPriority">Prioridad</label>
-              <select id="formPriority">
-                <option value="Baja">Baja</option>
-                <option value="Media" selected>Media</option>
-                <option value="Alta">Alta</option>
-                <option value="Urgente">Urgente</option>
-              </select>
-            </div>
-            <div>
-              <label for="formCategory">Categoría</label>
-              <select id="formCategory" required>
-                <option value="" selected disabled>Cargando categorías…</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="form-row grid-3">
-            <div>
-              <label for="formAssignee">Asignar a:</label>
-              <select id="formAssignee">
-                <option value="">Sin asignar</option>
-              </select>
-            </div>
-            <div>
-              <label for="formDueDate">Fecha límite</label>
-              <input type="datetime-local" id="formDueDate" />
-            </div>
-            <div>
-              <label for="formComplexityScore">Complejidad (1–10)</label>
-              <select id="formComplexityScore" aria-describedby="formComplexityHelp">
-                <option value="1" selected>1 · Muy sencilla</option>
-                <option value="2">2</option>
-                <option value="3">3</option>
-                <option value="4">4</option>
-                <option value="5">5 · Media</option>
-                <option value="6">6</option>
-                <option value="7">7</option>
-                <option value="8">8</option>
-                <option value="9">9</option>
-                <option value="10">10 · Muy compleja</option>
-              </select>
-              <small id="formComplexityHelp">Reporter inicia en 1. Admin y Agent pueden asignar o ajustar antes de cerrar.</small>
-            </div>
-          </div>
-
-          <div class="form-row">
-            <label for="formDescription">Descripción detallada *</label>
-            <textarea id="formDescription" rows="4" required placeholder="Detalles del requerimiento..."></textarea>
-          </div>
-
-          <section id="ticketChecklistSection" class="ticket-checklist-editor" aria-labelledby="checklistHeading">
-            <header class="checklist-editor-header">
-              <div>
-                <h4 id="checklistHeading">Lista de subtareas</h4>
-                <p>Divide el ticket en pasos y sigue su avance.</p>
+            <div class="ticket-form-metadata-grid">
+              <div class="ticket-form-field-pair">
+                <div id="formStatusField" class="form-row ticket-form-field">
+                  <label class="ticket-form-label" for="formInitialStatus">
+                    Estado inicial
+                    <span class="ticket-form-help-icon" role="img" aria-label="Luego puedes cambiarlo desde el tablero" title="Luego puedes cambiarlo desde el tablero">i</span>
+                  </label>
+                  <select class="ticket-form-control" id="formInitialStatus">
+                    <option value="new">Nuevo</option>
+                    <option value="open">Abierto</option>
+                    <option value="in_progress">En Progreso</option>
+                    <option value="resolved">Resuelto</option>
+                    <option value="closed">Cerrado</option>
+                    <option value="blocked">Bloqueado</option>
+                  </select>
+                </div>
+                <div class="form-row ticket-form-field">
+                  <label class="ticket-form-label" for="formPriority">Prioridad</label>
+                  <select class="ticket-form-control" id="formPriority">
+                    <option value="Baja">Baja</option>
+                    <option value="Media" selected>Media</option>
+                    <option value="Alta">Alta</option>
+                    <option value="Urgente">Urgente</option>
+                  </select>
+                </div>
               </div>
-              <span id="checklistProgressText" class="checklist-progress-text">0/0 · 0%</span>
-            </header>
-            <div
-              id="checklistProgressTrack"
-              class="checklist-progress-track"
-              role="progressbar"
-              aria-label="Progreso de subtareas"
-              aria-valuemin="0"
-              aria-valuemax="100"
-              aria-valuenow="0"
-            >
-              <span id="checklistProgressFill" class="checklist-progress-fill"></span>
-            </div>
-            <div id="checklistItems" class="checklist-items"></div>
-            <div id="checklistAddRow" class="checklist-add-row">
-              <input id="checklistNewItem" type="text" maxlength="200" placeholder="Escribe una subtarea..." aria-label="Nueva subtarea" />
-              <button id="btnAddChecklistItem" type="button" class="btn btn-outline">Agregar</button>
-            </div>
-            <small id="checklistHelp" class="checklist-help">Puedes agregar hasta 100 subtareas, de máximo 200 caracteres cada una. Los cambios se guardan con el ticket.</small>
-          </section>
 
-          <section id="ticketHistorySection" class="ticket-history hidden" aria-labelledby="ticketHistoryHeading">
-            <h4 id="ticketHistoryHeading">Historial de estados</h4>
-            <ol id="ticketHistoryList"></ol>
-          </section>
+              <div class="ticket-form-field-pair">
+                <div class="form-row ticket-form-field">
+                  <label class="ticket-form-label" for="formCategory">Categoría</label>
+                  <select class="ticket-form-control" id="formCategory" required>
+                    <option value="" selected disabled>Cargando categorías…</option>
+                  </select>
+                </div>
+                <div class="form-row ticket-form-field">
+                  <label class="ticket-form-label" for="formAssignee">Asignar a</label>
+                  <select class="ticket-form-control" id="formAssignee">
+                    <option value="">Sin asignar</option>
+                  </select>
+                </div>
+              </div>
 
-          <section id="ticketCommentsSection" class="ticket-comments" aria-labelledby="ticketCommentsHeading">
-            <header class="comments-header">
-              <div>
-                <h4 id="ticketCommentsHeading">Conversación del ticket</h4>
-                <p id="ticketCommentsHelp" class="comments-help">Comentarios visibles para el equipo y quien creó el ticket.</p>
-              </div>
-            </header>
-            <ol id="ticketCommentsList" class="ticket-comments-list"></ol>
-            <div id="templateControls" class="template-controls">
-              <label for="responseTemplateSelect">Usar respuesta guardada</label>
-              <div class="template-apply-row">
-                <select id="responseTemplateSelect"><option value="">Selecciona una plantilla</option></select>
-                <button id="btnApplyTemplate" type="button" class="btn btn-outline">Insertar</button>
-              </div>
-              <div id="templateAdminEditor" class="template-admin-editor hidden">
-                <h5>Administrar plantillas del equipo</h5>
-                <input id="templateTitle" type="text" maxlength="100" placeholder="Nombre de la plantilla" aria-label="Nombre de la plantilla" />
-                <textarea id="templateBody" rows="3" maxlength="4000" placeholder="Texto de respuesta" aria-label="Texto de respuesta"></textarea>
-                <div class="template-admin-actions">
-                  <button id="btnSaveTemplate" type="button" class="btn btn-outline">Guardar plantilla</button>
-                  <button id="btnDeleteTemplate" type="button" class="btn btn-danger hidden">Eliminar seleccionada</button>
+              <div class="ticket-form-field-pair">
+                <div class="form-row ticket-form-field">
+                  <label class="ticket-form-label" for="formDueDate">Fecha límite</label>
+                  <input class="ticket-form-control" type="datetime-local" id="formDueDate" />
+                </div>
+                <div class="form-row ticket-form-field">
+                  <label class="ticket-form-label" for="formComplexityScore">
+                    Complejidad (1–10)
+                    <span class="ticket-form-help-icon" role="img" aria-label="Reporters inician en 1; agentes y administradores pueden ajustar" title="Reporters inician en 1; agentes y administradores pueden ajustar">i</span>
+                  </label>
+                  <select class="ticket-form-control" id="formComplexityScore">
+                    <option value="1" selected>1 · Muy sencilla</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                    <option value="4">4</option>
+                    <option value="5">5 · Media</option>
+                    <option value="6">6</option>
+                    <option value="7">7</option>
+                    <option value="8">8</option>
+                    <option value="9">9</option>
+                    <option value="10">10 · Muy compleja</option>
+                  </select>
                 </div>
               </div>
             </div>
-            <div id="ticketCommentComposer" class="comment-composer">
-              <label for="ticketCommentInput">Escribe un comentario</label>
-              <textarea id="ticketCommentInput" rows="3" maxlength="4000" placeholder="Comparte una actualización o pregunta..."></textarea>
-              <div class="comment-composer-footer">
-                <small>Máximo 4000 caracteres</small>
-                <button id="btnPostComment" type="button" class="btn btn-primary">Publicar comentario</button>
-              </div>
-            </div>
-          </section>
 
-          <footer class="modal-actions">
+            <div class="form-row ticket-form-field">
+              <label class="ticket-form-label" for="formDescription">Descripción detallada *</label>
+              <textarea class="ticket-form-control" id="formDescription" rows="4" required placeholder="Detalles del requerimiento..."></textarea>
+            </div>
+
+            <section id="ticketChecklistSection" class="ticket-checklist-editor" aria-labelledby="checklistHeading">
+              <header class="checklist-editor-header">
+                <div>
+                  <h4 id="checklistHeading">Lista de subtareas</h4>
+                  <p>Divide el ticket en pasos y sigue su avance.</p>
+                </div>
+                <span id="checklistProgressText" class="checklist-progress-text">0/0 · 0%</span>
+              </header>
+              <div
+                id="checklistProgressTrack"
+                class="checklist-progress-track"
+                role="progressbar"
+                aria-label="Progreso de subtareas"
+                aria-valuemin="0"
+                aria-valuemax="100"
+                aria-valuenow="0"
+              >
+                <span id="checklistProgressFill" class="checklist-progress-fill"></span>
+              </div>
+              <div id="checklistItems" class="checklist-items"></div>
+              <div id="checklistAddRow" class="checklist-add-row">
+                <input id="checklistNewItem" type="text" maxlength="200" placeholder="Escribe una subtarea..." aria-label="Nueva subtarea" />
+                <button id="btnAddChecklistItem" type="button" class="btn btn-outline">Agregar</button>
+              </div>
+              <small id="checklistHelp" class="checklist-help">Puedes agregar hasta 100 subtareas, de máximo 200 caracteres cada una. Los cambios se guardan con el ticket.</small>
+            </section>
+
+            <section id="ticketHistorySection" class="ticket-history hidden" aria-labelledby="ticketHistoryHeading">
+              <h4 id="ticketHistoryHeading">Historial de estados</h4>
+              <ol id="ticketHistoryList"></ol>
+            </section>
+
+            <section id="ticketCommentsSection" class="ticket-comments" aria-labelledby="ticketCommentsHeading">
+              <header class="comments-header">
+                <div>
+                  <h4 id="ticketCommentsHeading">Conversación del ticket</h4>
+                  <p id="ticketCommentsHelp" class="comments-help">Comentarios visibles para el equipo y quien creó el ticket.</p>
+                </div>
+              </header>
+              <ol id="ticketCommentsList" class="ticket-comments-list"></ol>
+              <div id="templateControls" class="template-controls">
+                <label for="responseTemplateSelect">Usar respuesta guardada</label>
+                <div class="template-apply-row">
+                  <select id="responseTemplateSelect"><option value="">Selecciona una plantilla</option></select>
+                  <button id="btnApplyTemplate" type="button" class="btn btn-outline">Insertar</button>
+                </div>
+                <div id="templateAdminEditor" class="template-admin-editor hidden">
+                  <h5>Administrar plantillas del equipo</h5>
+                  <input id="templateTitle" type="text" maxlength="100" placeholder="Nombre de la plantilla" aria-label="Nombre de la plantilla" />
+                  <textarea id="templateBody" rows="3" maxlength="4000" placeholder="Texto de respuesta" aria-label="Texto de respuesta"></textarea>
+                  <div class="template-admin-actions">
+                    <button id="btnSaveTemplate" type="button" class="btn btn-outline">Guardar plantilla</button>
+                    <button id="btnDeleteTemplate" type="button" class="btn btn-danger hidden">Eliminar seleccionada</button>
+                  </div>
+                </div>
+              </div>
+              <div id="ticketCommentComposer" class="comment-composer">
+                <label for="ticketCommentInput">Escribe un comentario</label>
+                <textarea id="ticketCommentInput" rows="3" maxlength="4000" placeholder="Comparte una actualización o pregunta..."></textarea>
+                <div class="comment-composer-footer">
+                  <small>Máximo 4000 caracteres</small>
+                  <button id="btnPostComment" type="button" class="btn btn-primary">Publicar comentario</button>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <footer class="modal-actions ticket-form-actions">
             <button type="button" id="btnReopenTicket" class="btn ui-button ui-button--secondary ui-button--md hidden">Reabrir ticket</button>
             <button type="button" id="btnDeleteTicket" class="btn ui-button ui-button--destructive-ghost ui-button--md hidden">Eliminar ticket</button>
-            <button type="button" id="btnCancelModal" class="btn ui-button ui-button--secondary ui-button--md">Cancelar</button>
-            <button type="submit" class="btn ui-button ui-button--default ui-button--md">Crear solicitud</button>
+            <button type="button" id="btnCancelModal" class="btn ui-button ui-button--secondary ui-button--md ticket-form-cancel">Cancelar</button>
+            <button type="submit" id="btnSubmitTicketModal" class="btn ui-button ui-button--default ui-button--md ticket-form-submit">Crear solicitud</button>
           </footer>
         </form>
       </div>
@@ -780,6 +791,6 @@
       </section>
     </main>
 
-    <script type="module" src="js/app.js?v=metrics-audit-v1"></script>
+    <script type="module" src="js/app.js?v=ui-polish-v1"></script>
   </body>
 </html>
