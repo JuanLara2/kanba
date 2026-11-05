@@ -322,6 +322,23 @@
     min-width: 0;
   }
 
+  #calendarPanel {
+    height: calc(100dvh - var(--mobile-header-height, 3.5rem) - 3.8rem - 3rem);
+    min-height: 18rem;
+    overflow-x: auto;
+    overflow-y: auto;
+    overscroll-behavior-x: contain;
+    overscroll-behavior-y: contain;
+    padding-bottom: calc(7rem + env(safe-area-inset-bottom, 16px));
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  #ticketCalendar {
+    min-height: 100%;
+    touch-action: pan-y;
+  }
+
   .kanban-grid {
     display: grid;
     grid-auto-columns: 84vw;
@@ -546,6 +563,12 @@
 
   .calendar-unscheduled-list {
     grid-template-columns: 1fr;
+  }
+
+  .calendar-drag-handle {
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+    margin: -0.75rem -0.6rem -0.3rem 0;
   }
 }
 

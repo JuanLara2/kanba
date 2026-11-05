@@ -9,7 +9,7 @@ import { formatSlaRemaining, getSlaState } from '../js/services/slaService.js';
 import { calculateTicketMetrics, metricsToCsv } from '../js/services/metricsService.js';
 import { RealtimeService } from '../js/services/realtimeService.js';
 import { initializeThemeController, THEME_STORAGE_KEY } from '../js/ui/themeController.js';
-import { dueDateForCalendarDay, getMonthGridDates, localDateKey } from '../js/ui/calendarView.js';
+import { CalendarView, dueDateForCalendarDay, getMonthGridDates, localDateKey } from '../js/ui/calendarView.js';
 import { DragDropController } from '../js/ui/dragDrop.js';
 
 function createContext() {
@@ -704,6 +704,57 @@ test('calendar date helpers build Monday-first month grids and preserve the due 
   const newlyScheduledDate = new Date(dueDateForCalendarDay(new Date(2026, 9, 26)));
   assert.equal(newlyScheduledDate.getHours(), 17);
   assert.equal(newlyScheduledDate.getMinutes(), 0);
+});
+
+test('calendar ticket touch starts dragging only from its drag handle', () => {
+  const handlers = new Map();
+  const container = {
+    addEventListener(type, handler) {
+      handlers.set(type, handler);
+    }
+  };
+  let captures = 0;
+  const ticket = {
+    dataset: { ticketId: 'TCK-1001' },
+    setPointerCapture() {
+      captures += 1;
+    }
+  };
+  const handle = {
+    nodeType: 1,
+    closest(selector) {
+      if (selector === '.calendar-drag-handle') return this;
+      if (selector === '[data-calendar-ticket].can-drag') return ticket;
+      return null;
+    }
+  };
+  const ticketTarget = {
+    nodeType: 1,
+    closest(selector) {
+      return selector === '[data-calendar-ticket].can-drag' ? ticket : null;
+    }
+  };
+  new CalendarView({ container, onDateChange() {}, canReschedule: true });
+
+  handlers.get('pointerdown')({
+    target: ticketTarget,
+    isPrimary: true,
+    button: 0,
+    pointerId: 1,
+    clientX: 10,
+    clientY: 10
+  });
+  assert.equal(captures, 0);
+
+  handlers.get('pointerdown')({
+    target: handle,
+    isPrimary: true,
+    button: 0,
+    pointerId: 2,
+    clientX: 10,
+    clientY: 10
+  });
+  assert.equal(captures, 1);
 });
 
 test('only administrators delete tickets and invalid ticket fields are rejected', async () => {

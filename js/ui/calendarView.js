@@ -62,6 +62,7 @@ export class CalendarView {
         return;
       }
 
+      if (closestElement(event.target, '.calendar-drag-handle')) return;
       const ticket = closestElement(event.target, '[data-calendar-ticket]');
       if (ticket && this.suppressTicketClick) {
         event.preventDefault();
@@ -72,6 +73,7 @@ export class CalendarView {
     });
 
     this.container.addEventListener('pointerdown', (event) => {
+      if (!closestElement(event.target, '.calendar-drag-handle')) return;
       const ticket = closestElement(event.target, '[data-calendar-ticket].can-drag');
       if (!ticket || !this.canReschedule || !this.onDateChange || !event.isPrimary || event.button !== 0) return;
 
@@ -233,6 +235,7 @@ export class CalendarView {
       <button class="calendar-ticket${canDrag ? ' can-drag' : ''}" type="button"
         data-calendar-ticket data-ticket-id="${this.escapeHtml(ticket.id)}"
         title="${this.escapeHtml(ticket.id)} · ${this.escapeHtml(ticket.title)}">
+        ${canDrag ? '<span class="calendar-drag-handle" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><circle cx="9" cy="5" r="1.5" fill="currentColor"/><circle cx="15" cy="5" r="1.5" fill="currentColor"/><circle cx="9" cy="12" r="1.5" fill="currentColor"/><circle cx="15" cy="12" r="1.5" fill="currentColor"/><circle cx="9" cy="19" r="1.5" fill="currentColor"/><circle cx="15" cy="19" r="1.5" fill="currentColor"/></svg></span>' : ''}
         <span class="calendar-ticket-id">${this.escapeHtml(ticket.id)}</span>
         <span class="calendar-ticket-title">${this.escapeHtml(ticket.title)}</span>
         <span class="calendar-ticket-status">${this.escapeHtml(ticket.status.replace('_', ' '))}</span>

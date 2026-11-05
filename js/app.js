@@ -6,7 +6,7 @@ import { FilterSortService } from './services/filterService.js';
 import { BoardView } from './ui/boardView.js?v=selection-action-bar-v1';
 import { ModalView } from './ui/modalView.js?v=complexity-scoring-v1';
 import { DragDropController } from './ui/dragDrop.js?v=pointer-grip-v1';
-import { CalendarView, dueDateForCalendarDay } from './ui/calendarView.js';
+import { CalendarView, dueDateForCalendarDay } from './ui/calendarView.js?v=calendar-native-scroll-v1';
 import { initializeThemeController } from './ui/themeController.js';
 import { PRIORITY_ORDER, SLA_REFRESH_INTERVAL_MS, STATUS_DEFINITIONS } from './config/constants.js';
 import { calculateTicketMetrics, metricsToCsv } from './services/metricsService.js?v=metrics-charts-v1';
