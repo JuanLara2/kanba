@@ -5,8 +5,8 @@ import { TicketService } from './services/ticketService.js?v=complexity-scoring-
 import { FilterSortService } from './services/filterService.js';
 import { BoardView } from './ui/boardView.js?v=ui-polish-v1';
 import { ModalView } from './ui/modalView.js?v=ux-audit-v1';
-import { DragDropController } from './ui/dragDrop.js?v=sound-feedback-v1';
-import { CalendarView, dueDateForCalendarDay } from './ui/calendarView.js?v=sound-feedback-v1';
+import { DragDropController } from './ui/dragDrop.js?v=sound-feedback-v2';
+import { CalendarView, dueDateForCalendarDay } from './ui/calendarView.js?v=sound-feedback-v2';
 import { initializeThemeController } from './ui/themeController.js';
 import { PRIORITY_ORDER, SLA_REFRESH_INTERVAL_MS, STATUS_DEFINITIONS } from './config/constants.js';
 import { calculateTicketMetrics, metricsToCsv } from './services/metricsService.js?v=metrics-charts-v1';
@@ -16,7 +16,7 @@ import { createSplashScreen } from './ui/splashScreen.js?v=brand-logo-v1';
 import { OutboxService } from './services/outboxService.js';
 import { MutationDispatcher } from './services/mutationDispatcher.js';
 import { Haptics } from './utils/haptics.js?v=ux-audit-v1';
-import { soundManager } from './utils/soundManager.js?v=sound-feedback-v1';
+import { soundManager } from './utils/soundManager.js?v=sound-feedback-v2';
 import './ui/metricsDiagnostics.js?v=metrics-audit-v1';
 
 const splashScreen = createSplashScreen();
@@ -879,8 +879,9 @@ function bindStaticEvents() {
   document.getElementById('changePasswordCancelBtn')?.addEventListener('click', closeChangePasswordModal);
   changePasswordForm?.addEventListener('submit', handleChangePasswordSubmit);
   document.getElementById('btnSoundToggle')?.addEventListener('click', () => {
-    soundManager.toggleMute();
+    const enabled = soundManager.toggleMute();
     updateSoundToggle();
+    if (enabled) soundManager.playTaskDone();
   });
   updateSoundToggle();
   document.getElementById('boardTab').addEventListener('click', () => navigateBottomTab('board'));

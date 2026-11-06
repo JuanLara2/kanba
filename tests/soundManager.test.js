@@ -9,6 +9,7 @@ test('sound manager unlocks after interaction, synthesizes effects, and persists
   const listeners = new Map();
   const oscillators = [];
   const masterValues = [];
+  const tonePeaks = [];
   const storage = new Map();
 
   class FakeAudioParam {
@@ -18,7 +19,7 @@ test('sound manager unlocks after interaction, synthesizes effects, and persists
 
     setValueAtTime() {}
     exponentialRampToValueAtTime(value) {
-      if (this.isGain) assert.ok(value <= 0.12);
+      if (this.isGain) tonePeaks.push(value);
     }
     setTargetAtTime(value) {
       masterValues.push(value);
@@ -80,6 +81,7 @@ test('sound manager unlocks after interaction, synthesizes effects, and persists
     assert.equal(sounds.enabled, true);
     listeners.get('pointerdown')();
     assert.equal(listeners.has('keydown'), false);
+    assert.equal(sounds.masterGain.gain.value, 0.12);
     assert.equal(sounds.playDragStart(), true);
     assert.equal(listeners.has('pointerdown'), false);
 
@@ -90,6 +92,8 @@ test('sound manager unlocks after interaction, synthesizes effects, and persists
     assert.equal(oscillators.length, 7);
     assert.ok(oscillators.every((oscillator) => oscillator.stopTime > oscillator.startTime));
     assert.ok(masterValues.every((value) => value === 0 || value === 0.12));
+    assert.ok(tonePeaks.some((value) => value >= 0.6));
+    assert.ok(tonePeaks.every((value) => value <= 1));
 
     assert.equal(sounds.toggleMute(), false);
     assert.equal(sounds.isMuted(), true);

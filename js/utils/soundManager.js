@@ -83,7 +83,7 @@ export class SoundManager {
     frequency,
     endFrequency = frequency,
     duration,
-    volume = 0.05,
+    volume = 0.7,
     type = 'sine',
     filterFrequency = null,
     delay = 0
@@ -115,7 +115,7 @@ export class SoundManager {
     output.connect(envelope);
     envelope.connect(this.masterGain);
     envelope.gain.setValueAtTime(0.0001, start);
-    envelope.gain.exponentialRampToValueAtTime(Math.min(volume, MASTER_VOLUME), start + Math.min(0.006, duration / 3));
+    envelope.gain.exponentialRampToValueAtTime(Math.min(volume, 1), start + Math.min(0.006, duration / 3));
     envelope.gain.exponentialRampToValueAtTime(0.0001, end);
 
     oscillator.start(start);
@@ -129,7 +129,7 @@ export class SoundManager {
   }
 
   playDragStart() {
-    return this.playTone({ frequency: 720, endFrequency: 260, duration: 0.055, volume: 0.035 });
+    return this.playTone({ frequency: 720, endFrequency: 260, duration: 0.055, volume: 0.65 });
   }
 
   playDrop() {
@@ -137,14 +137,14 @@ export class SoundManager {
       frequency: 210,
       endFrequency: 105,
       duration: 0.08,
-      volume: 0.065,
+      volume: 0.85,
       type: 'triangle',
       filterFrequency: 850
     });
   }
 
   playSubtaskToggle() {
-    return this.playTone({ frequency: 680, endFrequency: 520, duration: 0.04, volume: 0.03 });
+    return this.playTone({ frequency: 680, endFrequency: 520, duration: 0.04, volume: 0.6 });
   }
 
   playTaskDone() {
@@ -155,7 +155,7 @@ export class SoundManager {
         frequency,
         duration: index === notes.length - 1 ? 0.07 : 0.09,
         delay: index * 0.055,
-        volume: 0.04,
+        volume: 0.75,
         type: 'triangle',
         filterFrequency: 2600
       }) || played;
@@ -168,7 +168,7 @@ export class SoundManager {
       frequency: 240,
       endFrequency: 75,
       duration: 0.1,
-      volume: 0.06,
+      volume: 0.8,
       type: 'triangle',
       filterFrequency: 500
     });
