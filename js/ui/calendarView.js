@@ -1,12 +1,84 @@
-import { getChecklistProgress } from '../services/ticketService.js';
 import { getSlaState } from '../services/slaService.js';
 import { Haptics } from '../utils/haptics.js';
 
 const WEEKDAY_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+const SUBTASK_TOOLTIP_ID = 'calendarSubtaskTooltip';
+const SUBTASKS_QUICK_VIEW_ID = 'calendarSubtasksQuickView';
+let quickViewCloseTimer = null;
+let quickViewReturnFocus = null;
+let quickViewPreviousBodyOverflow = '';
 
 function closestElement(target, selector) {
   const element = target?.nodeType === 1 ? target : target?.parentElement;
   return element?.closest?.(selector) || null;
+}
+
+function initializeSubtasksQuickView() {
+  if (typeof document === 'undefined') return null;
+  let quickView = document.getElementById(SUBTASKS_QUICK_VIEW_ID);
+  if (!quickView) {
+    quickView = document.createElement('div');
+    quickView.id = SUBTASKS_QUICK_VIEW_ID;
+    quickView.className = 'calendar-subtasks-quick-view';
+    quickView.hidden = true;
+    quickView.setAttribute('aria-hidden', 'true');
+    quickView.innerHTML = `
+      <button class="calendar-subtasks-backdrop" type="button" data-quick-view-close aria-label="Cerrar detalle de subtareas"></button>
+      <section class="calendar-subtasks-sheet" role="dialog" aria-modal="true" aria-labelledby="calendar-subtasks-title">
+        <div class="calendar-subtasks-sheet-handle" aria-hidden="true"></div>
+        <header class="calendar-subtasks-sheet-header">
+          <div class="calendar-subtasks-sheet-heading">
+            <span class="calendar-subtasks-ticket-id"></span>
+            <h2 id="calendar-subtasks-title" class="calendar-subtasks-ticket-title"></h2>
+          </div>
+          <button class="calendar-subtasks-close" type="button" data-quick-view-close aria-label="Cerrar">✕</button>
+        </header>
+        <div class="calendar-subtasks-sheet-progress">
+          <div class="calendar-subtasks-sheet-progress-meta">
+            <span>Progreso de subtareas</span>
+            <span class="calendar-subtasks-sheet-percent"></span>
+          </div>
+          <div class="calendar-subtasks-sheet-progress-track">
+            <div class="calendar-subtasks-sheet-progress-fill"></div>
+          </div>
+        </div>
+        <ul class="calendar-subtasks-sheet-list"></ul>
+      </section>
+    `;
+    document.body.append(quickView);
+  }
+
+  if (quickView.dataset.initialized !== 'true') {
+    quickView.addEventListener('click', (event) => {
+      if (closestElement(event.target, '[data-quick-view-close]')) closeSubtasksQuickView();
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && !quickView.hidden) {
+        event.preventDefault();
+        closeSubtasksQuickView();
+      }
+    });
+    quickView.dataset.initialized = 'true';
+  }
+
+  return quickView;
+}
+
+function closeSubtasksQuickView() {
+  const quickView = typeof document === 'undefined'
+    ? null
+    : document.getElementById(SUBTASKS_QUICK_VIEW_ID);
+  if (!quickView || quickView.hidden) return;
+
+  window.clearTimeout(quickViewCloseTimer);
+  quickView.classList.remove('is-open');
+  quickView.setAttribute('aria-hidden', 'true');
+  document.body.style.overflow = quickViewPreviousBodyOverflow;
+  quickViewCloseTimer = window.setTimeout(() => {
+    quickView.hidden = true;
+    quickViewReturnFocus?.focus?.();
+    quickViewReturnFocus = null;
+  }, 250);
 }
 
 export function localDateKey(value) {
@@ -47,11 +119,52 @@ export class CalendarView {
     this.tickets = [];
     this.pointerDrag = null;
     this.suppressTicketClick = false;
+    this.subtaskTooltip = null;
+    this.subtaskTooltipTicket = null;
+    this.subtaskTooltipDescribedBy = null;
     this.bindEvents();
   }
 
   bindEvents() {
+    this.container.addEventListener('mouseover', (event) => {
+      const ticket = closestElement(event.target, '[data-calendar-ticket]');
+      if (!ticket || ticket.contains(event.relatedTarget)) return;
+      this.showSubtaskTooltip(ticket);
+    });
+
+    this.container.addEventListener('mouseout', (event) => {
+      const ticket = closestElement(event.target, '[data-calendar-ticket]');
+      if (!ticket || ticket.contains(event.relatedTarget)) return;
+      if (this.subtaskTooltipTicket === ticket) this.hideSubtaskTooltip();
+    });
+
+    this.container.addEventListener('focusin', (event) => {
+      const ticket = closestElement(event.target, '[data-calendar-ticket]');
+      if (ticket) this.showSubtaskTooltip(ticket);
+    });
+
+    this.container.addEventListener('focusout', (event) => {
+      const ticket = closestElement(event.target, '[data-calendar-ticket]');
+      if (!ticket || ticket.contains(event.relatedTarget)) return;
+      if (this.subtaskTooltipTicket === ticket) this.hideSubtaskTooltip();
+    });
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('scroll', () => this.positionSubtaskTooltip(), true);
+      window.addEventListener('resize', () => this.positionSubtaskTooltip());
+    }
+
     this.container.addEventListener('click', (event) => {
+      const progressButton = closestElement(event.target, '.calendar-ticket-progress[role="button"]');
+      if (progressButton) {
+        event.preventDefault();
+        event.stopPropagation();
+        const ticketElement = closestElement(progressButton, '[data-calendar-ticket]');
+        const ticket = this.tickets.find((item) => item.id === ticketElement?.dataset.ticketId);
+        if (ticket) this.openSubtasksQuickView(ticket, progressButton);
+        return;
+      }
+
       const monthButton = closestElement(event.target, '[data-calendar-month]');
       if (monthButton) {
         this.month = new Date(this.month.getFullYear(), this.month.getMonth() + Number(monthButton.dataset.calendarMonth), 1);
@@ -86,6 +199,16 @@ export class CalendarView {
     });
 
     this.container.addEventListener('keydown', (event) => {
+      const progressButton = closestElement(event.target, '.calendar-ticket-progress[role="button"]');
+      if (progressButton && ['Enter', ' '].includes(event.key)) {
+        event.preventDefault();
+        event.stopPropagation();
+        const ticketElement = closestElement(progressButton, '[data-calendar-ticket]');
+        const ticket = this.tickets.find((item) => item.id === ticketElement?.dataset.ticketId);
+        if (ticket) this.openSubtasksQuickView(ticket, progressButton);
+        return;
+      }
+
       if (!['Enter', ' '].includes(event.key)) return;
       const emptyDate = closestElement(event.target, '[data-calendar-create-date]');
       if (!emptyDate || event.target !== emptyDate) return;
@@ -207,6 +330,7 @@ export class CalendarView {
   }
 
   render(tickets, canReschedule = this.canReschedule) {
+    this.hideSubtaskTooltip();
     this.tickets = tickets;
     this.canReschedule = canReschedule;
     const title = this.month.toLocaleDateString('es', { month: 'long', year: 'numeric' });
@@ -279,7 +403,12 @@ export class CalendarView {
 
   ticketMarkup(ticket) {
     const canDrag = this.canReschedule;
-    const progress = getChecklistProgress(ticket.checklist);
+    const subtasks = Array.isArray(ticket.subtasks)
+      ? ticket.subtasks
+      : (Array.isArray(ticket.checklist) ? ticket.checklist : []);
+    const total = subtasks.length;
+    const completed = subtasks.filter((subtask) => subtask.completed || subtask.done).length;
+    const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
     const statusClass = ['new', 'open', 'in_progress', 'resolved', 'closed', 'blocked'].includes(ticket.status)
       ? ` status-${ticket.status}`
       : '';
@@ -288,16 +417,155 @@ export class CalendarView {
       ? ` sla-${slaState}`
       : '';
     return `
-      <button class="calendar-ticket${canDrag ? ' can-drag' : ''}${statusClass}${slaClass}" type="button"
-        data-calendar-ticket data-ticket-id="${this.escapeHtml(ticket.id)}"
-        title="${this.escapeHtml(ticket.id)} · ${this.escapeHtml(ticket.title)}">
+      <div class="calendar-ticket${canDrag ? ' can-drag' : ''}${statusClass}${slaClass}"
+        data-calendar-ticket data-ticket-id="${this.escapeHtml(ticket.id)}">
         ${canDrag ? '<span class="calendar-drag-handle" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><circle cx="9" cy="5" r="1.5" fill="currentColor"/><circle cx="15" cy="5" r="1.5" fill="currentColor"/><circle cx="9" cy="12" r="1.5" fill="currentColor"/><circle cx="15" cy="12" r="1.5" fill="currentColor"/><circle cx="9" cy="19" r="1.5" fill="currentColor"/><circle cx="15" cy="19" r="1.5" fill="currentColor"/></svg></span>' : ''}
-        <span class="calendar-ticket-id">${this.escapeHtml(ticket.id)}</span>
-        <span class="calendar-ticket-title">${this.escapeHtml(ticket.title)}</span>
-        <span class="calendar-ticket-status">${this.escapeHtml(ticket.status.replace('_', ' '))}</span>
-        ${progress.total ? `<span class="calendar-ticket-progress">${progress.completed}/${progress.total} subtareas · ${progress.percentage}%</span>` : ''}
-      </button>
+        <button class="calendar-ticket-main" type="button"
+          aria-label="${this.escapeHtml(ticket.id)} · ${this.escapeHtml(ticket.title)}">
+          <span class="calendar-ticket-id">${this.escapeHtml(ticket.id)}</span>
+          <span class="calendar-ticket-title">${this.escapeHtml(ticket.title)}</span>
+          <span class="calendar-ticket-status">${this.escapeHtml(ticket.status.replace('_', ' '))}</span>
+        </button>
+        ${total ? `
+          <span class="calendar-ticket-progress" role="button" tabindex="0"
+            aria-label="Ver subtareas: ${completed} de ${total} completadas">
+            <span class="calendar-ticket-progress-meta">
+              <span class="calendar-ticket-progress-count">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                ${completed}/${total}
+              </span>
+              <span class="calendar-ticket-progress-percent">${percent}%</span>
+            </span>
+            <span class="calendar-ticket-progress-track" aria-hidden="true">
+              <span class="calendar-ticket-progress-fill" style="width: ${percent}%;"></span>
+            </span>
+          </span>
+        ` : ''}
+      </div>
     `;
+  }
+
+  showSubtaskTooltip(ticketElement) {
+    const ticket = this.tickets.find((item) => item.id === ticketElement.dataset.ticketId);
+    const subtasks = Array.isArray(ticket?.subtasks)
+      ? ticket.subtasks
+      : (Array.isArray(ticket?.checklist) ? ticket.checklist : []);
+    if (!ticket || subtasks.length === 0 || this.pointerDrag?.active) return;
+
+    if (!this.subtaskTooltip) {
+      this.subtaskTooltip = document.createElement('div');
+      this.subtaskTooltip.id = SUBTASK_TOOLTIP_ID;
+      this.subtaskTooltip.className = 'calendar-subtask-tooltip';
+      this.subtaskTooltip.setAttribute('role', 'tooltip');
+      this.subtaskTooltip.setAttribute('aria-hidden', 'true');
+      document.body.append(this.subtaskTooltip);
+    }
+
+    const completed = subtasks.filter((subtask) => subtask.completed || subtask.done).length;
+    const total = subtasks.length;
+    const percent = Math.round((completed / total) * 100);
+    const listItems = subtasks.slice(0, 4).map((subtask) => {
+      const isCompleted = Boolean(subtask.completed || subtask.done);
+      const title = this.escapeHtml(subtask.title || subtask.text || '');
+      return `
+        <li class="calendar-subtask-item${isCompleted ? ' is-completed' : ''}">
+          <span class="calendar-subtask-indicator" aria-hidden="true"></span>
+          <span class="calendar-subtask-label">${title}</span>
+        </li>
+      `;
+    }).join('');
+
+    this.subtaskTooltip.innerHTML = `
+      <div class="calendar-subtask-tooltip-header">
+        <span>Subtareas</span>
+        <span>${completed}/${total} (${percent}%)</span>
+      </div>
+      <ul class="calendar-subtask-list">
+        ${listItems}
+        ${total > 4 ? `<li class="calendar-subtask-more">+${total - 4} más...</li>` : ''}
+      </ul>
+    `;
+    this.subtaskTooltipDescribedBy?.removeAttribute('aria-describedby');
+    this.subtaskTooltipTicket = ticketElement;
+    this.subtaskTooltipDescribedBy = ticketElement.contains(document.activeElement)
+      ? document.activeElement
+      : ticketElement.querySelector('.calendar-ticket-main');
+    this.subtaskTooltipDescribedBy?.setAttribute('aria-describedby', SUBTASK_TOOLTIP_ID);
+    this.subtaskTooltip.setAttribute('aria-hidden', 'false');
+    this.subtaskTooltip.classList.add('is-visible');
+    this.positionSubtaskTooltip();
+  }
+
+  openSubtasksQuickView(ticket, trigger = null) {
+    const subtasks = Array.isArray(ticket.subtasks)
+      ? ticket.subtasks
+      : (Array.isArray(ticket.checklist) ? ticket.checklist : []);
+    if (subtasks.length === 0) return;
+
+    const quickView = initializeSubtasksQuickView();
+    if (!quickView) return;
+
+    window.clearTimeout(quickViewCloseTimer);
+    this.hideSubtaskTooltip();
+    const completed = subtasks.filter((subtask) => subtask.completed || subtask.done).length;
+    const percent = Math.round((completed / subtasks.length) * 100);
+    quickView.querySelector('.calendar-subtasks-ticket-id').textContent = ticket.id;
+    quickView.querySelector('.calendar-subtasks-ticket-title').textContent = ticket.title;
+    quickView.querySelector('.calendar-subtasks-sheet-percent').textContent = `${completed}/${subtasks.length} (${percent}%)`;
+    quickView.querySelector('.calendar-subtasks-sheet-progress-fill').style.width = `${percent}%`;
+    quickView.querySelector('.calendar-subtasks-sheet-list').innerHTML = subtasks.map((subtask) => {
+      const isCompleted = Boolean(subtask.completed || subtask.done);
+      return `
+        <li class="calendar-subtasks-sheet-item${isCompleted ? ' is-completed' : ''}">
+          <span class="calendar-subtasks-sheet-check" aria-hidden="true">${isCompleted ? '✓' : ''}</span>
+          <span>${this.escapeHtml(subtask.title || subtask.text || '')}</span>
+        </li>
+      `;
+    }).join('');
+
+    quickViewReturnFocus = trigger;
+    quickViewPreviousBodyOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    quickView.hidden = false;
+    quickView.setAttribute('aria-hidden', 'false');
+    window.requestAnimationFrame(() => {
+      if (quickView.hidden) return;
+      quickView.classList.add('is-open');
+      quickView.querySelector('.calendar-subtasks-close').focus();
+    });
+  }
+
+  hideSubtaskTooltip() {
+    if (!this.subtaskTooltip || !this.subtaskTooltipTicket) return;
+    this.subtaskTooltipDescribedBy?.removeAttribute('aria-describedby');
+    this.subtaskTooltipTicket = null;
+    this.subtaskTooltipDescribedBy = null;
+    this.subtaskTooltip.setAttribute('aria-hidden', 'true');
+    this.subtaskTooltip.classList.remove('is-visible');
+  }
+
+  positionSubtaskTooltip() {
+    if (!this.subtaskTooltip?.classList.contains('is-visible') || !this.subtaskTooltipTicket) return;
+    if (!this.subtaskTooltipTicket.isConnected) {
+      this.hideSubtaskTooltip();
+      return;
+    }
+
+    const ticketRect = this.subtaskTooltipTicket.getBoundingClientRect();
+    const tooltipRect = this.subtaskTooltip.getBoundingClientRect();
+    const gap = 8;
+    const margin = 8;
+    const placeAbove = ticketRect.top >= tooltipRect.height + gap + margin;
+    const top = placeAbove
+      ? ticketRect.top - tooltipRect.height - gap
+      : Math.min(ticketRect.bottom + gap, window.innerHeight - tooltipRect.height - margin);
+    const left = Math.max(
+      margin,
+      Math.min(ticketRect.left + ticketRect.width / 2 - tooltipRect.width / 2, window.innerWidth - tooltipRect.width - margin)
+    );
+
+    this.subtaskTooltip.style.top = `${Math.max(margin, top)}px`;
+    this.subtaskTooltip.style.left = `${left}px`;
   }
 
   escapeHtml(value) {

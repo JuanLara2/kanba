@@ -750,6 +750,81 @@ test('calendar date helpers build Monday-first month grids and preserve the due 
   assert.equal(newlyScheduledDate.getMinutes(), 0);
 });
 
+test('calendar ticket progress supports subtasks, legacy checklists, and escaped ticket titles', () => {
+  const calendar = new CalendarView({ container: { addEventListener() {} } });
+  const markup = calendar.ticketMarkup({
+    id: 'TCK-1',
+    title: '<Ticket>',
+    status: 'open',
+    subtasks: [
+      { title: '<Completed>', completed: true },
+      { text: 'Pending', done: false },
+      { title: 'Done flag', done: true }
+    ]
+  });
+
+  assert.match(markup, /role="button" tabindex="0"/);
+  assert.match(markup, /67%/);
+  assert.match(markup, /&lt;Ticket&gt;/);
+  assert.match(markup, /Ver subtareas: 2 de 3 completadas/);
+  assert.match(calendar.ticketMarkup({
+    id: 'TCK-2',
+    title: 'Legacy ticket',
+    status: 'open',
+    checklist: [{ text: 'Legacy item', completed: true }]
+  }), /100%/);
+});
+
+test('calendar progress activation opens its quick view without opening the ticket', () => {
+  const handlers = new Map();
+  const container = {
+    addEventListener(type, handler) {
+      handlers.set(type, handler);
+    }
+  };
+  let ticketOpened = false;
+  let quickViewOpened = false;
+  const calendar = new CalendarView({
+    container,
+    onTicketClick() {
+      ticketOpened = true;
+    }
+  });
+  calendar.tickets = [{ id: 'TCK-3', subtasks: [{ title: 'Review', done: false }] }];
+  calendar.openSubtasksQuickView = () => {
+    quickViewOpened = true;
+  };
+  const ticketElement = { dataset: { ticketId: 'TCK-3' } };
+  const progressButton = {
+    nodeType: 1,
+    closest(selector) {
+      return selector === '[data-calendar-ticket]' ? ticketElement : null;
+    }
+  };
+  const eventTarget = {
+    nodeType: 1,
+    closest(selector) {
+      return selector === '.calendar-ticket-progress[role="button"]' ? progressButton : null;
+    }
+  };
+  let defaultPrevented = false;
+  let propagationStopped = false;
+  handlers.get('click')({
+    target: eventTarget,
+    preventDefault() {
+      defaultPrevented = true;
+    },
+    stopPropagation() {
+      propagationStopped = true;
+    }
+  });
+
+  assert.equal(quickViewOpened, true);
+  assert.equal(ticketOpened, false);
+  assert.equal(defaultPrevented, true);
+  assert.equal(propagationStopped, true);
+});
+
 test('calendar ticket touch captures the pointer only after drag movement starts on its handle', () => {
   const handlers = new Map();
   const container = {

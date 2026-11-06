@@ -1536,7 +1536,13 @@
   }
 
   .profile-menu-panel {
-    right: -0.5rem;
+    position: absolute !important;
+    top: calc(100% + 0.5rem) !important;
+    right: 0.75rem !important;
+    left: auto !important;
+    width: min(calc(100vw - 1.5rem), 280px) !important;
+    z-index: 50 !important;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5) !important;
   }
 
   .controls-toolbar {
