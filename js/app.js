@@ -532,17 +532,23 @@ function renderProfileSummary(user = activeUser) {
   const name = document.getElementById('profileUserName');
   const email = document.getElementById('profileUserEmail');
   const role = document.getElementById('profileUserRole');
-  const headerAvatar = document.getElementById('headerUserAvatar');
 
   renderAvatarFallback(preview, user, 'U');
-  renderAvatarFallback(headerAvatar, user, 'U');
+  renderHeaderUser(user);
   name.textContent = user?.fullName || 'Sin nombre';
   email.textContent = user?.email || 'Sin correo';
   role.textContent = user?.role || 'Sin rol';
 }
 
+function renderHeaderUser(user) {
+  const firstName = user?.fullName?.trim().split(/\s+/)[0] || '';
+  document.getElementById('headerFirstName').textContent = firstName;
+  document.getElementById('headerRoleBadge').textContent = user?.role?.toUpperCase() || '';
+  renderAvatarFallback(document.getElementById('headerUserAvatar'), user, 'U');
+}
+
 function setProfileMenuOpen(isOpen, restoreFocus = false) {
-  const trigger = document.getElementById('btnOpenProfile');
+  const trigger = document.getElementById('btnUserProfile');
   const panel = document.getElementById('profileMenuPanel');
   panel.classList.toggle('hidden', !isOpen);
   trigger.setAttribute('aria-expanded', String(isOpen));
@@ -550,7 +556,7 @@ function setProfileMenuOpen(isOpen, restoreFocus = false) {
 }
 
 function toggleProfileMenu() {
-  const isOpen = document.getElementById('btnOpenProfile').getAttribute('aria-expanded') === 'true';
+  const isOpen = document.getElementById('btnUserProfile').getAttribute('aria-expanded') === 'true';
   setProfileMenuOpen(!isOpen);
 }
 
@@ -753,7 +759,7 @@ function bindStaticEvents() {
   });
   document.getElementById('btnForgotPassword').addEventListener('click', handleForgotPassword);
   passwordRecoveryForm.addEventListener('submit', handlePasswordRecoverySubmit);
-  document.getElementById('btnOpenProfile').addEventListener('click', toggleProfileMenu);
+  document.getElementById('btnUserProfile').addEventListener('click', toggleProfileMenu);
   document.getElementById('btnProfileMenuOpenProfile').addEventListener('click', () => {
     setProfileMenuOpen(false);
     openProfileModal();
@@ -774,7 +780,7 @@ function bindStaticEvents() {
   });
   document.addEventListener('pointerdown', (event) => {
     const profileMenu = document.getElementById('profileMenu');
-    const isOpen = document.getElementById('btnOpenProfile').getAttribute('aria-expanded') === 'true';
+    const isOpen = document.getElementById('btnUserProfile').getAttribute('aria-expanded') === 'true';
     if (!isOpen || profileMenu.contains(event.target)) return;
     setProfileMenuOpen(false);
   });
@@ -2770,7 +2776,7 @@ async function syncAuthState() {
     if (btnManageCategories) btnManageCategories.classList.toggle('hidden', !auth.canManageCategories(currentUser));
     document.getElementById('sessionUserName').textContent = currentUser.fullName;
     document.getElementById('sessionUserRole').textContent = currentUser.role;
-    renderAvatarFallback(document.getElementById('headerUserAvatar'), currentUser, 'U');
+    renderHeaderUser(currentUser);
     if (profileModal && !profileModal.classList.contains('hidden')) renderProfileSummary(currentUser);
   } else {
     realtimeService.stop();
@@ -2786,7 +2792,7 @@ async function syncAuthState() {
     if (btnManageCategories) btnManageCategories.classList.add('hidden');
     document.getElementById('sessionUserName').textContent = 'Invitado';
     document.getElementById('sessionUserRole').textContent = 'Sin sesión';
-    renderAvatarFallback(document.getElementById('headerUserAvatar'), null, 'U');
+    renderHeaderUser(null);
     usersMap.clear();
     allTickets = [];
     ticketCategories = [];

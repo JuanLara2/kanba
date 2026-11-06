@@ -184,7 +184,7 @@
     min-height: 42px;
   }
 
-  .app-header #btnOpenProfile {
+  .app-header #btnUserProfile {
     position: absolute;
     top: max(0.85rem, env(safe-area-inset-top, 0px));
     right: 1rem;
@@ -476,7 +476,7 @@
     min-height: 36px;
   }
 
-  .app-header #btnOpenProfile {
+  .app-header #btnUserProfile {
     top: max(0.75rem, env(safe-area-inset-top, 0px));
     right: 0.75rem;
     height: 36px;
@@ -484,7 +484,7 @@
     font-size: 0.85rem;
   }
 
-  .app-header #btnOpenProfile .header-avatar {
+  .app-header #btnUserProfile .header-avatar {
     width: 32px;
     height: 32px;
     font-size: 0.82rem;
@@ -1502,14 +1502,14 @@
     min-width: 0;
   }
 
-  .app-header #btnOpenProfile {
+  .app-header #btnUserProfile {
     position: static;
-    width: 2.5rem;
-    min-width: 2.5rem;
+    width: auto;
+    min-width: 0;
     height: 2.5rem;
     min-height: 2.5rem;
-    justify-content: center;
-    padding: 0;
+    justify-content: flex-start;
+    padding: 0 0.375rem;
     box-shadow: none;
   }
 
@@ -1982,8 +1982,7 @@
   }
 
   .header-right > *,
-  .app-header .header-icon-button,
-  .app-header #btnOpenProfile {
+  .app-header .header-icon-button {
     position: relative;
     inset: auto;
     width: 2.2rem;
@@ -1993,6 +1992,13 @@
     justify-content: center;
     padding: 0.3rem;
     box-shadow: none;
+  }
+
+  .app-header #btnUserProfile {
+    width: auto;
+    min-width: 0;
+    justify-content: flex-start;
+    padding: 0.3rem 0.375rem;
   }
 
   .header-action-label {
