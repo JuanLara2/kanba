@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { SoundManager } from '../js/utils/soundManager.js';
 
-test('sound manager unlocks after interaction, synthesizes effects, and persists mute state', () => {
+test('sound manager unlocks after interaction, synthesizes effects, and persists mute state', async () => {
   const originalContext = Object.getOwnPropertyDescriptor(globalThis, 'AudioContext');
   const originalDocument = Object.getOwnPropertyDescriptor(globalThis, 'document');
   const originalStorage = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
@@ -81,6 +81,7 @@ test('sound manager unlocks after interaction, synthesizes effects, and persists
     assert.equal(sounds.enabled, true);
     listeners.get('pointerdown')();
     assert.equal(listeners.has('keydown'), false);
+    assert.equal(await sounds.unlock(), true);
     assert.equal(sounds.masterGain.gain.value, 0.12);
     assert.equal(sounds.playDragStart(), true);
     assert.equal(listeners.has('pointerdown'), false);
@@ -111,6 +112,67 @@ test('sound manager unlocks after interaction, synthesizes effects, and persists
     else delete globalThis.document;
     if (originalStorage) Object.defineProperty(globalThis, 'localStorage', originalStorage);
     else delete globalThis.localStorage;
+  }
+});
+
+test('sound manager waits for audio context resume before scheduling a tone', async () => {
+  const originalContext = Object.getOwnPropertyDescriptor(globalThis, 'AudioContext');
+  const oscillators = [];
+  let finishResume;
+
+  class FakeParam {
+    setValueAtTime() {}
+    exponentialRampToValueAtTime() {}
+    setTargetAtTime() {}
+  }
+
+  class FakeAudioContext {
+    constructor() {
+      this.currentTime = 1;
+      this.state = 'suspended';
+      this.destination = {};
+    }
+
+    createGain() {
+      return { gain: Object.assign(new FakeParam(), { value: 0 }), connect() {}, disconnect() {} };
+    }
+
+    createOscillator() {
+      const oscillator = {
+        frequency: new FakeParam(),
+        connect() {},
+        start() {},
+        stop() {},
+        disconnect() {},
+        addEventListener() {}
+      };
+      oscillators.push(oscillator);
+      return oscillator;
+    }
+
+    resume() {
+      return new Promise((resolve) => {
+        finishResume = () => {
+          this.state = 'running';
+          resolve();
+        };
+      });
+    }
+  }
+
+  Object.defineProperty(globalThis, 'AudioContext', { configurable: true, value: FakeAudioContext });
+
+  try {
+    const sounds = new SoundManager();
+    assert.equal(sounds.playSubtaskToggle(), true);
+    assert.equal(oscillators.length, 0);
+    finishResume();
+    assert.equal(await sounds.unlock(), true);
+    await Promise.resolve();
+    assert.equal(oscillators.length, 1);
+  } finally {
+    if (originalContext) Object.defineProperty(globalThis, 'AudioContext', originalContext);
+    else delete globalThis.AudioContext;
   }
 });
 

@@ -18,6 +18,7 @@ export class SoundManager {
     this.enabled = !readMutedPreference();
     this.context = null;
     this.masterGain = null;
+    this.unlockPromise = null;
     this.unlockHandler = () => this.unlock();
 
     if (typeof document !== 'undefined') {
@@ -46,13 +47,30 @@ export class SoundManager {
 
   unlock() {
     this.removeUnlockListeners();
-    if (!this.ensureAudioGraph()) return false;
-    if (this.context.state === 'suspended') {
-      this.context.resume()?.catch((error) => {
-        console.warn('No se pudo activar el audio del navegador.', error);
-      });
+    if (!this.ensureAudioGraph()) return Promise.resolve(false);
+    if (this.unlockPromise) return this.unlockPromise;
+    if (this.context.state === 'running') return Promise.resolve(true);
+
+    try {
+      this.unlockPromise = this.context.resume()
+        .then(() => {
+          if (this.context.state !== 'running') {
+            throw new Error(`El contexto de audio quedó en estado "${this.context.state}".`);
+          }
+          return true;
+        })
+        .catch((error) => {
+          console.error('No se pudo activar el audio del navegador.', error);
+          return false;
+        })
+        .finally(() => {
+          this.unlockPromise = null;
+        });
+      return this.unlockPromise;
+    } catch (error) {
+      console.error('No se pudo reanudar el contexto de audio.', error);
+      return Promise.resolve(false);
     }
-    return true;
   }
 
   removeUnlockListeners() {
@@ -72,7 +90,8 @@ export class SoundManager {
       this.masterGain.gain.value = this.enabled ? MASTER_VOLUME : 0;
       this.masterGain.connect(this.context.destination);
       return true;
-    } catch {
+    } catch (error) {
+      console.error('No se pudo crear la cadena de audio.', error);
       this.context = null;
       this.masterGain = null;
       return false;
@@ -89,8 +108,19 @@ export class SoundManager {
     delay = 0
   }) {
     if (!this.enabled || !this.ensureAudioGraph()) return false;
-    if (this.context.state === 'suspended') this.unlock();
+    if (this.context.state !== 'running') {
+      this.unlock().then((unlocked) => {
+        if (unlocked && this.enabled) {
+          this.scheduleTone({ frequency, endFrequency, duration, volume, type, filterFrequency, delay });
+        }
+      });
+      return true;
+    }
 
+    return this.scheduleTone({ frequency, endFrequency, duration, volume, type, filterFrequency, delay });
+  }
+
+  scheduleTone({ frequency, endFrequency, duration, volume, type, filterFrequency, delay }) {
     const start = this.context.currentTime + delay;
     const end = start + duration;
     const oscillator = this.context.createOscillator();
@@ -114,9 +144,10 @@ export class SoundManager {
 
     output.connect(envelope);
     envelope.connect(this.masterGain);
-    envelope.gain.setValueAtTime(0.0001, start);
-    envelope.gain.exponentialRampToValueAtTime(Math.min(volume, 1), start + Math.min(0.006, duration / 3));
-    envelope.gain.exponentialRampToValueAtTime(0.0001, end);
+    const peakVolume = Math.min(Math.max(volume, 0.001), 1);
+    envelope.gain.setValueAtTime(0.001, start);
+    envelope.gain.exponentialRampToValueAtTime(peakVolume, start + Math.min(0.006, duration / 3));
+    envelope.gain.exponentialRampToValueAtTime(0.001, end);
 
     oscillator.start(start);
     oscillator.stop(end + 0.005);

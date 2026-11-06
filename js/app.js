@@ -16,7 +16,7 @@ import { createSplashScreen } from './ui/splashScreen.js?v=brand-logo-v1';
 import { OutboxService } from './services/outboxService.js';
 import { MutationDispatcher } from './services/mutationDispatcher.js';
 import { Haptics } from './utils/haptics.js?v=ux-audit-v1';
-import { soundManager } from './utils/soundManager.js?v=sound-feedback-v2';
+import { soundManager } from './utils/soundManager.js?v=sound-feedback-v3';
 import './ui/metricsDiagnostics.js?v=metrics-audit-v1';
 
 const splashScreen = createSplashScreen();
@@ -878,10 +878,15 @@ function bindStaticEvents() {
   document.getElementById('changePasswordCloseBtn')?.addEventListener('click', closeChangePasswordModal);
   document.getElementById('changePasswordCancelBtn')?.addEventListener('click', closeChangePasswordModal);
   changePasswordForm?.addEventListener('submit', handleChangePasswordSubmit);
-  document.getElementById('btnSoundToggle')?.addEventListener('click', () => {
+  document.getElementById('btnSoundToggle')?.addEventListener('click', async () => {
     const enabled = soundManager.toggleMute();
     updateSoundToggle();
-    if (enabled) soundManager.playTaskDone();
+    if (!enabled) return;
+    if (!await soundManager.unlock()) {
+      showToast('El navegador no permitió activar el sonido.');
+      return;
+    }
+    soundManager.playTaskDone();
   });
   updateSoundToggle();
   document.getElementById('boardTab').addEventListener('click', () => navigateBottomTab('board'));

@@ -1,5 +1,5 @@
 import { Haptics } from '../utils/haptics.js?v=ux-audit-v1';
-import { soundManager } from '../utils/soundManager.js?v=sound-feedback-v2';
+import { soundManager } from '../utils/soundManager.js?v=sound-feedback-v3';
 
 function closestElement(target, selector) {
   const element = target?.nodeType === 1 ? target : target?.parentElement;
