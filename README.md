@@ -1,44 +1,131 @@
-VortexTask (Kanba) ⚡PWA de Alto Rendimiento para Gestión de Tareas y Resolución de Incidentes (Local-First)Desarrollada con Vanilla JavaScript (ES6+), Supabase Realtime y Tailwind CSS. Cero sobrecarga de frameworks, interacciones táctiles móviles a 60 fps e integración directa con APIs nativas del hardware.📌 Resumen EjecutivoVortexTask es una Aplicación Web Progresiva (PWA) de alto rendimiento orientada a operaciones de misión crítica, seguimiento de incidentes y gestión ágil de flujos de trabajo. A diferencia de las aplicaciones de productividad convencionales que dependen de frameworks pesados y librerías de terceros voluminosas, VortexTask está construida sobre las APIs nativas de la plataforma web.Ofrece una ergonomía móvil de nivel nativo y fluidez de escritorio, integrando ordenamiento fraccional (Lexorank), retroalimentación háptica por hardware, la View Transitions API y un motor de Pointer Events, todo dentro de un peso inicial transferido inferior a 50 KB gzipped.🏛️ Arquitectura del Sistema y Flujo de DatosLa aplicación implementa una arquitectura desacoplada, reactiva y orientada a eventos nativos, organizada en controladores de dominio, capas de persistencia y adaptadores de hardware:┌─────────────────────────────────────────────────────────────────────────────┐
-│                       CLIENTE RUNTIME VORTEXTASK (PWA)                      │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│   [ Motor Táctil y Pointer Events ]      [ Enrutador y Gestor de Vistas ]   │
-│      │                                         │                            │
-│      ├── KanbanDnd.js (Aislamiento de Grip)    ├── View Transitions API     │
-│      ├── Detección de Destino en Calendario    └── Bottom Sheets Dinámicos  │
-│      └── Vibration API (Motor Háptico)                 │                    │
-│                        │                               │                    │
-│                        ▼                               ▼                    │
-│             ┌─────────────────────────────────────────────────────┐         │
-│             │        Estado Local y Motor de UI Optimista         │         │
-│             └─────────────────────────────────────────────────────┘         │
-│                                        │                                    │
-│                   ┌────────────────────┴────────────────────┐               │
-│                   ▼                                         ▼               │
-│      [ Capa de Persistencia Offline ]           [ Gateway Supabase Realtime]│
-│      ├── Service Worker (App Shell)             ├── WebSockets (Sincronía)  │
-│      └── IndexedDB (Mutaciones Locales)         └── PostgREST API (REST)    │
-│                                                             │               │
-└─────────────────────────────────────────────────────────────┼───────────────┘
-                                                              ▼
-                                            ┌─────────────────────────────────┐
-                                            │      POSTGRESQL & SUPABASE      │
-                                            ├─────────────────────────────────┤
-                                            │ • Row Level Security (RLS)      │
-                                            │ • Captura de Cambios (Realtime) │
-                                            │ • Motor de Indexación Fraccional│
-                                            └─────────────────────────────────┘
-⚙️ Registro de Decisiones de Arquitectura (ADRs)1. Motor Táctil Nativo: Pointer Events vs. HTML5 Drag and DropContexto: La API estándar de Drag and Drop de HTML5 (dragstart, dragover, drop) falla de manera recurrente en navegadores móviles (iOS WebKit y Android Chromium WebViews), no soporta gestos táctiles directos y anula el scroll nativo del viewport.Decisión: Se implementó un pipeline táctil a medida en KanbanDnd.js y calendarView.js mediante la API de Pointer Events (pointerdown, pointermove, pointerup, pointercancel) junto con setPointerCapture.Resultado: Cero cancelaciones accidentales de arrastre, precisión de coordenadas táctiles, control estricto de gestos (touch-action: none exclusivamente en el tirador de 6 puntos vs. touch-action: pan-y en las columnas y celdas) y resolución de zonas de soltado en tiempo real con document.elementFromPoint.2. Ordenamiento Fraccional de Baja Contención (Lexorank)Contexto: Las soluciones tradicionales de reordenamiento actualizan secuencias de enteros (order = 1, 2, 3...), generando bloqueos masivos y múltiples operaciones de escritura concurrentes en base de datos.Decisión: Implementación de cálculo de punto medio mediante ordenamiento fraccional:$$\text{posición}_{\text{nueva}} = \frac{\text{posición}_{\text{anterior}} + \text{posición}_{\text{siguiente}}}{2}$$Resultado: Desplazar una tarjeta entre columnas o celdas de calendario requiere únicamente la mutación de una sola fila ($O(1)$ en escritura), eliminando la contención de transacciones entre usuarios simultáneos.3. Experiencia Sensorial Nativa (Háptica y View Transitions)View Transitions API: El cambio de pantallas entre Tablero, Calendario y Métricas utiliza document.startViewTransition(), logrando fundidos suaves acelerados por GPU a 60 fps sin necesidad de renderizadores virtuales externos.Motor Háptico (Vibration API): Una utilidad centralizada Haptics ejecuta patrones de vibración física adaptados a cada interacción:35ms: Confirmación al levantar una tarjeta desde el tirador.[20ms, 40ms, 20ms]: Soltado y persistencia exitosa en nueva columna o fecha.15ms: Micro-pulso de alternancia en modo selección masiva.[40ms, 60ms, 60ms]: Advertencia en confirmación de eliminación o acción crítica.📱 Ergonomía e Interfaz Mobile-FirstVortexTask incorpora estándares ergonómicos pensados específicamente para el uso en dispositivos móviles y modo PWA:Bottom Sheets Contextuales: El modal de creación y edición de tickets se transforma automáticamente según la pantalla: un diálogo centrado en escritorio y un Bottom Sheet táctil en móviles (max-h-[92dvh], barra de agarre superior y pie de botones adhesivo con scroll interno independiente).Compatibilidad con Áreas Seguras: Adaptación completa a la barra de gestos y cámaras de pantalla mediante env(safe-area-inset-bottom) y env(safe-area-inset-top).Rejilla Simétrica de Metadatos: Distribución en 2 columnas emparejadas (Estado inicial + Prioridad, Categoría + Asignar a, Fecha límite + Complejidad) para evitar el desplazamiento vertical innecesario.Quick View de Subtareas en Calendario: Panel inferior interactivo para inspeccionar, marcar y actualizar subtareas directamente desde la celda del calendario sin necesidad de entrar al flujo completo de edición.🛡️ Seguridad y Control de Acceso (RBAC + Supabase RLS)La seguridad y las reglas de negocio están delegadas a nivel de motor en PostgreSQL mediante Row Level Security (RLS), evitando cualquier vulnerabilidad por omisión en el cliente:RolPermisos en TableroCalendario y SubtareasMétricas y AnalíticaCategorías y ConfiguraciónAdminLectura, creación, asignación, eliminación y reordenamiento global.Programación completa.KPIs globales, cumplimiento de SLA y exportación CSV.Control total.AgentGestión de tickets asignados, cambios de estado y checklist de subtareas.Reagendamiento de tickets propios.Indicadores de resolución personal y volumen operativo.Solo lectura.ReporterCreación y seguimiento de requerimientos propios.Visualización de fechas límite propias.Sin acceso.Solo lectura.📊 Analítica y Motor de MétricasEl módulo de Métricas (#metricsPanel) calcula en tiempo real el cumplimiento operativo y los acuerdos de nivel de servicio (SLA):Grid Adaptativo de KPIs: Distribución responsiva protegida con fuentes tabulares (tabular-nums) y truncamiento elíptico contra desbordamientos visuales.Contenedores de Chart.js Autoadaptables: Wrappers relativos (h-56 sm:h-72) con debounce integrado para evitar bucles de redimensionamiento durante la rotación de pantalla (portrait / landscape).Diagnóstico de QA Integrado: Función de auto-verificación en consola (window.__testMetricsView()) para validar programáticamente el scroll, las dimensiones de los lienzos y los paddings de accesibilidad.🚀 Integración Continua y Despliegue (CI/CD)El pipeline de GitHub Actions hacia GitHub Pages cuenta con aislamiento de etapas y control de concurrencia:Control de Concurrencia: Bloqueo de carrera con cancel-in-progress: false sobre el grupo de producción pages.Desduplicación de Artefactos: Separación estricta entre el empaquetado build (upload-pages-artifact@v3) y la publicación deploy (deploy-pages@v4), evitando inconsistencias en reintentos.🛠️ Configuración en Entorno LocalClonar el repositorio:git clone https://github.com/JuanLara2/kanba.git
-cd kanba
-Configurar Credenciales de Supabase:
-Configura las variables de conexión con tu proyecto de Supabase:// src/config/supabase.js
-export const SUPABASE_URL = "https://tu-proyecto.supabase.co";
-export const SUPABASE_ANON_KEY = "tu-clave-anon";
-Ejecutar Localmente:
-Al utilizar módulos ES6 nativos y Service Workers, ejecuta el proyecto mediante cualquier servidor HTTP estático:# Con Python 3
-python3 -m http.server 5500
+# VortexTask (Kanba)
 
-# O con Node.js / npx
-npx serve .
-Abrir en Navegador:
-Ingresa a http://localhost:5500, activa la emulación móvil en DevTools o instala la aplicación directamente como PWA desde la barra de direcciones.📄 LicenciaEste proyecto está bajo la Licencia MIT. Consulta el archivo LICENSE para más información.
+**Gestión de tickets para equipos con tablero Kanban, calendario y métricas.**
+
+VortexTask es una aplicación web con interfaz adaptable y manifiesto PWA. Está construida con JavaScript nativo, HTML y CSS, y utiliza Supabase para autenticación, persistencia y sincronización en tiempo real.
+
+## Contenido
+
+- [Funciones](#funciones)
+- [Tecnologías](#tecnologías)
+- [Arquitectura](#arquitectura)
+- [Requisitos](#requisitos)
+- [Configuración de Supabase](#configuración-de-supabase)
+- [Ejecución local](#ejecución-local)
+- [Pruebas](#pruebas)
+- [Despliegue](#despliegue)
+- [Seguridad](#seguridad)
+- [Licencia](#licencia)
+
+## Funciones
+
+- Tablero Kanban para organizar tickets por estado.
+- Calendario mensual para consultar y reprogramar fechas límite.
+- Vista rápida de subtareas desde las tarjetas del calendario.
+- Métricas operativas, indicadores de SLA y exportación CSV.
+- Autenticación y permisos por rol: Admin, Agent y Reporter.
+- Comentarios, notificaciones y actualizaciones en tiempo real.
+- Cola local de cambios pendientes en IndexedDB, con reintento al recuperar la conexión.
+- Interfaz adaptable, áreas seguras para dispositivos móviles y soporte progresivo para View Transitions y vibración háptica.
+
+> La cola local conserva cambios pendientes, pero la aplicación no implementa caché offline del App Shell ni un service worker.
+
+## Tecnologías
+
+| Área | Implementación |
+| --- | --- |
+| Interfaz | JavaScript ES modules, HTML y CSS propio |
+| Backend | Supabase Auth, PostgreSQL, PostgREST y Realtime |
+| Acceso a datos | Cliente Supabase y adaptador REST del proyecto |
+| Persistencia local | IndexedDB para la cola de mutaciones |
+| Gráficas | SVG nativo |
+| Pruebas | Node.js y `node:test` |
+
+El proyecto no utiliza Tailwind CSS ni Chart.js actualmente.
+
+## Arquitectura
+
+```text
+┌────────────────────── Navegador / PWA ───────────────────────┐
+│                                                              │
+│  Tablero · Calendario · Métricas · Modales                   │
+│                         │                                    │
+│       Estado optimista · Servicios · MutationDispatcher      │
+│                    ┌────┴─────┐                              │
+│                    │          │                              │
+│             IndexedDB       Cliente REST / Realtime           │
+└───────────────────────────────────┬──────────────────────────┘
+                                    │
+                    Supabase Auth · PostgreSQL · RLS
+```
+
+Los cambios compatibles con la cola offline se aplican de forma optimista y se guardan en IndexedDB para intentar sincronizarlos cuando vuelva la conexión. La autorización y el aislamiento de datos deben validarse también en Supabase mediante RLS.
+
+## Requisitos
+
+- Node.js 20 o posterior para las pruebas y validaciones.
+- Un proyecto Supabase configurado con el esquema y las migraciones del repositorio.
+- Un servidor HTTP local para servir el frontend. No abras `index.html` directamente como archivo.
+
+## Configuración de Supabase
+
+1. Crea un proyecto Supabase.
+2. En **SQL Editor**, ejecuta [`supabase/schema.sql`](./supabase/schema.sql).
+3. Aplica las migraciones de [`supabase/migrations/`](./supabase/migrations/) en orden cronológico por nombre. Lleva un registro de las migraciones ya ejecutadas.
+4. Configura la URL y la clave pública/publishable del proyecto en [`js/config/supabase.js`](./js/config/supabase.js):
+
+   ```js
+   export const SUPABASE_URL = 'https://your-project.supabase.co';
+   export const SUPABASE_ANON_KEY = 'your-publishable-key';
+   ```
+
+5. Despliega la función de Supabase para la creación de usuarios:
+
+   ```bash
+   supabase functions deploy admin-create-user
+   ```
+
+6. Configura el primer perfil Admin mediante un procedimiento de aprovisionamiento confiable. La función `admin-create-user` requiere que quien la invoque ya tenga el rol Admin; por eso no crea por sí sola el primer administrador.
+
+> La URL y la clave publishable/anon se usan en el cliente y no son secretos. Nunca incluyas una clave `service_role` en el frontend ni en el repositorio. Mantén las claves privilegiadas en secretos del entorno de Supabase.
+
+## Ejecución local
+
+Desde la raíz del repositorio, inicia un servidor estático. Por ejemplo:
+
+```bash
+# Python
+python -m http.server 5500
+
+# En Windows, si el comando anterior no está disponible
+py -m http.server 5500
+```
+
+Abre <http://localhost:5500> en el navegador. También puedes usar otro servidor estático compatible con módulos ES.
+
+## Pruebas
+
+```bash
+npm ci
+npm test
+npm run check
+```
+
+- `npm test` ejecuta la suite de pruebas automatizadas.
+- `npm run check` comprueba la sintaxis de `js/app.js`.
+
+## Despliegue
+
+El workflow [`deploy-pages.yml`](./.github/workflows/deploy-pages.yml) ejecuta las pruebas y la comprobación de sintaxis; luego publica el sitio en GitHub Pages cuando hay cambios en `main`.
+
+En GitHub, configura **Settings → Pages → Build and deployment → GitHub Actions**. Verifica que `js/config/supabase.js` apunte al proyecto Supabase correspondiente al entorno publicado.
+
+## Seguridad
+
+- Row Level Security (RLS) debe estar habilitado y configurado en Supabase; ocultar o deshabilitar controles en la interfaz no sustituye la autorización del servidor.
+- La función `admin-create-user` usa la clave de servicio en el entorno de Supabase y verifica la identidad y el rol del usuario que la invoca.
+- Revisa el esquema y las migraciones antes de aplicarlos en producción.
+
+## Licencia
+
+El repositorio no incluye actualmente un archivo de licencia. No se debe asumir una licencia de uso o redistribución hasta que se publique una.
