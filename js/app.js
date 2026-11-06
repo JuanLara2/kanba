@@ -123,6 +123,9 @@ const realtimeService = new RealtimeService(client, {
 });
 
 async function bootstrap() {
+  if (document.activeElement instanceof HTMLElement) {
+    document.activeElement.blur();
+  }
   initializePasswordRecovery();
   splashScreen.setProgress(20, 'Preparando espacio de trabajo...');
   initializeThemeController();
