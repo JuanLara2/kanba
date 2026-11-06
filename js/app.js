@@ -160,6 +160,16 @@ async function bootstrap() {
   });
 
   bindStaticEvents();
+  const hashView = window.location.hash.slice(1);
+  const activeTabId = document.querySelector('.view-tab.is-active')?.id;
+  const initialView = hashView === 'metrics'
+    ? 'metrics'
+    : activeTabId === 'calendarTab'
+      ? 'calendar'
+      : activeTabId === 'metricsTab'
+        ? 'metrics'
+        : 'board';
+  setActiveView(initialView);
   window.addEventListener('online', handleConnectionRestored);
   window.addEventListener('offline', refreshPendingSyncStatus);
   splashScreen.setProgress(55, 'Sincronizando tareas...');
@@ -2011,8 +2021,11 @@ function setActiveView(view) {
   const updateView = () => {
     const showCalendar = view === 'calendar';
     const showMetrics = view === 'metrics';
-    const btnNew = document.getElementById('btnNewTicket');
-    if (btnNew) btnNew.classList.toggle('hidden', showMetrics);
+    if (showMetrics) {
+      document.getElementById('btnNewTicket')?.classList.add('hidden');
+    } else {
+      document.getElementById('btnNewTicket')?.classList.remove('hidden');
+    }
     document.getElementById('appShell').classList.toggle('is-calendar-view', showCalendar);
     document.getElementById('appShell').classList.toggle('is-metrics-view', showMetrics);
     document.querySelector('.mobile-selection-entry').classList.toggle('hidden', showCalendar || showMetrics);
