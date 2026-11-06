@@ -259,16 +259,25 @@
             <p>Los puntos representan la complejidad estimada, no una medida aislada de calidad o productividad.</p>
           </div>
           <div class="metrics-controls">
-            <label>Desde <input id="metricsStart" type="date" /></label>
-            <label>Hasta <input id="metricsEnd" type="date" /></label>
-            <label for="metricsGrouping">Agrupar por
-              <select id="metricsGrouping">
-                <option value="day">Día</option>
-                <option value="week">Semana</option>
-                <option value="month">Mes</option>
-              </select>
-            </label>
-            <button id="btnExportMetrics" class="btn btn-outline" type="button">Exportar CSV</button>
+            <div class="metrics-date-row">
+              <label class="metrics-date-field" for="metricsStart">Desde
+                <input id="metricsStart" type="date" />
+              </label>
+              <label class="metrics-date-field" for="metricsEnd">Hasta
+                <input id="metricsEnd" type="date" />
+              </label>
+            </div>
+            <div class="metrics-actions-row">
+              <label class="metrics-group-control" for="metricsGrouping">
+                <span>Agrupar por:</span>
+                <select id="metricsGrouping">
+                  <option value="day">Día</option>
+                  <option value="week">Semana</option>
+                  <option value="month">Mes</option>
+                </select>
+              </label>
+              <button id="btnExportMetrics" class="btn btn-outline metrics-export-btn" type="button">Exportar CSV</button>
+            </div>
           </div>
         </header>
         <p id="metricsError" class="metrics-error hidden" role="alert"></p>
