@@ -1908,6 +1908,48 @@ html[data-theme="light"] .theme-picker select option {
   padding: 0.7rem 0.8rem;
 }
 
+.password-input-wrap {
+  position: relative;
+}
+
+.password-input-wrap #passwordInput {
+  padding-right: 3rem;
+}
+
+.password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 0.625rem;
+  display: inline-flex;
+  width: 2.5rem;
+  height: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transform: translateY(-50%);
+  border: 0;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.password-toggle:hover {
+  background: color-mix(in srgb, var(--text-muted) 12%, transparent);
+  color: var(--text-main);
+}
+
+.password-toggle:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
+}
+
+.password-toggle .icon {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
 .modal-actions {
   display: flex;
   justify-content: flex-end;

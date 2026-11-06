@@ -509,6 +509,7 @@ async function handleChangePasswordSubmit(event) {
 
 function renderAvatarFallback(element, user, fallback = 'U') {
   const target = element;
+  if (!target) return;
   target.replaceChildren();
   const initials = user?.fullName ? user.fullName.trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase() : fallback;
   if (user?.avatarUrl) {
@@ -535,28 +536,52 @@ function renderProfileSummary(user = activeUser) {
 
   renderAvatarFallback(preview, user, 'U');
   renderHeaderUser(user);
-  name.textContent = user?.fullName || 'Sin nombre';
-  email.textContent = user?.email || 'Sin correo';
-  role.textContent = user?.role || 'Sin rol';
+  if (name) name.textContent = user?.fullName || 'Sin nombre';
+  if (email) email.textContent = user?.email || 'Sin correo';
+  if (role) role.textContent = user?.role || 'Sin rol';
 }
 
 function renderHeaderUser(user) {
   const firstName = user?.fullName?.trim().split(/\s+/)[0] || '';
-  document.getElementById('headerFirstName').textContent = firstName;
-  document.getElementById('headerRoleBadge').textContent = user?.role?.toUpperCase() || '';
-  renderAvatarFallback(document.getElementById('headerUserAvatar'), user, 'U');
+  const firstNameElement = document.getElementById('headerFirstName');
+  const roleElement = document.getElementById('headerRoleBadge');
+  const avatarElement = document.getElementById('headerUserAvatar');
+  if (firstNameElement) firstNameElement.textContent = firstName;
+  if (roleElement) roleElement.textContent = user?.role?.toUpperCase() || '';
+  renderAvatarFallback(avatarElement, user, 'U');
+}
+
+function initPasswordToggle() {
+  const toggleButton = document.getElementById('btnTogglePassword');
+  const passwordInput = document.getElementById('passwordInput');
+  const eyeOpen = document.getElementById('iconEyeOpen');
+  const eyeClosed = document.getElementById('iconEyeClosed');
+  if (!toggleButton || !passwordInput || !eyeOpen || !eyeClosed) return;
+
+  toggleButton.addEventListener('click', () => {
+    const showPassword = passwordInput.type === 'password';
+    passwordInput.type = showPassword ? 'text' : 'password';
+    eyeOpen.classList.toggle('hidden', showPassword);
+    eyeClosed.classList.toggle('hidden', !showPassword);
+    toggleButton.setAttribute('aria-label', showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña');
+    toggleButton.setAttribute('aria-pressed', String(showPassword));
+    passwordInput.focus();
+  });
 }
 
 function setProfileMenuOpen(isOpen, restoreFocus = false) {
   const trigger = document.getElementById('btnUserProfile');
   const panel = document.getElementById('profileMenuPanel');
+  if (!trigger || !panel) return;
   panel.classList.toggle('hidden', !isOpen);
   trigger.setAttribute('aria-expanded', String(isOpen));
   if (!isOpen && restoreFocus) trigger.focus();
 }
 
 function toggleProfileMenu() {
-  const isOpen = document.getElementById('btnUserProfile').getAttribute('aria-expanded') === 'true';
+  const trigger = document.getElementById('btnUserProfile');
+  if (!trigger) return;
+  const isOpen = trigger.getAttribute('aria-expanded') === 'true';
   setProfileMenuOpen(!isOpen);
 }
 
@@ -718,25 +743,26 @@ async function handleProfileAvatarRemoval() {
 }
 
 function bindStaticEvents() {
+  initPasswordToggle();
   const userRoleSelect = document.getElementById('userRole');
-  userRoleSelect.addEventListener('change', updateUserRoleDescription);
+  userRoleSelect?.addEventListener('change', updateUserRoleDescription);
   const createWorkspaceCheckbox = document.getElementById('userCreateWorkspace');
-  createWorkspaceCheckbox.addEventListener('change', syncNewWorkspaceForm);
-  usersForm.addEventListener('reset', () => {
+  createWorkspaceCheckbox?.addEventListener('change', syncNewWorkspaceForm);
+  usersForm?.addEventListener('reset', () => {
     setTimeout(syncNewWorkspaceForm, 0);
   });
   syncNewWorkspaceForm();
   updateUserRoleDescription();
-  document.getElementById('btnManageCategories').addEventListener('click', () => {
+  document.getElementById('btnManageCategories')?.addEventListener('click', () => {
     setProfileMenuOpen(false);
     openCategoriesModal();
   });
-  document.getElementById('categoriesModalCloseBtn').addEventListener('click', closeCategoriesModal);
-  document.getElementById('categoriesModalCancelBtn').addEventListener('click', closeCategoriesModal);
-  categoriesModal.addEventListener('click', (event) => {
+  document.getElementById('categoriesModalCloseBtn')?.addEventListener('click', closeCategoriesModal);
+  document.getElementById('categoriesModalCancelBtn')?.addEventListener('click', closeCategoriesModal);
+  categoriesModal?.addEventListener('click', (event) => {
     if (event.target === categoriesModal) closeCategoriesModal();
   });
-  categoriesModal.addEventListener('keydown', (event) => {
+  categoriesModal?.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') {
       closeCategoriesModal();
       return;
@@ -752,19 +778,19 @@ function bindStaticEvents() {
       focusable[0].focus();
     }
   });
-  categoryForm.addEventListener('submit', handleCategorySubmit);
-  document.getElementById('categoryList').addEventListener('click', handleCategoryListClick);
-  document.getElementById('btnRetrySync').addEventListener('click', () => {
+  categoryForm?.addEventListener('submit', handleCategorySubmit);
+  document.getElementById('categoryList')?.addEventListener('click', handleCategoryListClick);
+  document.getElementById('btnRetrySync')?.addEventListener('click', () => {
     void handleConnectionRestored();
   });
-  document.getElementById('btnForgotPassword').addEventListener('click', handleForgotPassword);
-  passwordRecoveryForm.addEventListener('submit', handlePasswordRecoverySubmit);
-  document.getElementById('btnUserProfile').addEventListener('click', toggleProfileMenu);
-  document.getElementById('btnProfileMenuOpenProfile').addEventListener('click', () => {
+  document.getElementById('btnForgotPassword')?.addEventListener('click', handleForgotPassword);
+  passwordRecoveryForm?.addEventListener('submit', handlePasswordRecoverySubmit);
+  document.getElementById('btnUserProfile')?.addEventListener('click', toggleProfileMenu);
+  document.getElementById('btnProfileMenuOpenProfile')?.addEventListener('click', () => {
     setProfileMenuOpen(false);
     openProfileModal();
   });
-  document.getElementById('profileMenu').addEventListener('keydown', (event) => {
+  document.getElementById('profileMenu')?.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') {
       setProfileMenuOpen(false, true);
       return;
@@ -780,18 +806,20 @@ function bindStaticEvents() {
   });
   document.addEventListener('pointerdown', (event) => {
     const profileMenu = document.getElementById('profileMenu');
-    const isOpen = document.getElementById('btnUserProfile').getAttribute('aria-expanded') === 'true';
-    if (!isOpen || profileMenu.contains(event.target)) return;
+    const profileTrigger = document.getElementById('btnUserProfile');
+    const isOpen = profileTrigger?.getAttribute('aria-expanded') === 'true';
+    if (!isOpen || !profileMenu || profileMenu.contains(event.target)) return;
     setProfileMenuOpen(false);
   });
-  document.getElementById('profileCloseBtn').addEventListener('click', closeProfileModal);
-  document.getElementById('profileCancelBtn').addEventListener('click', closeProfileModal);
-  document.getElementById('profileUploadBtn').addEventListener('click', handleProfileAvatarUpload);
-  document.getElementById('profileRemoveAvatarBtn').addEventListener('click', handleProfileAvatarRemoval);
-  profileAvatarInput.addEventListener('change', () => {
+  document.getElementById('profileCloseBtn')?.addEventListener('click', closeProfileModal);
+  document.getElementById('profileCancelBtn')?.addEventListener('click', closeProfileModal);
+  document.getElementById('profileUploadBtn')?.addEventListener('click', handleProfileAvatarUpload);
+  document.getElementById('profileRemoveAvatarBtn')?.addEventListener('click', handleProfileAvatarRemoval);
+  profileAvatarInput?.addEventListener('change', () => {
     const file = profileAvatarInput.files?.[0];
-    profileFileName.textContent = file ? file.name : 'Ningún archivo seleccionado';
+    if (profileFileName) profileFileName.textContent = file ? file.name : 'Ningún archivo seleccionado';
     const avatarStatus = document.getElementById('profileAvatarStatus');
+    if (!avatarStatus) return;
     if (!file) {
       avatarStatus.textContent = '';
       avatarStatus.classList.remove('is-error');
@@ -802,6 +830,7 @@ function bindStaticEvents() {
     const reader = new FileReader();
     reader.onload = () => {
       const preview = document.getElementById('profileAvatarPreview');
+      if (!preview) return;
       preview.replaceChildren();
       const image = document.createElement('img');
       image.src = String(reader.result || '');
@@ -810,21 +839,21 @@ function bindStaticEvents() {
     };
     reader.readAsDataURL(file);
   });
-  document.getElementById('btnChangePassword').addEventListener('click', () => {
+  document.getElementById('btnChangePassword')?.addEventListener('click', () => {
     setProfileMenuOpen(false);
     changePasswordModal.classList.remove('hidden');
     trackMobileOverlayOpen('password');
     document.getElementById('newAccountPassword').focus();
   });
-  document.getElementById('profileChangePasswordBtn').addEventListener('click', () => {
+  document.getElementById('profileChangePasswordBtn')?.addEventListener('click', () => {
     closeProfileModal();
     changePasswordModal.classList.remove('hidden');
     trackMobileOverlayOpen('password');
     document.getElementById('newAccountPassword').focus();
   });
-  document.getElementById('changePasswordCloseBtn').addEventListener('click', closeChangePasswordModal);
-  document.getElementById('changePasswordCancelBtn').addEventListener('click', closeChangePasswordModal);
-  changePasswordForm.addEventListener('submit', handleChangePasswordSubmit);
+  document.getElementById('changePasswordCloseBtn')?.addEventListener('click', closeChangePasswordModal);
+  document.getElementById('changePasswordCancelBtn')?.addEventListener('click', closeChangePasswordModal);
+  changePasswordForm?.addEventListener('submit', handleChangePasswordSubmit);
   document.getElementById('boardTab').addEventListener('click', () => navigateBottomTab('board'));
   document.getElementById('calendarTab').addEventListener('click', () => navigateBottomTab('calendar'));
   document.getElementById('metricsTab').addEventListener('click', () => navigateBottomTab('metrics'));
@@ -845,8 +874,8 @@ function bindStaticEvents() {
     setActiveView(resolvedView);
     tabs[nextIndex].focus();
   });
-  document.getElementById('btnNewTicket').addEventListener('click', openNewTicketModal);
-  document.getElementById('profileManageUsersBtn').addEventListener('click', async () => {
+  document.getElementById('btnNewTicket')?.addEventListener('click', openNewTicketModal);
+  document.getElementById('profileManageUsersBtn')?.addEventListener('click', async () => {
     const user = activeUser || await auth.getCurrentUser();
     if (!auth.canManageUsers(user)) {
       showToast('Solo un administrador puede administrar usuarios.');
@@ -865,10 +894,11 @@ function bindStaticEvents() {
   document.getElementById('usersModal').addEventListener('click', handleUserRoleUpdate);
   document.getElementById('usersModalCloseBtn').addEventListener('click', () => modalView.closeUsers());
   document.getElementById('usersModalCancelBtn').addEventListener('click', () => modalView.closeUsers());
-  document.getElementById('btnNotifications').addEventListener('click', () => {
+  document.getElementById('btnNotifications')?.addEventListener('click', () => {
     const panel = document.getElementById('notificationsPanel');
+    if (!panel) return;
     const isOpen = panel.classList.toggle('hidden') === false;
-    document.getElementById('btnNotifications').setAttribute('aria-expanded', String(isOpen));
+    document.getElementById('btnNotifications')?.setAttribute('aria-expanded', String(isOpen));
     if (isOpen) trackMobileOverlayOpen('notifications');
     else trackMobileOverlayClose('notifications');
     if (isOpen) refreshNotificationList();
@@ -947,7 +977,10 @@ function bindStaticEvents() {
       showToast(error.message || 'No se pudo eliminar el ticket');
     }
   });
-  document.getElementById('btnLogout').addEventListener('click', async () => {
+  document.getElementById('btnLogout')?.addEventListener('click', async () => {
+    closeProfileModal();
+    setProfileMenuOpen(false);
+
     let logoutError;
     try {
       await auth.logout();
@@ -2222,7 +2255,7 @@ function renderNotifications() {
 async function handleLoginSubmit(event) {
   event.preventDefault();
   const email = document.getElementById('loginEmail').value;
-  const password = document.getElementById('loginPassword').value;
+  const password = document.getElementById('passwordInput').value;
 
   try {
     const user = await auth.login(email, password);
@@ -2774,8 +2807,10 @@ async function syncAuthState() {
     if (btnManageUsers) btnManageUsers.classList.toggle('hidden', !auth.canManageUsers(currentUser));
     if (profileManageUsersBtn) profileManageUsersBtn.classList.toggle('hidden', !auth.canManageUsers(currentUser));
     if (btnManageCategories) btnManageCategories.classList.toggle('hidden', !auth.canManageCategories(currentUser));
-    document.getElementById('sessionUserName').textContent = currentUser.fullName;
-    document.getElementById('sessionUserRole').textContent = currentUser.role;
+    const sessionUserName = document.getElementById('sessionUserName');
+    const sessionUserRole = document.getElementById('sessionUserRole');
+    if (sessionUserName) sessionUserName.textContent = currentUser.fullName;
+    if (sessionUserRole) sessionUserRole.textContent = currentUser.role;
     renderHeaderUser(currentUser);
     if (profileModal && !profileModal.classList.contains('hidden')) renderProfileSummary(currentUser);
   } else {
@@ -2790,8 +2825,10 @@ async function syncAuthState() {
     if (btnManageUsers) btnManageUsers.classList.add('hidden');
     if (profileManageUsersBtn) profileManageUsersBtn.classList.add('hidden');
     if (btnManageCategories) btnManageCategories.classList.add('hidden');
-    document.getElementById('sessionUserName').textContent = 'Invitado';
-    document.getElementById('sessionUserRole').textContent = 'Sin sesión';
+    const sessionUserName = document.getElementById('sessionUserName');
+    const sessionUserRole = document.getElementById('sessionUserRole');
+    if (sessionUserName) sessionUserName.textContent = 'Invitado';
+    if (sessionUserRole) sessionUserRole.textContent = 'Sin sesión';
     renderHeaderUser(null);
     usersMap.clear();
     allTickets = [];
