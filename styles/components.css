@@ -2419,6 +2419,13 @@ html[data-theme="pink"] .btn-danger { color: #b91c1c; }
   display: none;
 }
 
+.app-shell.is-metrics-view #btnNewTicket {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
 .metrics-header {
   min-width: 0;
   display: flex;
@@ -2454,7 +2461,7 @@ html[data-theme="pink"] .btn-danger { color: #b91c1c; }
   display: flex;
   width: min(100%, 34rem);
   flex-direction: column;
-  gap: 0.625rem;
+  gap: 0.5rem;
 }
 
 .metrics-date-row {
@@ -2463,58 +2470,46 @@ html[data-theme="pink"] .btn-danger { color: #b91c1c; }
   gap: 0.5rem;
 }
 
-.metrics-controls label {
+.metrics-field {
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
+  min-width: 0;
+  gap: 0.125rem;
   color: var(--text-muted);
-  font-size: 0.6875rem;
+}
+
+.metrics-field-label {
+  display: block;
+  font-size: 0.625rem;
   font-weight: 500;
 }
 
-.metrics-date-field input {
+.metrics-date-field,
+.metrics-group-select {
   width: 100%;
   min-width: 0;
-  padding: 0.4rem 0.5rem;
+  height: 2rem;
+  padding: 0 0.5rem;
   font-size: 0.75rem;
-}
-
-.metrics-controls input {
   border: 1px solid var(--border-subtle);
   border-radius: 7px;
   background: var(--bg-input);
   color: var(--text-main);
-  padding: 0.5rem;
-}
-
-.metrics-controls select {
-  min-width: 0;
-  border: 1px solid var(--border-subtle);
-  border-radius: 7px;
-  background: var(--bg-input);
-  color: var(--text-main);
-  padding: 0.4rem 0.5rem;
-  font-size: 0.75rem;
 }
 
 .metrics-actions-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: end;
   gap: 0.5rem;
-  padding-top: 0.25rem;
-}
-
-.metrics-group-control {
-  flex-direction: row !important;
-  align-items: center;
-  gap: 0.4rem !important;
-  white-space: nowrap;
 }
 
 .metrics-export-btn {
+  width: 100%;
+  min-width: 0;
   min-height: 2rem;
-  padding: 0.4rem 0.875rem;
+  height: 2rem;
+  padding: 0 0.5rem;
   font-size: 0.75rem;
   white-space: nowrap;
 }
@@ -2833,10 +2828,6 @@ html[data-theme="pink"] .btn-danger { color: #b91c1c; }
 
   .metrics-controls {
     width: 100%;
-  }
-
-  .metrics-date-field {
-    min-width: 0;
   }
 
   .metrics-cards {

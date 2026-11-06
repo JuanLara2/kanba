@@ -260,22 +260,24 @@
           </div>
           <div class="metrics-controls">
             <div class="metrics-date-row">
-              <label class="metrics-date-field" for="metricsStart">Desde
-                <input id="metricsStart" type="date" />
-              </label>
-              <label class="metrics-date-field" for="metricsEnd">Hasta
-                <input id="metricsEnd" type="date" />
-              </label>
+              <div class="metrics-field">
+                <label class="metrics-field-label" for="metricsStart">Desde</label>
+                <input class="metrics-date-field" id="metricsStart" type="date" />
+              </div>
+              <div class="metrics-field">
+                <label class="metrics-field-label" for="metricsEnd">Hasta</label>
+                <input class="metrics-date-field" id="metricsEnd" type="date" />
+              </div>
             </div>
             <div class="metrics-actions-row">
-              <label class="metrics-group-control" for="metricsGrouping">
-                <span>Agrupar por:</span>
-                <select id="metricsGrouping">
+              <div class="metrics-field">
+                <label class="metrics-field-label" for="metricsGrouping">Agrupar por</label>
+                <select class="metrics-group-select" id="metricsGrouping">
                   <option value="day">Día</option>
                   <option value="week">Semana</option>
                   <option value="month">Mes</option>
                 </select>
-              </label>
+              </div>
               <button id="btnExportMetrics" class="btn btn-outline metrics-export-btn" type="button">Exportar CSV</button>
             </div>
           </div>

@@ -2011,7 +2011,8 @@ function setActiveView(view) {
   const updateView = () => {
     const showCalendar = view === 'calendar';
     const showMetrics = view === 'metrics';
-    document.getElementById('btnNewTicket').classList.toggle('hidden', showMetrics);
+    const btnNew = document.getElementById('btnNewTicket');
+    if (btnNew) btnNew.classList.toggle('hidden', showMetrics);
     document.getElementById('appShell').classList.toggle('is-calendar-view', showCalendar);
     document.getElementById('appShell').classList.toggle('is-metrics-view', showMetrics);
     document.querySelector('.mobile-selection-entry').classList.toggle('hidden', showCalendar || showMetrics);
