@@ -1,84 +1,13 @@
 import { getSlaState } from '../services/slaService.js';
 import { Haptics } from '../utils/haptics.js';
+import { CalendarQuickView } from './calendarQuickView.js';
 
 const WEEKDAY_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 const SUBTASK_TOOLTIP_ID = 'calendarSubtaskTooltip';
-const SUBTASKS_QUICK_VIEW_ID = 'calendarSubtasksQuickView';
-let quickViewCloseTimer = null;
-let quickViewReturnFocus = null;
-let quickViewPreviousBodyOverflow = '';
 
 function closestElement(target, selector) {
   const element = target?.nodeType === 1 ? target : target?.parentElement;
   return element?.closest?.(selector) || null;
-}
-
-function initializeSubtasksQuickView() {
-  if (typeof document === 'undefined') return null;
-  let quickView = document.getElementById(SUBTASKS_QUICK_VIEW_ID);
-  if (!quickView) {
-    quickView = document.createElement('div');
-    quickView.id = SUBTASKS_QUICK_VIEW_ID;
-    quickView.className = 'calendar-subtasks-quick-view';
-    quickView.hidden = true;
-    quickView.setAttribute('aria-hidden', 'true');
-    quickView.innerHTML = `
-      <button class="calendar-subtasks-backdrop" type="button" data-quick-view-close aria-label="Cerrar detalle de subtareas"></button>
-      <section class="calendar-subtasks-sheet" role="dialog" aria-modal="true" aria-labelledby="calendar-subtasks-title">
-        <div class="calendar-subtasks-sheet-handle" aria-hidden="true"></div>
-        <header class="calendar-subtasks-sheet-header">
-          <div class="calendar-subtasks-sheet-heading">
-            <span class="calendar-subtasks-ticket-id"></span>
-            <h2 id="calendar-subtasks-title" class="calendar-subtasks-ticket-title"></h2>
-          </div>
-          <button class="calendar-subtasks-close" type="button" data-quick-view-close aria-label="Cerrar">✕</button>
-        </header>
-        <div class="calendar-subtasks-sheet-progress">
-          <div class="calendar-subtasks-sheet-progress-meta">
-            <span>Progreso de subtareas</span>
-            <span class="calendar-subtasks-sheet-percent"></span>
-          </div>
-          <div class="calendar-subtasks-sheet-progress-track">
-            <div class="calendar-subtasks-sheet-progress-fill"></div>
-          </div>
-        </div>
-        <ul class="calendar-subtasks-sheet-list"></ul>
-      </section>
-    `;
-    document.body.append(quickView);
-  }
-
-  if (quickView.dataset.initialized !== 'true') {
-    quickView.addEventListener('click', (event) => {
-      if (closestElement(event.target, '[data-quick-view-close]')) closeSubtasksQuickView();
-    });
-    document.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape' && !quickView.hidden) {
-        event.preventDefault();
-        closeSubtasksQuickView();
-      }
-    });
-    quickView.dataset.initialized = 'true';
-  }
-
-  return quickView;
-}
-
-function closeSubtasksQuickView() {
-  const quickView = typeof document === 'undefined'
-    ? null
-    : document.getElementById(SUBTASKS_QUICK_VIEW_ID);
-  if (!quickView || quickView.hidden) return;
-
-  window.clearTimeout(quickViewCloseTimer);
-  quickView.classList.remove('is-open');
-  quickView.setAttribute('aria-hidden', 'true');
-  document.body.style.overflow = quickViewPreviousBodyOverflow;
-  quickViewCloseTimer = window.setTimeout(() => {
-    quickView.hidden = true;
-    quickViewReturnFocus?.focus?.();
-    quickViewReturnFocus = null;
-  }, 250);
 }
 
 export function localDateKey(value) {
@@ -108,12 +37,27 @@ export function dueDateForCalendarDay(day, previousDueDate = null) {
 }
 
 export class CalendarView {
-  constructor({ container, onDateChange, onTicketClick, onCreateForDate, onSearch, canReschedule = false }) {
+  constructor({
+    container,
+    onDateChange,
+    onTicketClick,
+    onCreateForDate,
+    onSearch,
+    onChecklistChange,
+    onChecklistError,
+    canEditSubtasks,
+    canReschedule = false
+  }) {
     this.container = container;
     this.onDateChange = onDateChange;
     this.onTicketClick = onTicketClick;
     this.onCreateForDate = onCreateForDate;
     this.onSearch = onSearch;
+    this.quickView = new CalendarQuickView({
+      onChecklistChange,
+      onError: onChecklistError,
+      canEditSubtasks
+    });
     this.canReschedule = canReschedule;
     this.month = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
     this.tickets = [];
@@ -432,7 +376,7 @@ export class CalendarView {
             <span class="calendar-ticket-progress-meta">
               <span class="calendar-ticket-progress-count">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-                ${completed}/${total}
+                <span class="calendar-ticket-progress-count-value">${completed}/${total}</span>
               </span>
               <span class="calendar-ticket-progress-percent">${percent}%</span>
             </span>
@@ -497,42 +441,29 @@ export class CalendarView {
   }
 
   openSubtasksQuickView(ticket, trigger = null) {
-    const subtasks = Array.isArray(ticket.subtasks)
-      ? ticket.subtasks
-      : (Array.isArray(ticket.checklist) ? ticket.checklist : []);
-    if (subtasks.length === 0) return;
-
-    const quickView = initializeSubtasksQuickView();
-    if (!quickView) return;
-
-    window.clearTimeout(quickViewCloseTimer);
     this.hideSubtaskTooltip();
-    const completed = subtasks.filter((subtask) => subtask.completed || subtask.done).length;
-    const percent = Math.round((completed / subtasks.length) * 100);
-    quickView.querySelector('.calendar-subtasks-ticket-id').textContent = ticket.id;
-    quickView.querySelector('.calendar-subtasks-ticket-title').textContent = ticket.title;
-    quickView.querySelector('.calendar-subtasks-sheet-percent').textContent = `${completed}/${subtasks.length} (${percent}%)`;
-    quickView.querySelector('.calendar-subtasks-sheet-progress-fill').style.width = `${percent}%`;
-    quickView.querySelector('.calendar-subtasks-sheet-list').innerHTML = subtasks.map((subtask) => {
-      const isCompleted = Boolean(subtask.completed || subtask.done);
-      return `
-        <li class="calendar-subtasks-sheet-item${isCompleted ? ' is-completed' : ''}">
-          <span class="calendar-subtasks-sheet-check" aria-hidden="true">${isCompleted ? '✓' : ''}</span>
-          <span>${this.escapeHtml(subtask.title || subtask.text || '')}</span>
-        </li>
-      `;
-    }).join('');
+    this.quickView.open(ticket, trigger);
+  }
 
-    quickViewReturnFocus = trigger;
-    quickViewPreviousBodyOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    quickView.hidden = false;
-    quickView.setAttribute('aria-hidden', 'false');
-    window.requestAnimationFrame(() => {
-      if (quickView.hidden) return;
-      quickView.classList.add('is-open');
-      quickView.querySelector('.calendar-subtasks-close').focus();
+  updateTicketProgress(ticket) {
+    const subtasks = Array.isArray(ticket?.subtasks)
+      ? ticket.subtasks
+      : (Array.isArray(ticket?.checklist) ? ticket.checklist : []);
+    const total = subtasks.length;
+    const completed = subtasks.filter((subtask) => subtask.completed || subtask.done).length;
+    const percent = total ? Math.round((completed / total) * 100) : 0;
+
+    this.container.querySelectorAll('[data-calendar-ticket]').forEach((ticketElement) => {
+      if (ticketElement.dataset.ticketId !== String(ticket.id)) return;
+      const progress = ticketElement.querySelector('.calendar-ticket-progress');
+      if (!progress) return;
+      progress.setAttribute('aria-label', `Ver subtareas: ${completed} de ${total} completadas`);
+      progress.querySelector('.calendar-ticket-progress-count-value').textContent = `${completed}/${total}`;
+      progress.querySelector('.calendar-ticket-progress-percent').textContent = `${percent}%`;
+      progress.querySelector('.calendar-ticket-progress-fill').style.width = `${percent}%`;
     });
+
+    this.quickView.refresh(ticket);
   }
 
   hideSubtaskTooltip() {

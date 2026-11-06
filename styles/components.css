@@ -1246,6 +1246,25 @@ html[data-theme="light"] .theme-picker select option {
   background: rgba(52, 211, 153, 0.12);
 }
 
+.calendar-subtasks-sheet-checkbox {
+  width: 1.15rem;
+  height: 1.15rem;
+  flex: 0 0 auto;
+  margin: 0.1rem 0 0;
+  accent-color: #818cf8;
+  cursor: pointer;
+}
+
+.calendar-subtasks-sheet-checkbox:focus-visible {
+  outline: 2px solid #a5b4fc;
+  outline-offset: 2px;
+}
+
+.calendar-subtasks-sheet-item.is-completed .calendar-subtasks-sheet-checkbox + span {
+  color: #94a3b8;
+  text-decoration: line-through;
+}
+
 .empty-column {
   border: 1px dashed var(--border-subtle);
   border-radius: 8px;

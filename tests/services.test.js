@@ -825,6 +825,54 @@ test('calendar progress activation opens its quick view without opening the tick
   assert.equal(propagationStopped, true);
 });
 
+test('calendar checklist changes refresh the ticket progress bar without rerendering', () => {
+  const progressValues = {};
+  const progress = {
+    setAttribute(name, value) {
+      progressValues[name] = value;
+    },
+    querySelector(selector) {
+      const property = selector === '.calendar-ticket-progress-count-value'
+        ? 'count'
+        : selector === '.calendar-ticket-progress-percent'
+          ? 'percent'
+          : 'width';
+      return {
+        set textContent(value) {
+          progressValues[property] = value;
+        },
+        style: {
+          set width(value) {
+            progressValues.width = value;
+          }
+        }
+      };
+    }
+  };
+  const ticketElement = {
+    dataset: { ticketId: 'TCK-4' },
+    querySelector: () => progress
+  };
+  const container = {
+    addEventListener() {},
+    querySelectorAll: () => [ticketElement]
+  };
+  const calendar = new CalendarView({ container });
+  calendar.quickView.refresh = () => {};
+  calendar.updateTicketProgress({
+    id: 'TCK-4',
+    checklist: [
+      { text: 'Completed', completed: true },
+      { text: 'Pending', completed: false }
+    ]
+  });
+
+  assert.equal(progressValues['aria-label'], 'Ver subtareas: 1 de 2 completadas');
+  assert.equal(progressValues.count, '1/2');
+  assert.equal(progressValues.percent, '50%');
+  assert.equal(progressValues.width, '50%');
+});
+
 test('calendar ticket touch captures the pointer only after drag movement starts on its handle', () => {
   const handlers = new Map();
   const container = {

@@ -153,7 +153,10 @@ async function bootstrap() {
     onDateChange: handleCalendarDateChange,
     onTicketClick: openTicketForEditing,
     onCreateForDate: openNewTicketForDate,
-    onSearch: focusCalendarSearch
+    onSearch: focusCalendarSearch,
+    onChecklistChange: handleCalendarChecklistToggle,
+    onChecklistError: (error) => showToast(error.message || 'No se pudo actualizar la subtarea.'),
+    canEditSubtasks: (ticket) => auth.canEditTicket(activeUser, ticket)
   });
 
   bindStaticEvents();
@@ -2005,23 +2008,31 @@ async function handleCalendarDateChange(ticketId, dateKey) {
 }
 
 function setActiveView(view) {
-  const showCalendar = view === 'calendar';
-  const showMetrics = view === 'metrics';
-  document.getElementById('appShell').classList.toggle('is-calendar-view', showCalendar);
-  document.getElementById('appShell').classList.toggle('is-metrics-view', showMetrics);
-  document.querySelector('.mobile-selection-entry').classList.toggle('hidden', showCalendar || showMetrics);
-  document.getElementById('boardPanel').classList.toggle('hidden', showCalendar || showMetrics);
-  document.getElementById('calendarPanel').classList.toggle('hidden', !showCalendar);
-  document.getElementById('metricsPanel').classList.toggle('hidden', !showMetrics);
-  document.getElementById('boardTab').classList.toggle('is-active', !showCalendar && !showMetrics);
-  document.getElementById('calendarTab').classList.toggle('is-active', showCalendar);
-  document.getElementById('metricsTab').classList.toggle('is-active', showMetrics);
-  document.getElementById('boardTab').setAttribute('aria-selected', String(!showCalendar && !showMetrics));
-  document.getElementById('calendarTab').setAttribute('aria-selected', String(showCalendar));
-  document.getElementById('metricsTab').setAttribute('aria-selected', String(showMetrics));
-  document.getElementById('boardTab').tabIndex = showCalendar || showMetrics ? -1 : 0;
-  document.getElementById('calendarTab').tabIndex = showCalendar ? 0 : -1;
-  document.getElementById('metricsTab').tabIndex = showMetrics ? 0 : -1;
+  const updateView = () => {
+    const showCalendar = view === 'calendar';
+    const showMetrics = view === 'metrics';
+    document.getElementById('appShell').classList.toggle('is-calendar-view', showCalendar);
+    document.getElementById('appShell').classList.toggle('is-metrics-view', showMetrics);
+    document.querySelector('.mobile-selection-entry').classList.toggle('hidden', showCalendar || showMetrics);
+    document.getElementById('boardPanel').classList.toggle('hidden', showCalendar || showMetrics);
+    document.getElementById('calendarPanel').classList.toggle('hidden', !showCalendar);
+    document.getElementById('metricsPanel').classList.toggle('hidden', !showMetrics);
+    document.getElementById('boardTab').classList.toggle('is-active', !showCalendar && !showMetrics);
+    document.getElementById('calendarTab').classList.toggle('is-active', showCalendar);
+    document.getElementById('metricsTab').classList.toggle('is-active', showMetrics);
+    document.getElementById('boardTab').setAttribute('aria-selected', String(!showCalendar && !showMetrics));
+    document.getElementById('calendarTab').setAttribute('aria-selected', String(showCalendar));
+    document.getElementById('metricsTab').setAttribute('aria-selected', String(showMetrics));
+    document.getElementById('boardTab').tabIndex = showCalendar || showMetrics ? -1 : 0;
+    document.getElementById('calendarTab').tabIndex = showCalendar ? 0 : -1;
+    document.getElementById('metricsTab').tabIndex = showMetrics ? 0 : -1;
+  };
+
+  if (typeof document.startViewTransition === 'function') {
+    document.startViewTransition(updateView);
+  } else {
+    updateView();
+  }
 }
 
 function updateUserRoleDescription() {
@@ -2485,6 +2496,45 @@ function handleChecklistToggle(index, completed) {
   }).catch((error) => showToast(error.message || 'No se pudo actualizar la subtarea.'));
 }
 
+function handleCalendarChecklistToggle(ticket, index, completed) {
+  const current = allTickets.find((item) => item.id === ticket.id);
+  const checklist = current?.checklist;
+  const item = checklist?.[index];
+  if (!item) {
+    return Promise.reject(new Error('La subtarea ya no está disponible. Recarga el calendario e inténtalo de nuevo.'));
+  }
+  if (Boolean(item.completed || item.done) === completed) return Promise.resolve({ status: 'synced' });
+
+  const previousCompleted = Boolean(item.completed || item.done);
+  const text = item.text;
+  if (typeof text !== 'string') {
+    return Promise.reject(new Error('No se pudo identificar la subtarea para guardarla.'));
+  }
+
+  return mutations.dispatch({
+    type: 'ticket.checklist.complete',
+    entityId: current.id,
+    payload: { index, text, completed, previousCompleted },
+    optimistic: () => {
+      item.completed = completed;
+      if ('done' in item) item.done = completed;
+      calendarView?.updateTicketProgress(current);
+    },
+    rollback: () => {
+      const latest = allTickets.find((candidate) => candidate.id === current.id);
+      const latestItem = latest?.checklist?.[index];
+      if (latestItem?.text === text) {
+        latestItem.completed = previousCompleted;
+        if ('done' in latestItem) latestItem.done = previousCompleted;
+        calendarView?.updateTicketProgress(latest);
+      }
+    }
+  }).then((result) => {
+    if (result.status === 'synced') showToast('Subtarea actualizada');
+    return result;
+  });
+}
+
 async function handleMutationSynced(action, ticket) {
   if (ticket) {
     const index = allTickets.findIndex((item) => item.id === ticket.id);
@@ -2497,7 +2547,12 @@ async function handleMutationSynced(action, ticket) {
     };
     if (index === -1) allTickets.unshift(syncedTicket);
     else allTickets[index] = syncedTicket;
-    renderBoard();
+    if (action.type === 'ticket.checklist.complete') {
+      calendarView?.updateTicketProgress(syncedTicket);
+      if (modalView.currentTicketId === ticket.id) modalView.syncChecklist(syncedTicket.checklist || []);
+    } else {
+      renderBoard();
+    }
     renderMobileSearchResults();
   }
   await refreshPendingSyncStatus();
