@@ -82,7 +82,7 @@ test('sound manager unlocks after interaction, synthesizes effects, and persists
     listeners.get('pointerdown')();
     assert.equal(listeners.has('keydown'), false);
     assert.equal(await sounds.unlock(), true);
-    assert.equal(sounds.masterGain.gain.value, 0.12);
+    assert.equal(sounds.masterGain.gain.value, 0.144);
     assert.equal(sounds.playDragStart(), true);
     assert.equal(listeners.has('pointerdown'), false);
 
@@ -92,7 +92,7 @@ test('sound manager unlocks after interaction, synthesizes effects, and persists
     sounds.playDelete();
     assert.equal(oscillators.length, 7);
     assert.ok(oscillators.every((oscillator) => oscillator.stopTime > oscillator.startTime));
-    assert.ok(masterValues.every((value) => value === 0 || value === 0.12));
+    assert.ok(masterValues.every((value) => value === 0 || value === 0.144));
     assert.ok(tonePeaks.some((value) => value >= 0.6));
     assert.ok(tonePeaks.every((value) => value <= 1));
 

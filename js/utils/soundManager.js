@@ -1,5 +1,5 @@
 const SOUND_MUTED_STORAGE_KEY = 'vortex-task-sounds-muted';
-const MASTER_VOLUME = 0.12;
+const MASTER_VOLUME = 0.144;
 
 function getAudioContextConstructor() {
   return globalThis.AudioContext || globalThis.webkitAudioContext || null;
