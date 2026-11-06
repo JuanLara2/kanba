@@ -4,7 +4,7 @@ import { AuthService } from './services/authService.js?v=user-role-management-v1
 import { TicketService } from './services/ticketService.js?v=complexity-scoring-v1';
 import { FilterSortService } from './services/filterService.js';
 import { BoardView } from './ui/boardView.js?v=ui-polish-v1';
-import { ModalView } from './ui/modalView.js?v=complexity-scoring-v1';
+import { ModalView } from './ui/modalView.js?v=ux-audit-v1';
 import { DragDropController } from './ui/dragDrop.js?v=pointer-grip-v1';
 import { CalendarView, dueDateForCalendarDay } from './ui/calendarView.js?v=ui-polish-v1';
 import { initializeThemeController } from './ui/themeController.js';
@@ -12,10 +12,10 @@ import { PRIORITY_ORDER, SLA_REFRESH_INTERVAL_MS, STATUS_DEFINITIONS } from './c
 import { calculateTicketMetrics, metricsToCsv } from './services/metricsService.js?v=metrics-charts-v1';
 import { clearMetricsCharts, renderMetricsCharts } from './ui/metricsCharts.js?v=metrics-charts-v1';
 import { RealtimeService } from './services/realtimeService.js?v=realtime-protocol-v2';
-import { createSplashScreen } from './ui/splashScreen.js';
+import { createSplashScreen } from './ui/splashScreen.js?v=cinematic-splash-v1';
 import { OutboxService } from './services/outboxService.js';
 import { MutationDispatcher } from './services/mutationDispatcher.js';
-import { Haptics } from './utils/haptics.js?v=haptics-v1';
+import { Haptics } from './utils/haptics.js?v=ux-audit-v1';
 import './ui/metricsDiagnostics.js?v=metrics-audit-v1';
 
 const splashScreen = createSplashScreen();
@@ -88,6 +88,7 @@ let allTickets = [];
 let ticketCategories = [];
 let usersMap = new Map();
 let activeUser = null;
+let loginInProgress = false;
 let notifications = [];
 let satisfactionEntries = [];
 let notificationErrorShown = false;
@@ -1270,7 +1271,7 @@ function handleMobileBoardTouchEnd(event) {
     block: 'nearest',
     inline: 'center'
   });
-  Haptics.actionSuccess();
+  Haptics.tabSwitch();
 }
 
 function handleMobileCardTouchStart(event) {
@@ -1362,7 +1363,7 @@ async function resolveTicketFromSwipe(ticketId) {
     await ticketService.changeTicketStatus(ticketId, 'resolved');
     await loadTickets();
     renderBoard();
-    Haptics.actionSuccess();
+    Haptics.dropSuccess();
     showToast('Ticket marcado como resuelto.');
   } catch (error) {
     showToast(error.message || 'No se pudo resolver el ticket.');
@@ -1672,7 +1673,8 @@ async function handleMobileStatusSelection(event) {
   options.forEach((button) => { button.disabled = true; });
   try {
     await ticketService.changeTicketStatus(ticketId, nextStatus);
-    Haptics.actionSuccess();
+    if (nextStatus === 'closed') Haptics.dropSuccess();
+    else Haptics.actionSuccess();
     closeMobileStatusSheet();
     await loadTickets();
     renderBoard();
@@ -1844,7 +1846,8 @@ async function runMobileBatchAction(successMessage, action) {
       await loadTickets();
       ticketIds.filter((ticketId) => !failed.some((item) => item.ticketId === ticketId))
         .forEach((ticketId) => selectedMobileTicketIds.delete(ticketId));
-      Haptics.actionSuccess();
+      if (successMessage === 'Tickets cerrados') Haptics.dropSuccess();
+      else Haptics.actionSuccess();
     }
     renderBoard();
     renderMobileBatchToolbar();
@@ -2257,8 +2260,18 @@ function renderNotifications() {
 
 async function handleLoginSubmit(event) {
   event.preventDefault();
+  if (loginInProgress) return;
+  loginInProgress = true;
   const email = document.getElementById('loginEmail').value;
   const password = document.getElementById('passwordInput').value;
+  const submitButton = document.getElementById('btnLoginSubmit');
+  const originalLabel = submitButton?.textContent;
+  if (submitButton) {
+    submitButton.disabled = true;
+    submitButton.classList.add('is-loading');
+    submitButton.setAttribute('aria-busy', 'true');
+    submitButton.textContent = 'Validando acceso...';
+  }
 
   try {
     const user = await auth.login(email, password);
@@ -2270,6 +2283,14 @@ async function handleLoginSubmit(event) {
     }
   } catch (error) {
     showToast(error.message || 'No se pudo iniciar sesión');
+  } finally {
+    loginInProgress = false;
+    if (submitButton) {
+      submitButton.disabled = false;
+      submitButton.classList.remove('is-loading');
+      submitButton.removeAttribute('aria-busy');
+      submitButton.textContent = originalLabel || 'Ingresar al tablero';
+    }
   }
 }
 
@@ -2527,6 +2548,7 @@ function handleChecklistToggle(index, completed) {
     return;
   }
   const previousCompleted = item.completed;
+  Haptics.selectionTick();
   void mutations.dispatch({
     type: 'ticket.checklist.complete',
     entityId: ticketId,
@@ -2568,6 +2590,7 @@ function handleCalendarChecklistToggle(ticket, index, completed) {
     return Promise.reject(new Error('No se pudo identificar la subtarea para guardarla.'));
   }
 
+  Haptics.selectionTick();
   return mutations.dispatch({
     type: 'ticket.checklist.complete',
     entityId: current.id,

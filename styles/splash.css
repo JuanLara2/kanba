@@ -10,11 +10,43 @@
   justify-content: center;
   box-sizing: border-box;
   padding: max(1.5rem, env(safe-area-inset-top, 0px)) 1rem max(1.5rem, env(safe-area-inset-bottom, 0px));
-  background: radial-gradient(circle at center, #131424 0%, #080910 100%);
+  overflow: hidden;
+  isolation: isolate;
+  background:
+    radial-gradient(ellipse at 50% 42%, rgba(52, 23, 88, 0.62), transparent 46%),
+    radial-gradient(circle at center, #131424 0%, #080910 100%);
   color: #fff;
   opacity: 1;
   visibility: visible;
   transition: opacity 0.8s ease, visibility 0.8s ease;
+}
+
+.splash-screen::before,
+.splash-screen::after {
+  position: absolute;
+  z-index: -1;
+  inset: -20%;
+  pointer-events: none;
+  content: "";
+}
+
+.splash-screen::before {
+  background:
+    radial-gradient(ellipse at 28% 42%, rgba(115, 36, 185, 0.18), transparent 34%),
+    radial-gradient(ellipse at 72% 58%, rgba(0, 194, 255, 0.12), transparent 32%);
+  filter: blur(30px);
+  animation: splash-haze-drift 18s ease-in-out infinite alternate;
+}
+
+.splash-screen::after {
+  opacity: 0.55;
+  background-image:
+    radial-gradient(1.5px 1.5px at 14% 24%, rgba(255, 255, 255, 0.9) 50%, transparent 100%),
+    radial-gradient(2px 2px at 76% 18%, rgba(109, 224, 255, 0.9) 50%, transparent 100%),
+    radial-gradient(1px 1px at 83% 72%, rgba(255, 255, 255, 0.8) 50%, transparent 100%),
+    radial-gradient(1.5px 1.5px at 23% 82%, rgba(226, 91, 255, 0.9) 50%, transparent 100%),
+    radial-gradient(1px 1px at 58% 12%, rgba(255, 255, 255, 0.7) 50%, transparent 100%);
+  animation: splash-dust-drift 14s ease-in-out infinite alternate;
 }
 
 .splash-screen.is-hidden {
@@ -25,25 +57,49 @@
 
 .splash-brand {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2.5rem;
-  animation: splash-float 4s ease-in-out infinite;
+  gap: 0;
+  text-align: center;
+}
+
+.splash-vortex-wrap {
+  position: relative;
+  display: grid;
+  width: 220px;
+  height: 220px;
+  margin-bottom: 1.2rem;
+  place-items: center;
+  animation: splash-float 5s ease-in-out infinite, splash-vortex-reveal 900ms ease-out both;
+}
+
+.splash-vortex-wrap::before {
+  position: absolute;
+  inset: 18%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(158, 53, 255, 0.24), rgba(0, 204, 255, 0.08) 48%, transparent 72%);
+  filter: blur(18px);
+  content: "";
 }
 
 .splash-vortex {
-  width: 220px;
-  height: 220px;
-  filter: drop-shadow(0 0 25px rgba(188, 19, 254, 0.35));
+  position: relative;
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 0 18px rgba(188, 19, 254, 0.45));
 }
 
 .splash-wordmark {
   display: flex;
   flex-direction: column;
+  align-items: center;
   user-select: none;
+  animation: splash-reveal 900ms 180ms ease-out both;
 }
 
 .splash-title {
+  display: flex;
   font-size: 4.8rem;
   font-weight: 900;
   line-height: 0.95;
@@ -52,24 +108,20 @@
 
 .splash-title-vortex {
   color: #fff;
-  text-shadow: 0 0 20px rgba(255, 255, 255, 0.4);
-  animation: splash-glow 3s ease-in-out infinite alternate;
+  text-shadow: 0 0 24px rgba(255, 255, 255, 0.28);
 }
 
 .splash-title-task {
   color: #e024c3;
-  text-shadow: 0 0 25px rgba(224, 36, 195, 0.65), 0 0 50px rgba(188, 19, 254, 0.4);
-  animation: splash-pulse 2.5s ease-in-out infinite alternate;
+  text-shadow: 0 0 25px rgba(224, 36, 195, 0.62), 0 0 50px rgba(188, 19, 254, 0.38);
 }
 
 .splash-subtitle {
-  margin-top: 1rem;
-  padding-left: 0.2rem;
-  color: #8c98ba;
-  font-size: 0.95rem;
-  font-weight: 600;
-  letter-spacing: 0.55rem;
-  text-transform: uppercase;
+  margin-top: 0.9rem;
+  color: rgba(248, 250, 252, 0.82);
+  font-size: clamp(0.9rem, 2.5vw, 1.05rem);
+  font-weight: 500;
+  letter-spacing: 0.04em;
 }
 
 .splash-progress {
@@ -108,7 +160,27 @@
 
 @keyframes splash-float {
   0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-8px); }
+  50% { transform: translateY(-7px); }
+}
+
+@keyframes splash-reveal {
+  from { opacity: 0; transform: translateY(16px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes splash-vortex-reveal {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes splash-haze-drift {
+  from { transform: translate3d(-2%, -1%, 0) scale(1); }
+  to { transform: translate3d(2%, 1%, 0) scale(1.06); }
+}
+
+@keyframes splash-dust-drift {
+  from { transform: translate3d(0, 0, 0); opacity: 0.35; }
+  to { transform: translate3d(0, -10px, 0); opacity: 0.7; }
 }
 
 @keyframes splash-pulse {
@@ -123,23 +195,22 @@
 
 @media (max-width: 560px) {
   .splash-brand {
-    flex-direction: column;
-    gap: 1rem;
-    text-align: center;
+    gap: 0;
   }
 
-  .splash-vortex {
+  .splash-vortex-wrap {
     width: 160px;
     height: 160px;
+    margin-bottom: 0.9rem;
   }
 
   .splash-title {
-    font-size: 3.8rem;
+    font-size: clamp(3rem, 15vw, 3.8rem);
   }
 
   .splash-subtitle {
-    font-size: 0.7rem;
-    letter-spacing: 0.3rem;
+    max-width: 18rem;
+    line-height: 1.5;
   }
 
   .splash-progress {
@@ -147,15 +218,86 @@
   }
 }
 
+@media (max-height: 600px) {
+  .splash-vortex-wrap {
+    width: 120px;
+    height: 120px;
+    margin-bottom: 0.7rem;
+  }
+
+  .splash-title {
+    font-size: clamp(2.4rem, 11vh, 3.2rem);
+  }
+
+  .splash-subtitle {
+    margin-top: 0.55rem;
+  }
+
+  .splash-progress {
+    gap: 0.35rem;
+    margin-top: 1.2rem;
+  }
+
+  .splash-status {
+    font-size: 0.65rem;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .splash-brand,
-  .splash-title-vortex,
-  .splash-title-task {
+  .splash-screen::before,
+  .splash-screen::after,
+  .splash-vortex-wrap,
+  .splash-wordmark,
+  .splash-brand {
     animation: none;
   }
 
   .splash-screen,
   .splash-progress-fill {
     transition-duration: 0.01ms;
+  }
+}
+
+/* ==========================================================================
+   Vortex Isotype GPU Animation (.animate-vortex)
+   ========================================================================== */
+
+@keyframes vortex-spin {
+  0% {
+    transform: rotate(0deg) translateZ(0);
+  }
+  100% {
+    transform: rotate(360deg) translateZ(0);
+  }
+}
+
+@keyframes vortex-glow {
+  0%, 100% {
+    filter: drop-shadow(0 0 16px rgba(188, 19, 254, 0.55))
+            drop-shadow(0 0 32px rgba(224, 36, 195, 0.3));
+  }
+  50% {
+    filter: drop-shadow(0 0 20px rgba(0, 210, 255, 0.6))
+            drop-shadow(0 0 38px rgba(0, 210, 255, 0.35));
+  }
+}
+
+.animate-vortex {
+  display: inline-block;
+  transform: translateZ(0);
+  transform-origin: center center;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  will-change: transform, filter;
+  animation:
+    vortex-spin 18s linear infinite,
+    vortex-glow 4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-vortex {
+    animation: vortex-glow 8s ease-in-out infinite;
+    transform: none;
+    will-change: filter;
   }
 }

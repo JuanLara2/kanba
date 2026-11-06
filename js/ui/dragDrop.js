@@ -1,4 +1,4 @@
-import { Haptics } from '../utils/haptics.js';
+import { Haptics } from '../utils/haptics.js?v=ux-audit-v1';
 
 function closestElement(target, selector) {
   const element = target?.nodeType === 1 ? target : target?.parentElement;

@@ -264,12 +264,15 @@ export class ModalView {
       const row = document.createElement('div');
       row.className = `checklist-item${item.completed ? ' is-complete' : ''}`;
 
+      const checkboxTarget = document.createElement('label');
+      checkboxTarget.className = 'checklist-checkbox-target';
       const checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
       checkbox.checked = Boolean(item.completed);
       checkbox.disabled = !this.canManageChecklist;
       checkbox.dataset.checklistComplete = String(index);
       checkbox.setAttribute('aria-label', `Completar subtarea ${item.text}`);
+      checkboxTarget.appendChild(checkbox);
 
       const text = document.createElement('input');
       text.type = 'text';
@@ -279,7 +282,7 @@ export class ModalView {
       text.dataset.checklistText = String(index);
       text.setAttribute('aria-label', `Texto de subtarea ${index + 1}`);
 
-      row.append(checkbox, text);
+      row.append(checkboxTarget, text);
       if (this.canManageChecklist) {
         const remove = document.createElement('button');
         remove.type = 'button';
@@ -480,7 +483,7 @@ export class ModalView {
   showLogin() {
     this.loginModal.classList.remove('hidden');
     document.getElementById('appShell').classList.add('hidden');
-    document.getElementById('loginEmail').focus();
+    document.getElementById('loginHeading')?.focus();
   }
 
   hideLogin() {

@@ -1,5 +1,5 @@
 import { getSlaState } from '../services/slaService.js';
-import { Haptics } from '../utils/haptics.js';
+import { Haptics } from '../utils/haptics.js?v=ux-audit-v1';
 import { CalendarQuickView } from './calendarQuickView.js';
 
 const WEEKDAY_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];

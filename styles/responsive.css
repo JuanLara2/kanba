@@ -1669,8 +1669,54 @@
     touch-action: pan-y;
   }
 
+  .app-shell button:not(.hidden),
+  #loginModal button:not(.hidden) {
+    min-height: 2.75rem;
+  }
+
+  .app-shell .close-x {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+
+  .app-shell select,
+  #loginModal select {
+    min-height: 2.75rem;
+  }
+
+  .view-tab {
+    min-height: 2.75rem;
+  }
+
+  .btn-change-status,
+  .ticket-status-label,
+  .calendar-drag-handle {
+    min-height: 2.75rem;
+  }
+
+  .calendar-drag-handle {
+    min-width: 2.75rem;
+  }
+
+  .checklist-checkbox-target,
+  .checklist-remove {
+    width: 2.75rem;
+    min-width: 2.75rem;
+    height: 2.75rem;
+    min-height: 2.75rem;
+  }
+
+  .rating-options span {
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+  }
+
+  .login-forgot-button {
+    min-height: 2.75rem;
+  }
+
   .mobile-status-tab {
-    min-height: 2.4rem;
+    min-height: 2.75rem;
     padding: 0.35rem 0.6rem;
     font-size: 0.76rem;
   }

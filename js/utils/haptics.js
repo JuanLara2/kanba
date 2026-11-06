@@ -25,7 +25,7 @@ export const Haptics = {
   },
 
   dropSuccess() {
-    return vibrate([20, 40, 20]);
+    return vibrate([20, 30, 20]);
   },
 
   selectionTick() {

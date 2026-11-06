@@ -39,7 +39,7 @@ test('haptics emit semantic patterns only when the device is supported and activ
     Haptics.selectionTick();
     Haptics.tabSwitch();
     Haptics.destructive();
-    assert.deepEqual(patterns, [35, [20, 40, 20], 15, 10, [40, 60, 60]]);
+    assert.deepEqual(patterns, [35, [20, 30, 20], 15, 10, [40, 60, 60]]);
 
     globalThis.navigator.userActivation = { isActive: false, hasBeenActive: false };
     assert.equal(Haptics.selectionTick(), false);

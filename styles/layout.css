@@ -195,6 +195,31 @@
   font-size: 1rem;
 }
 
+.login-submit.is-loading {
+  cursor: wait;
+  opacity: 0.9;
+}
+
+.login-submit.is-loading::before {
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: login-submit-spin 0.7s linear infinite;
+  content: "";
+}
+
+@keyframes login-submit-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-submit.is-loading::before {
+    animation: none;
+  }
+}
+
 .login-security-note {
   color: #6b7280;
   font-size: 0.85rem;

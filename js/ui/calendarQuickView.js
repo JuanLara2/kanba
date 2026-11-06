@@ -1,4 +1,4 @@
-import { Haptics } from '../utils/haptics.js';
+import { Haptics } from '../utils/haptics.js?v=ux-audit-v1';
 
 const QUICK_VIEW_ID = 'calendarSubtasksQuickView';
 let quickViewCloseTimer = null;

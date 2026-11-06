@@ -9,19 +9,20 @@
     <link rel="manifest" href="manifest.json" />
     <meta name="theme-color" content="#151a2a" />
     <link rel="stylesheet" href="styles/base.css" />
-    <link rel="stylesheet" href="styles/layout.css?v=metrics-audit-v1" />
-    <link rel="stylesheet" href="styles/components.css?v=login-password-toggle-v1" />
-    <link rel="stylesheet" href="styles/responsive.css?v=profile-header-v1" />
-    <link rel="stylesheet" href="styles/splash.css?v=splash-dvh-v1" />
+    <link rel="stylesheet" href="styles/layout.css?v=ux-audit-v1" />
+    <link rel="stylesheet" href="styles/components.css?v=vortex-spin-anim-v2" />
+    <link rel="stylesheet" href="styles/responsive.css?v=ux-audit-v1" />
+    <link rel="stylesheet" href="styles/splash.css?v=cinematic-splash-v1" />
   </head>
   <body>
     <div id="splashScreen" class="splash-screen" role="status" aria-live="polite" aria-label="Iniciando Vortex Task">
       <div class="splash-brand">
-        <canvas id="splashVortex" class="splash-vortex" width="440" height="440" aria-hidden="true"></canvas>
+        <div class="splash-vortex-wrap">
+          <canvas id="splashVortex" class="splash-vortex animate-vortex" width="440" height="440" aria-hidden="true"></canvas>
+        </div>
         <div class="splash-wordmark" aria-hidden="true">
-          <span class="splash-title splash-title-vortex">Vortex</span>
-          <span class="splash-title splash-title-task">Task</span>
-          <span class="splash-subtitle">Agile Kanban Engine</span>
+          <h1 class="splash-title"><span class="splash-title-vortex">Vortex</span><span class="splash-title-task">Task</span></h1>
+          <span class="splash-subtitle">Acelera tu flujo de trabajo</span>
         </div>
       </div>
       <div class="splash-progress">
@@ -769,7 +770,7 @@
         <form id="loginForm" class="login-form" aria-labelledby="loginHeading">
           <div class="login-heading-group">
             <p class="login-eyebrow">BIENVENIDO</p>
-            <h1 id="loginHeading">Iniciar sesión</h1>
+            <h1 id="loginHeading" tabindex="-1" class="outline-none focus:outline-none select-none">Iniciar sesión</h1>
             <p>Ingresa a tu espacio de trabajo</p>
           </div>
           <div class="form-row">
@@ -795,7 +796,7 @@
             </div>
           </div>
           <button id="btnForgotPassword" class="login-forgot-button" type="button">¿Olvidaste tu contraseña?</button>
-          <button type="submit" class="btn btn-primary login-submit">Ingresar al tablero</button>
+          <button id="btnLoginSubmit" type="submit" class="btn btn-primary login-submit">Ingresar al tablero</button>
           <p class="login-security-note">Acceso seguro a tu espacio de trabajo</p>
         </form>
         <form id="passwordRecoveryForm" class="login-form hidden" aria-labelledby="passwordRecoveryHeading">
@@ -817,6 +818,6 @@
       </section>
     </main>
 
-    <script type="module" src="js/app.js?v=splash-dvh-v1"></script>
+    <script type="module" src="js/app.js?v=cinematic-splash-v1"></script>
   </body>
 </html>

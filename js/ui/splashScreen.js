@@ -26,9 +26,6 @@ export function createSplashScreen() {
   const progressTrack = document.getElementById('splashProgressTrack');
   const progressFill = document.getElementById('splashProgressFill');
   const status = document.getElementById('splashStatus');
-  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  let animationFrame;
-  let rotation = 0;
   let hideTimeout;
   let autoHideTimeout;
   let progressTimer;
@@ -47,7 +44,6 @@ export function createSplashScreen() {
     context.clearRect(0, 0, canvas.width, canvas.height);
     context.save();
     context.translate(center, center);
-    context.rotate(rotation);
 
     for (let index = 0; index < 28; index += 1) {
       const factor = index / 28;
@@ -72,13 +68,10 @@ export function createSplashScreen() {
       context.stroke();
       context.restore();
     }
-
     context.restore();
-    rotation += 0.022;
-    animationFrame = window.requestAnimationFrame(renderVortex);
   }
 
-  if (context && !prefersReducedMotion) {
+  if (context) {
     renderVortex();
   }
 
@@ -121,7 +114,6 @@ export function createSplashScreen() {
       }
 
       splash.classList.add('is-hidden');
-      if (animationFrame) window.cancelAnimationFrame(animationFrame);
     })();
 
     return hidePromise;
