@@ -5,17 +5,18 @@ import { TicketService } from './services/ticketService.js?v=complexity-scoring-
 import { FilterSortService } from './services/filterService.js';
 import { BoardView } from './ui/boardView.js?v=ui-polish-v1';
 import { ModalView } from './ui/modalView.js?v=ux-audit-v1';
-import { DragDropController } from './ui/dragDrop.js?v=pointer-grip-v1';
-import { CalendarView, dueDateForCalendarDay } from './ui/calendarView.js?v=ui-polish-v1';
+import { DragDropController } from './ui/dragDrop.js?v=sound-feedback-v1';
+import { CalendarView, dueDateForCalendarDay } from './ui/calendarView.js?v=sound-feedback-v1';
 import { initializeThemeController } from './ui/themeController.js';
 import { PRIORITY_ORDER, SLA_REFRESH_INTERVAL_MS, STATUS_DEFINITIONS } from './config/constants.js';
 import { calculateTicketMetrics, metricsToCsv } from './services/metricsService.js?v=metrics-charts-v1';
 import { clearMetricsCharts, renderMetricsCharts } from './ui/metricsCharts.js?v=metrics-charts-v1';
 import { RealtimeService } from './services/realtimeService.js?v=realtime-protocol-v2';
-import { createSplashScreen } from './ui/splashScreen.js?v=cinematic-splash-v1';
+import { createSplashScreen } from './ui/splashScreen.js?v=brand-logo-v1';
 import { OutboxService } from './services/outboxService.js';
 import { MutationDispatcher } from './services/mutationDispatcher.js';
 import { Haptics } from './utils/haptics.js?v=ux-audit-v1';
+import { soundManager } from './utils/soundManager.js?v=sound-feedback-v1';
 import './ui/metricsDiagnostics.js?v=metrics-audit-v1';
 
 const splashScreen = createSplashScreen();
@@ -183,6 +184,7 @@ async function bootstrap() {
   if (passwordRecoveryAccessToken) {
     loginForm.classList.add('hidden');
     passwordRecoveryForm.classList.remove('hidden');
+    syncPasswordUsernameFields();
     document.getElementById('recoveryPassword').focus();
   } else if (passwordRecoveryLinkExpired) {
     showToast('El enlace venció o ya fue usado. Solicita uno nuevo desde el inicio de sesión.', 7000);
@@ -491,6 +493,22 @@ function closeChangePasswordModal() {
   changePasswordModal.classList.add('hidden');
   if (wasOpen) trackMobileOverlayClose('password');
   changePasswordForm.reset();
+}
+
+function syncPasswordUsernameFields() {
+  const username = activeUser?.email || document.getElementById('loginEmail')?.value || '';
+  ['changePasswordUsername', 'passwordRecoveryUsername'].forEach((id) => {
+    const input = document.getElementById(id);
+    if (input) input.value = username;
+  });
+}
+
+function updateSoundToggle() {
+  const button = document.getElementById('btnSoundToggle');
+  if (!button) return;
+  const enabled = !soundManager.isMuted();
+  button.setAttribute('aria-pressed', String(enabled));
+  button.textContent = `Sonido: ${enabled ? 'Activado' : 'Desactivado'}`;
 }
 
 async function handleChangePasswordSubmit(event) {
@@ -845,12 +863,14 @@ function bindStaticEvents() {
   });
   document.getElementById('btnChangePassword')?.addEventListener('click', () => {
     setProfileMenuOpen(false);
+    syncPasswordUsernameFields();
     changePasswordModal.classList.remove('hidden');
     trackMobileOverlayOpen('password');
     document.getElementById('newAccountPassword').focus();
   });
   document.getElementById('profileChangePasswordBtn')?.addEventListener('click', () => {
     closeProfileModal();
+    syncPasswordUsernameFields();
     changePasswordModal.classList.remove('hidden');
     trackMobileOverlayOpen('password');
     document.getElementById('newAccountPassword').focus();
@@ -858,6 +878,11 @@ function bindStaticEvents() {
   document.getElementById('changePasswordCloseBtn')?.addEventListener('click', closeChangePasswordModal);
   document.getElementById('changePasswordCancelBtn')?.addEventListener('click', closeChangePasswordModal);
   changePasswordForm?.addEventListener('submit', handleChangePasswordSubmit);
+  document.getElementById('btnSoundToggle')?.addEventListener('click', () => {
+    soundManager.toggleMute();
+    updateSoundToggle();
+  });
+  updateSoundToggle();
   document.getElementById('boardTab').addEventListener('click', () => navigateBottomTab('board'));
   document.getElementById('calendarTab').addEventListener('click', () => navigateBottomTab('calendar'));
   document.getElementById('metricsTab').addEventListener('click', () => navigateBottomTab('metrics'));
@@ -973,6 +998,7 @@ function bindStaticEvents() {
       if (!window.confirm(`¿Eliminar el ticket ${ticketId}? Esta acción no se puede deshacer.`)) return;
       await ticketService.deleteTicket(ticketId);
       Haptics.destructive();
+      soundManager.playDelete();
       await loadTickets();
       modalView.closeTicket();
       renderBoard();
@@ -1364,6 +1390,7 @@ async function resolveTicketFromSwipe(ticketId) {
     await loadTickets();
     renderBoard();
     Haptics.dropSuccess();
+    soundManager.playTaskDone();
     showToast('Ticket marcado como resuelto.');
   } catch (error) {
     showToast(error.message || 'No se pudo resolver el ticket.');
@@ -1675,6 +1702,8 @@ async function handleMobileStatusSelection(event) {
     await ticketService.changeTicketStatus(ticketId, nextStatus);
     if (nextStatus === 'closed') Haptics.dropSuccess();
     else Haptics.actionSuccess();
+    if (nextStatus === 'resolved' || nextStatus === 'closed') soundManager.playTaskDone();
+    else soundManager.playDrop();
     closeMobileStatusSheet();
     await loadTickets();
     renderBoard();
@@ -1805,7 +1834,8 @@ async function applyMobileBatchStatus(status) {
   if (!STATUS_DEFINITIONS[status] || !selectedMobileTicketIds.size) return;
   await runMobileBatchAction(
     status === 'closed' ? 'Tickets cerrados' : `Tickets movidos a ${STATUS_DEFINITIONS[status].name}`,
-    (ticketId) => ticketService.changeTicketStatus(ticketId, status)
+    (ticketId) => ticketService.changeTicketStatus(ticketId, status),
+    status === 'resolved' || status === 'closed'
   );
 }
 
@@ -1826,7 +1856,7 @@ async function applyMobileBatchAssignee() {
   renderMobileBatchToolbar();
 }
 
-async function runMobileBatchAction(successMessage, action) {
+async function runMobileBatchAction(successMessage, action, taskDone = false) {
   const ticketIds = [...selectedMobileTicketIds];
   if (!ticketIds.length) return;
   const buttons = [...document.querySelectorAll('#mobileBatchToolbar button')];
@@ -1846,8 +1876,12 @@ async function runMobileBatchAction(successMessage, action) {
       await loadTickets();
       ticketIds.filter((ticketId) => !failed.some((item) => item.ticketId === ticketId))
         .forEach((ticketId) => selectedMobileTicketIds.delete(ticketId));
-      if (successMessage === 'Tickets cerrados') Haptics.dropSuccess();
-      else Haptics.actionSuccess();
+      if (taskDone) {
+        Haptics.dropSuccess();
+        soundManager.playTaskDone();
+      } else {
+        Haptics.actionSuccess();
+      }
     }
     renderBoard();
     renderMobileBatchToolbar();
@@ -1971,6 +2005,7 @@ async function deleteMobileTicket() {
   try {
     await ticketService.deleteTicket(ticket.id);
     Haptics.destructive();
+    soundManager.playDelete();
     selectedMobileTicketIds.delete(ticket.id);
     await loadTickets();
     closeMobileTicketActions();
@@ -2549,6 +2584,9 @@ function handleChecklistToggle(index, completed) {
   }
   const previousCompleted = item.completed;
   Haptics.selectionTick();
+  soundManager.playSubtaskToggle();
+  const completesChecklist = completed && checklist.every((entry, entryIndex) =>
+    entryIndex === index || Boolean(entry.completed || entry.done));
   void mutations.dispatch({
     type: 'ticket.checklist.complete',
     entityId: ticketId,
@@ -2571,6 +2609,7 @@ function handleChecklistToggle(index, completed) {
       renderMobileSearchResults();
     }
   }).then((result) => {
+    if (result.status !== 'rejected' && completesChecklist) soundManager.playTaskDone();
     if (result.status === 'synced') showToast('Subtarea actualizada');
   }).catch((error) => showToast(error.message || 'No se pudo actualizar la subtarea.'));
 }
@@ -2591,6 +2630,9 @@ function handleCalendarChecklistToggle(ticket, index, completed) {
   }
 
   Haptics.selectionTick();
+  soundManager.playSubtaskToggle();
+  const completesChecklist = completed && checklist.every((entry, entryIndex) =>
+    entryIndex === index || Boolean(entry.completed || entry.done));
   return mutations.dispatch({
     type: 'ticket.checklist.complete',
     entityId: current.id,
@@ -2610,6 +2652,7 @@ function handleCalendarChecklistToggle(ticket, index, completed) {
       }
     }
   }).then((result) => {
+    if (result.status !== 'rejected' && completesChecklist) soundManager.playTaskDone();
     if (result.status === 'synced') showToast('Subtarea actualizada');
     return result;
   });

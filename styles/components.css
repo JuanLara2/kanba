@@ -2201,6 +2201,12 @@ html[data-theme="light"] .theme-picker select option {
   box-shadow: 0 6px 16px color-mix(in srgb, var(--color-primary-start) 28%, transparent);
 }
 
+.logo-mark img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
 html[data-theme="light"] .priority-baja,
 html[data-theme="pink"] .priority-baja { color: #047857; }
 html[data-theme="light"] .priority-media,

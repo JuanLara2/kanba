@@ -1,8 +1,14 @@
 import { Haptics } from '../utils/haptics.js?v=ux-audit-v1';
+import { soundManager } from '../utils/soundManager.js?v=sound-feedback-v1';
 
 function closestElement(target, selector) {
   const element = target?.nodeType === 1 ? target : target?.parentElement;
   return element?.closest?.(selector) || null;
+}
+
+function playStatusSound(status) {
+  if (status === 'resolved' || status === 'closed') soundManager.playTaskDone();
+  else soundManager.playDrop();
 }
 
 export class DragDropController {
@@ -74,6 +80,7 @@ export class DragDropController {
           const result = await this.onStatusChange(ticketId, nextStatus);
           if (sourceStatus !== nextStatus && result?.status !== 'rejected' && result?.status !== 'unchanged') {
             Haptics.dropSuccess();
+            playStatusSound(nextStatus);
           }
         }
         return;
@@ -96,6 +103,7 @@ export class DragDropController {
       }
       card.classList.add('dragging');
       Haptics.dragStart();
+      soundManager.playDragStart();
       event.dataTransfer.effectAllowed = 'move';
       event.dataTransfer.setData('text/plain', card.dataset.ticketId);
     });
@@ -127,6 +135,7 @@ export class DragDropController {
         const result = await this.onStatusChange(ticketId, nextStatus);
         if (sourceStatus !== nextStatus && result?.status !== 'rejected' && result?.status !== 'unchanged') {
           Haptics.dropSuccess();
+          playStatusSound(nextStatus);
         }
       }
     });
@@ -161,6 +170,7 @@ export class DragDropController {
     drag.card.classList.add('dragging');
     drag.handle.classList.add('is-dragging');
     Haptics.dragStart();
+    soundManager.playDragStart();
   }
 
   clearPointerDrag(drag) {

@@ -1,5 +1,6 @@
 import { getSlaState } from '../services/slaService.js';
 import { Haptics } from '../utils/haptics.js?v=ux-audit-v1';
+import { soundManager } from '../utils/soundManager.js?v=sound-feedback-v1';
 import { CalendarQuickView } from './calendarQuickView.js';
 
 const WEEKDAY_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
@@ -189,6 +190,7 @@ export class CalendarView {
         drag.active = true;
         drag.ticket.classList.add('dragging');
         Haptics.dragStart();
+        soundManager.playDragStart();
       }
 
       event.preventDefault();
@@ -254,7 +256,10 @@ export class CalendarView {
       || (unscheduled && !ticket.dueDate)) return;
 
     const changed = await this.onDateChange(drag.ticketId, day?.dataset.calendarDate || null);
-    if (changed !== false) Haptics.dropSuccess();
+    if (changed !== false) {
+      Haptics.dropSuccess();
+      soundManager.playDrop();
+    }
   }
 
   cancelPointerDrag(event) {

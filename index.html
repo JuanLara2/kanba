@@ -4,21 +4,21 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Vortex Task</title>
-    <link rel="icon" type="image/png" href="img/icono.png" />
-    <link rel="apple-touch-icon" sizes="180x180" href="img/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" href="img/icono.png?v=brand-logo-v1" />
+    <link rel="apple-touch-icon" sizes="180x180" href="img/apple-touch-icon.png?v=brand-logo-v1" />
     <link rel="manifest" href="manifest.json" />
     <meta name="theme-color" content="#151a2a" />
-    <link rel="stylesheet" href="styles/base.css" />
-    <link rel="stylesheet" href="styles/layout.css?v=ux-audit-v1" />
-    <link rel="stylesheet" href="styles/components.css?v=vortex-spin-anim-v2" />
+    <link rel="stylesheet" href="styles/base.css?v=password-username-v1" />
+    <link rel="stylesheet" href="styles/layout.css?v=brand-logo-v1" />
+    <link rel="stylesheet" href="styles/components.css?v=brand-logo-v1" />
     <link rel="stylesheet" href="styles/responsive.css?v=ux-audit-v1" />
-    <link rel="stylesheet" href="styles/splash.css?v=cinematic-splash-v1" />
+    <link rel="stylesheet" href="styles/splash.css?v=brand-logo-v1" />
   </head>
   <body>
     <div id="splashScreen" class="splash-screen" role="status" aria-live="polite" aria-label="Iniciando Vortex Task">
       <div class="splash-brand">
         <div class="splash-vortex-wrap">
-          <canvas id="splashVortex" class="splash-vortex animate-vortex" width="440" height="440" aria-hidden="true"></canvas>
+          <img class="splash-vortex animate-vortex" src="img/vortex-symbol.png?v=brand-logo-v1" alt="" aria-hidden="true" />
         </div>
         <div class="splash-wordmark" aria-hidden="true">
           <h1 class="splash-title"><span class="splash-title-vortex">Vortex</span><span class="splash-title-task">Task</span></h1>
@@ -44,7 +44,7 @@
     <div id="appShell" class="app-shell mobile-app-shell hidden">
     <header class="app-header mobile-app-header">
       <div class="header-left">
-        <div class="logo-mark">VT</div>
+        <div class="logo-mark"><img src="img/vortex-symbol.png?v=brand-logo-v1" alt="" /></div>
         <div class="header-brand-copy">
           <h1 class="app-title">VortexTask</h1>
           <p class="app-subtitle">Acelera tu flujo de trabajo</p>
@@ -86,6 +86,9 @@
                 <option value="pink">Rosa</option>
               </select>
             </label>
+            <button id="btnSoundToggle" class="btn btn-outline" type="button" aria-pressed="true">
+              Sonido: Activado
+            </button>
             <button id="btnManageCategories" class="btn btn-outline hidden" type="button"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16M4 12h16M4 19h10M18 16v6M15 19h6"/></svg>Administrar categorías</button>
             <button id="btnChangePassword" class="btn btn-outline" type="button">
               <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M17 6l3 3M14 9l3 3"/></svg>
@@ -736,6 +739,7 @@
           <button id="changePasswordCloseBtn" class="close-x" type="button" aria-label="Cerrar">&times;</button>
         </header>
         <form id="changePasswordForm" class="modal-body">
+          <input id="changePasswordUsername" class="visually-hidden" type="text" name="username" autocomplete="username" aria-label="Correo de la cuenta" tabindex="-1" />
           <p>Elige una contraseña nueva de al menos 12 caracteres.</p>
           <div class="form-row">
             <label for="newAccountPassword">Nueva contraseña</label>
@@ -758,7 +762,7 @@
     <main id="loginModal" class="login-screen" aria-labelledby="loginHeading">
       <section class="login-brand-panel" aria-label="Vortex Task">
         <div class="login-brand-content">
-          <img class="vortex-logo" src="img/icono.png" alt="Símbolo Vortex" />
+          <img class="vortex-logo" src="img/vortex-symbol.png?v=brand-logo-v1" alt="Símbolo Vortex" />
           <p class="login-wordmark">Vortex<span>Task</span></p>
           <p class="login-tagline">Acelera tu flujo de trabajo</p>
         </div>
@@ -800,6 +804,7 @@
           <p class="login-security-note">Acceso seguro a tu espacio de trabajo</p>
         </form>
         <form id="passwordRecoveryForm" class="login-form hidden" aria-labelledby="passwordRecoveryHeading">
+          <input id="passwordRecoveryUsername" class="visually-hidden" type="text" name="username" autocomplete="username" aria-label="Correo de la cuenta" tabindex="-1" />
           <div class="login-heading-group">
             <p class="login-eyebrow">RECUPERACIÓN DE CUENTA</p>
             <h1 id="passwordRecoveryHeading">Crear nueva contraseña</h1>
@@ -818,6 +823,6 @@
       </section>
     </main>
 
-    <script type="module" src="js/app.js?v=cinematic-splash-v1"></script>
+    <script type="module" src="js/app.js?v=sound-feedback-v1"></script>
   </body>
 </html>
