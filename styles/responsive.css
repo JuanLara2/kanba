@@ -2409,3 +2409,87 @@
     display: none !important;
   }
 }
+
+  @media (max-width: 768px) {
+    .kanban-col .column-sub-tabs {
+      display: flex !important;
+      align-items: center !important;
+      height: 42px !important;
+      min-height: 42px !important;
+      flex: 0 0 42px !important;
+      position: relative !important;
+      z-index: 5 !important;
+      overflow-x: auto !important;
+      padding: 0.25rem 0.75rem !important;
+      box-sizing: border-box !important;
+    }
+
+    .kanban-col .column-sub-tabs .column-sub-tab,
+    .kanban-col .column-sub-tabs .sub-tab-chip {
+      height: 28px !important;
+      min-height: 28px !important;
+      flex: 0 0 auto !important;
+      flex-shrink: 0 !important;
+    }
+
+    .kanban-col .drop-zone {
+      margin-top: 0 !important;
+      height: 100% !important;
+      min-height: 0 !important;
+      flex: 1 1 auto !important;
+      overflow-y: auto !important;
+      overscroll-behavior-y: contain !important;
+      touch-action: pan-y !important;
+      padding: 0.5rem 0.75rem 7rem !important;
+      -webkit-overflow-scrolling: touch;
+    }
+  }
+
+/* Column-internal filters on mobile */
+.column-sub-tabs {
+  display: none;
+}
+
+.column-sub-tab {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.ticket-card.column-filter-hidden {
+  display: none !important;
+}
+
+@media (max-width: 1023px) {
+  .column-sub-tabs {
+    display: flex;
+    width: 100%;
+    gap: 0.5rem;
+    overflow-x: auto;
+    padding: 0.35rem 0.75rem 0.5rem;
+    touch-action: pan-x;
+    scrollbar-width: none;
+  }
+
+  .column-sub-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .column-sub-tab {
+    min-height: 32px;
+    padding: 0.35rem 0.75rem;
+    border: 1px solid rgba(30, 41, 59, 0.9);
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.8);
+    color: #94a3b8;
+    font-size: 0.75rem;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+
+  .column-sub-tab.active {
+    border-color: rgba(99, 102, 241, 0.5);
+    background: rgba(99, 102, 241, 0.2);
+    color: #a5b4fc;
+    font-weight: 600;
+  }
+}

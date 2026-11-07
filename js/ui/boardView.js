@@ -3,12 +3,77 @@ import { getChecklistProgress } from '../services/ticketService.js';
 import { formatSlaRemaining } from '../services/slaService.js';
 
 export class BoardView {
-  constructor(boardContainer, ticketService, usersMap) {
+  constructor(boardContainer, ticketService, usersMap, currentUserProvider = () => null) {
     this.board = boardContainer;
     this.ticketService = ticketService;
     this.usersMap = usersMap;
+    this.currentUserProvider = currentUserProvider;
     this.statusTabs = document.getElementById('mobileStatusTabs');
     this.activeStatus = 'new';
+    this.bindColumnFilters();
+  }
+
+  bindColumnFilters() {
+    this.board.addEventListener('click', (event) => {
+      const chip = event.target.closest?.('.column-sub-tab');
+      if (!chip) return;
+      event.preventPropagation?.();
+      event.stopPropagation();
+
+      const column = chip.closest('.kanban-col');
+      const dropZone = column?.querySelector('.drop-zone');
+      if (!column || !dropZone) return;
+
+      column.querySelectorAll('.column-sub-tab').forEach((item) => {
+        item.classList.toggle('active', item === chip);
+        item.setAttribute('aria-pressed', String(item === chip));
+      });
+      this.applyColumnFilter(dropZone, chip.dataset.filter, chip.dataset.category);
+    });
+  }
+
+  applyColumnFilter(dropZone, filter, category = '') {
+    const currentUser = this.currentUserProvider();
+    const currentUserId = currentUser?.id || '';
+
+    dropZone.querySelectorAll('.ticket-card').forEach((card) => {
+      let visible = true;
+      if (filter === 'urgent') {
+        visible = ['alta', 'urgente', 'high', 'urgent'].includes(card.dataset.priority || '');
+      } else if (filter === 'mine') {
+        visible = Boolean(currentUserId) && card.dataset.assignedTo === currentUserId;
+      } else if (filter === 'category') {
+        visible = card.dataset.category === category;
+      }
+      card.classList.toggle('column-filter-hidden', !visible);
+    });
+  }
+
+  buildColumnSubTabs(colTickets) {
+    if (colTickets.length <= 3) return '';
+
+    const urgentTickets = colTickets.filter((ticket) =>
+      ['Alta', 'Urgente', 'high', 'urgent'].includes(ticket.priority));
+    const currentUser = this.currentUserProvider();
+    const mineTickets = currentUser
+      ? colTickets.filter((ticket) => ticket.assignedTo === currentUser.id)
+      : [];
+
+    const chips = [`<button type="button" class="column-sub-tab active" data-filter="all" aria-pressed="true">Todos (${colTickets.length})</button>`];
+    if (urgentTickets.length) {
+      chips.push(`<button type="button" class="column-sub-tab" data-filter="urgent" aria-pressed="false">Urgentes (${urgentTickets.length})</button>`);
+    } else {
+      const categories = [...new Set(colTickets.map((ticket) => ticket.category).filter(Boolean))];
+      categories.forEach((category) => {
+        const count = colTickets.filter((ticket) => ticket.category === category).length;
+        chips.push(`<button type="button" class="column-sub-tab" data-filter="category" data-category="${this.escapeHtml(category)}" aria-pressed="false">${this.escapeHtml(category)} (${count})</button>`);
+      });
+    }
+    if (mineTickets.length) {
+      chips.push(`<button type="button" class="column-sub-tab" data-filter="mine" aria-pressed="false">Mios (${mineTickets.length})</button>`);
+    }
+
+    return `<div class="column-sub-tabs" role="tablist" aria-label="Filtros de tickets">${chips.join('')}</div>`;
   }
 
   render(tickets, canChangeStatus = () => false, statusCountTickets = tickets, mobileSelection = {}) {
@@ -34,6 +99,7 @@ export class BoardView {
             <span class="col-counter">${colTickets.length}</span>
           </div>
         </header>
+        ${this.buildColumnSubTabs(colTickets)}
         <div class="drop-zone" data-status="${colDef.id}" aria-label="Columna ${colDef.name}"></div>
       `;
 
@@ -123,6 +189,9 @@ export class BoardView {
       : '';
     card.setAttribute('aria-label', `${ticket.id}: ${ticket.title}. Prioridad: ${ticket.priority || 'Media'}. Estado: ${colDef.name}.${checklistLabel} Pulsa Enter para ver detalles.`);
     card.dataset.ticketId = ticket.id;
+    card.dataset.priority = String(ticket.priority || '').toLowerCase();
+    card.dataset.assignedTo = ticket.assignedTo || '';
+    card.dataset.category = ticket.category || '';
 
     const sla = this.ticketService.evaluateSLA(ticket);
     if (['normal', 'warning', 'overdue'].includes(sla.state)) {

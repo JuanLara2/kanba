@@ -134,7 +134,7 @@ async function bootstrap() {
   initializePasswordRecovery();
   splashScreen.setProgress(20, 'Preparando espacio de trabajo...');
   initializeThemeController();
-  boardView = new BoardView(boardEl, ticketService, usersMap);
+  boardView = new BoardView(boardEl, ticketService, usersMap, () => activeUser);
   modalView = new ModalView({
     modalEl,
     form,
