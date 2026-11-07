@@ -42,7 +42,7 @@
     </div>
 
     <div id="appShell" class="app-shell mobile-app-shell hidden">
-    <header class="app-header mobile-app-header">
+    <header id="topNav" class="app-header mobile-app-header">
       <div class="header-left">
         <div class="logo-mark"><img src="img/vortex-symbol.png?v=brand-logo-v1" alt="" /></div>
         <div class="header-brand-copy">
@@ -52,11 +52,10 @@
         <span id="realtimeStatus" class="realtime-status is-connecting" role="status">Conectando…</span>
       </div>
 
-      <div class="header-right">
+      <div id="topNavUserActions" class="header-right flex items-center gap-2 flex-shrink-0">
         <div class="notification-menu">
-          <button id="btnNotifications" class="btn btn-outline header-icon-button" type="button" aria-label="Avisos" aria-expanded="false" aria-controls="notificationsPanel">
+          <button id="btnNotifications" class="btn btn-outline header-icon-button" type="button" aria-label="Avisos pendientes" title="Avisos pendientes" aria-expanded="false" aria-controls="notificationsPanel">
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg>
-            <span class="header-action-label">Avisos</span>
             <span id="notificationBadge" class="notification-badge hidden" aria-label="Notificaciones sin leer">0</span>
           </button>
           <section id="notificationsPanel" class="notification-panel hidden" aria-labelledby="notificationsHeading">
@@ -68,7 +67,7 @@
           </section>
         </div>
         <div id="profileMenu" class="profile-menu">
-          <button id="btnUserProfile" class="btn btn-outline profile-trigger header-icon-button" type="button" aria-label="Abrir menú de perfil" aria-expanded="false" aria-controls="profileMenuPanel">
+          <button id="profileButton" class="btn btn-outline profile-trigger header-icon-button" type="button" aria-label="Abrir menú de perfil" aria-expanded="false" aria-controls="profileMenuPanel">
             <span id="headerUserAvatar" class="header-avatar" aria-hidden="true">U</span>
             <span id="headerFirstName" class="header-first-name"></span>
             <span id="headerRoleBadge" class="header-role-badge"></span>
@@ -90,6 +89,10 @@
               Sonido: Activado
             </button>
             <button id="btnManageCategories" class="btn btn-outline hidden" type="button"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16M4 12h16M4 19h10M18 16v6M15 19h6"/></svg>Administrar categorías</button>
+            <button id="btnOpenArchived" class="btn btn-outline" type="button">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="5" rx="1"/><path d="M5 8v12h14V8M10 12h4"/></svg>
+              Tickets archivados
+            </button>
             <button id="btnChangePassword" class="btn btn-outline" type="button">
               <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M17 6l3 3M14 9l3 3"/></svg>
               Cambiar contraseña
@@ -100,14 +103,24 @@
       </div>
     </header>
 
-    <nav class="controls-toolbar" aria-label="Filtros del tablero">
+    <nav id="boardToolbar" class="controls-toolbar" aria-label="Filtros del tablero">
       <div id="pendingSyncStatus" class="pending-sync-status hidden" role="status" aria-live="polite">
         <span id="pendingSyncMessage"></span>
         <button id="btnRetrySync" class="btn btn-outline" type="button">Reintentar</button>
       </div>
+      <div id="boardToolbarPrimary" class="board-toolbar-primary">
       <div class="search-box">
         <svg class="icon search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
-        <input type="text" id="filterSearch" placeholder="Buscar por palabra clave, ID o asignado..." />
+        <input type="search" id="boardSearchInput" placeholder="Buscar por palabra clave, ID o asignado..." autocomplete="off" />
+      </div>
+      <button id="btnToggleFilters" class="btn btn-outline desktop-toolbar-action" type="button" aria-haspopup="dialog" aria-expanded="false">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M6 12h12m-9 6h6"/></svg>
+        Filtros
+      </button>
+      <button id="btnToggleSelectionMode" class="btn btn-outline desktop-toolbar-action" type="button" aria-pressed="false">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="m8 12 2.5 2.5L16 9"/></svg>
+        Seleccionar
+      </button>
       </div>
       <button id="btnOpenMobileFilters" class="btn btn-outline mobile-filter-trigger" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="mobileFiltersSheet">
         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M7 12h10m-7 6h4"/></svg>
@@ -561,10 +574,30 @@
           </div>
 
           <footer class="modal-actions ticket-form-actions">
-            <button type="button" id="btnReopenTicket" class="btn ui-button ui-button--secondary ui-button--md hidden">Reabrir ticket</button>
-            <button type="button" id="btnDeleteTicket" class="btn ui-button ui-button--destructive-ghost ui-button--md hidden">Eliminar ticket</button>
-            <button type="button" id="btnCancelModal" class="btn ui-button ui-button--secondary ui-button--md ticket-form-cancel">Cancelar</button>
-            <button type="submit" id="btnSubmitTicketModal" class="btn ui-button ui-button--default ui-button--md ticket-form-submit">Crear solicitud</button>
+            <div class="ticket-form-actions-left">
+              <button type="button" id="btnReopenTicket" class="btn ui-button ui-button--secondary ui-button--md hidden">Reabrir ticket</button>
+              <button
+                type="button"
+                id="btnArchiveTicket"
+                disabled
+                class="archive-ticket-button inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all duration-200
+                       disabled:opacity-35 disabled:cursor-not-allowed disabled:border-slate-800 disabled:bg-slate-900/50 disabled:text-slate-500
+                       enabled:border-amber-500/30 enabled:bg-amber-500/10 enabled:text-amber-400 enabled:hover:bg-amber-500/20 enabled:hover:border-amber-500/50 enabled:active:scale-95"
+                title="Solo disponible para tickets en estado Cerrado"
+              >
+                <svg class="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <rect width="20" height="5" x="2" y="3" rx="1"/>
+                  <path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/>
+                  <path d="M10 12h4"/>
+                </svg>
+                <span>Archivar</span>
+              </button>
+              <button type="button" id="btnDeleteTicket" class="btn ui-button ui-button--destructive-ghost ui-button--md hidden">Eliminar ticket</button>
+            </div>
+            <div class="ticket-form-actions-right">
+              <button type="button" id="btnCancelModal" class="btn ui-button ui-button--secondary ui-button--md ticket-form-cancel">Cancelar</button>
+              <button type="submit" id="btnSubmitTicketModal" class="btn ui-button ui-button--default ui-button--md ticket-form-submit">Crear solicitud</button>
+            </div>
           </footer>
         </form>
       </div>
@@ -823,6 +856,26 @@
       </section>
     </main>
 
-    <script type="module" src="js/app.js?v=sound-feedback-v3"></script>
+    <div id="archivedTicketsModal" class="archived-modal hidden" role="dialog" aria-modal="true" aria-labelledby="archivedTicketsHeading">
+      <section class="archived-modal-panel">
+        <header class="archived-modal-header">
+          <div class="archived-modal-title">
+            <span class="archived-modal-title-icon">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="3" width="20" height="5" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/></svg>
+            </span>
+            <h3 id="archivedTicketsHeading">Tickets Archivados</h3>
+          </div>
+          <button id="btnCloseArchivedModal" class="icon-button" type="button" aria-label="Cerrar tickets archivados">✕</button>
+        </header>
+        <div class="archived-modal-search">
+          <input type="search" id="inputSearchArchived" placeholder="Buscar por título o código (#TCK-...)" autocomplete="off">
+        </div>
+        <div id="archivedTicketsList" class="archived-tickets-list" aria-live="polite">
+          <p class="archived-empty-state">Cargando tickets archivados...</p>
+        </div>
+      </section>
+    </div>
+
+    <script type="module" src="js/app.js?v=archived-tickets-v1"></script>
   </body>
 </html>

@@ -1989,6 +1989,58 @@ html[data-theme="light"] .theme-picker select option {
   backdrop-filter: blur(12px);
 }
 
+.ticket-form-actions-left,
+.ticket-form-actions-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ticket-form-actions-left {
+  margin-right: auto;
+}
+
+.archive-ticket-button {
+  display: inline-flex;
+  min-height: 2rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0.45rem 0.875rem;
+  border-radius: 0.75rem;
+  font-size: 0.75rem;
+  line-height: 1;
+  transition: border-color 180ms ease, background-color 180ms ease, color 180ms ease, transform 75ms ease;
+}
+
+.archive-ticket-button svg {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+}
+
+.archive-ticket-button:disabled {
+  border-color: rgba(51, 65, 85, 0.7);
+  background: rgba(15, 23, 42, 0.5);
+  color: #64748b;
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.archive-ticket-button:not(:disabled) {
+  border-color: rgba(245, 158, 11, 0.3);
+  background: rgba(245, 158, 11, 0.1);
+  color: #fbbf24;
+}
+
+.archive-ticket-button:not(:disabled):hover {
+  border-color: rgba(245, 158, 11, 0.5);
+  background: rgba(245, 158, 11, 0.2);
+}
+
+.archive-ticket-button:not(:disabled):active {
+  transform: scale(0.95);
+}
+
 .ticket-form-cancel {
   color: var(--text-muted);
 }
@@ -2964,4 +3016,122 @@ html[data-theme="pink"] .btn-danger { color: #b91c1c; }
   .sla-overview {
     grid-template-columns: 1fr;
   }
+}
+
+.archived-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 140;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(2, 6, 23, 0.72);
+  backdrop-filter: blur(5px);
+}
+
+.archived-modal.hidden { display: none; }
+
+.archived-modal-panel {
+  width: min(42rem, 100%);
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: 1rem;
+  padding: 1.25rem;
+  background: var(--surface-elevated, #0f172a);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
+}
+
+.archived-modal-header,
+.archived-modal-title {
+  display: flex;
+  align-items: center;
+}
+
+.archived-modal-header {
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.archived-modal-title { gap: 0.5rem; }
+.archived-modal-title h3 { margin: 0; font-size: 0.95rem; }
+
+.archived-modal-title-icon {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.5rem;
+  color: #fbbf24;
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.archived-modal-title-icon .icon { width: 1rem; height: 1rem; }
+
+.archived-modal-search { margin: 0.75rem 0; }
+
+.archived-modal-search input {
+  width: 100%;
+  height: 2rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.6rem;
+  padding: 0 0.75rem;
+  color: var(--text-primary);
+  background: rgba(2, 6, 23, 0.55);
+  font-size: 0.78rem;
+}
+
+.archived-modal-search input:focus {
+  outline: none;
+  border-color: rgba(245, 158, 11, 0.5);
+}
+
+.archived-tickets-list {
+  min-height: 12rem;
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.archived-ticket-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+  padding: 0.85rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.75rem;
+  background: rgba(15, 23, 42, 0.75);
+}
+
+.archived-ticket-main { min-width: 0; }
+.archived-ticket-code { color: var(--text-muted); font-size: 0.68rem; font-weight: 700; }
+.archived-ticket-main h4 { overflow: hidden; margin: 0.15rem 0; text-overflow: ellipsis; white-space: nowrap; }
+.archived-ticket-main p { margin: 0; color: var(--text-muted); font-size: 0.72rem; }
+
+.archived-empty-state {
+  display: flex;
+  min-height: 12rem;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.archived-empty-state strong { color: var(--text-primary); }
+.archived-load-error { color: #f87171; }
+
+@media (max-width: 640px) {
+  .archived-modal { align-items: flex-end; padding: 0; }
+  .archived-modal-panel { max-height: 88vh; border-radius: 1rem 1rem 0 0; }
+  .archived-ticket-row { align-items: stretch; flex-direction: column; }
+  .archived-restore-button { width: 100%; }
 }

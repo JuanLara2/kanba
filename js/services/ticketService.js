@@ -271,6 +271,47 @@ export class TicketService {
     return true;
   }
 
+  async archiveTicket(ticketId) {
+    const user = await this.auth.getCurrentUser();
+    if (!user) throw new Error('Sesión requerida para archivar tickets.');
+    const ticket = await this.db.getById('tickets', ticketId);
+    if (!ticket) throw new Error('El ticket no existe.');
+    if (!['cerrado', 'closed'].includes(ticket.status)) {
+      throw new Error('Solo se pueden archivar tickets en estado Cerrado.');
+    }
+    if (ticket.isArchived) throw new Error('El ticket ya está archivado.');
+
+    ticket.isArchived = true;
+    ticket.archivedAt = new Date().toISOString();
+    ticket.updatedAt = ticket.archivedAt;
+    return this.db.put('tickets', ticket);
+  }
+
+  async getArchivedTickets() {
+    const user = await this.auth.getCurrentUser();
+    if (!user) throw new Error('Sesión requerida para consultar tickets archivados.');
+    if (typeof this.db.getArchivedTickets !== 'function') {
+      throw new Error('La consulta de tickets archivados no está disponible.');
+    }
+    return this.db.getArchivedTickets();
+  }
+
+  async unarchiveTicket(ticketId) {
+    const user = await this.auth.getCurrentUser();
+    if (!user) throw new Error('Sesión requerida para restaurar tickets.');
+    const ticket = await this.db.getById('tickets', ticketId);
+    if (!ticket) throw new Error('El ticket no existe.');
+    if (!ticket.isArchived) throw new Error('El ticket no está archivado.');
+    if (!this.auth.canEditTicket(user, ticket)) {
+      throw new Error('No tienes permiso para restaurar este ticket.');
+    }
+
+    ticket.isArchived = false;
+    ticket.archivedAt = null;
+    ticket.updatedAt = new Date().toISOString();
+    return this.db.put('tickets', ticket);
+  }
+
   async changeTicketStatus(ticketId, nextStatus) {
     const user = await this.auth.getCurrentUser();
     const ticket = await this.db.getById('tickets', ticketId);

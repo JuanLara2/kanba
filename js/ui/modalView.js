@@ -80,6 +80,23 @@ export class ModalView {
         first.focus();
       }
     });
+
+    const statusSelect = document.getElementById('formInitialStatus');
+    statusSelect?.addEventListener('change', (event) => {
+      this.updateArchiveButtonState(event.target.value);
+    });
+  }
+
+  updateArchiveButtonState(currentStatus) {
+    const btnArchive = document.getElementById('btnArchiveTicket');
+    if (!btnArchive) return;
+
+    const isClosed = currentStatus === 'cerrado' || currentStatus === 'closed';
+    btnArchive.disabled = !isClosed || !this.currentTicketId;
+    btnArchive.setAttribute(
+      'title',
+      isClosed ? 'Archivar este ticket cerrado' : 'Debes marcar el ticket como Cerrado para poder archivarlo'
+    );
   }
 
   openTicket(ticket = null, permissions = {}) {
@@ -119,6 +136,7 @@ export class ModalView {
       document.getElementById('ticketCommentComposer').classList.toggle('hidden', !permissions.canComment);
       document.getElementById('ticketCommentInput').value = '';
       this.renderComments([]);
+      this.updateArchiveButtonState(ticket.status);
     } else {
       heading.textContent = 'Crear nueva solicitud';
       saveBtn.textContent = 'Crear solicitud';
@@ -129,6 +147,7 @@ export class ModalView {
       statusRow.classList.remove('hidden');
       document.getElementById('ticketHistorySection').classList.add('hidden');
       document.getElementById('ticketCommentsSection').classList.add('hidden');
+      this.updateArchiveButtonState('new');
     }
 
     this.canManageChecklist = Boolean(permissions.canManageChecklist);

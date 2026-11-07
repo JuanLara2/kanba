@@ -184,8 +184,7 @@
     min-height: 42px;
   }
 
-  .app-header #btnUserProfile {
-    position: absolute;
+  .app-header #profileButton {
     top: max(0.85rem, env(safe-area-inset-top, 0px));
     right: 1rem;
     z-index: 4;
@@ -476,7 +475,7 @@
     min-height: 36px;
   }
 
-  .app-header #btnUserProfile {
+  .app-header #profileButton {
     top: max(0.75rem, env(safe-area-inset-top, 0px));
     right: 0.75rem;
     height: 36px;
@@ -484,7 +483,7 @@
     font-size: 0.85rem;
   }
 
-  .app-header #btnUserProfile .header-avatar {
+  .app-header #profileButton .header-avatar {
     width: 32px;
     height: 32px;
     font-size: 0.82rem;
@@ -681,6 +680,27 @@
   .mobile-filter-actions {
     display: none !important;
   }
+
+  .desktop-toolbar-action { display: inline-flex !important; }
+  #boardToolbarPrimary {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    width: 100%;
+  }
+}
+
+.desktop-toolbar-action { display: none; }
+
+#btnToggleFilters,
+#btnToggleSelectionMode {
+  position: static !important;
+}
+
+#boardSearchInput {
+  width: 100%;
+  max-width: 420px;
 }
 
 @media (max-width: 768px), (max-height: 600px) and (orientation: landscape) {
@@ -704,6 +724,10 @@
 }
 
 @media (max-width: 768px), (max-height: 600px) and (orientation: landscape) {
+  .board-toolbar-primary {
+    display: contents;
+  }
+
   .controls-toolbar {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
@@ -1502,7 +1526,7 @@
     min-width: 0;
   }
 
-  .app-header #btnUserProfile {
+  .app-header #profileButton {
     position: static;
     width: auto;
     min-width: 0;
@@ -2040,7 +2064,7 @@
     box-shadow: none;
   }
 
-  .app-header #btnUserProfile {
+  .app-header #profileButton {
     width: auto;
     min-width: 0;
     justify-content: flex-start;
@@ -2235,5 +2259,153 @@
     right: 0.75rem !important;
     bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px)) !important;
     z-index: 20 !important;
+  }
+}
+
+/* Desktop header and board toolbar */
+@media (min-width: 1024px) {
+  #appShell,
+  .app-shell {
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  #topNav,
+  header.app-header {
+    flex-direction: row !important;
+    position: relative !important;
+    top: auto !important;
+    right: auto !important;
+    left: auto !important;
+    display: flex !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 52px !important;
+    box-sizing: border-box !important;
+    flex: 0 0 auto !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 1rem !important;
+    padding: 0.5rem 1rem !important;
+    margin: 0 !important;
+    z-index: 30 !important;
+    overflow: visible !important;
+  }
+
+  #topNavActions,
+  #topNavUserActions,
+  #topNav .user-actions-group,
+  #topNav .header-right {
+    position: static !important;
+    display: flex !important;
+    height: auto !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+    flex-wrap: nowrap !important;
+    flex-shrink: 0 !important;
+    gap: 0.5rem !important;
+    margin: 0 !important;
+    margin-left: auto !important;
+    transform: none !important;
+  }
+
+  #topNavUserActions {
+    width: auto !important;
+    margin-left: auto !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    flex-shrink: 0 !important;
+  }
+
+  #profileButton,
+  #btnNotifications {
+    top: auto !important;
+    bottom: auto !important;
+    right: auto !important;
+    left: auto !important;
+    margin: 0 !important;
+    display: inline-flex !important;
+    transform: none !important;
+  }
+
+  #btnNotifications {
+    position: relative !important;
+    width: 36px !important;
+    height: 36px !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  #profileButton {
+    position: static !important;
+    gap: 0.5rem !important;
+    height: 36px !important;
+    align-items: center !important;
+  }
+
+  #topNav > div:last-child {
+    position: static !important;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 0.5rem !important;
+    flex-shrink: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  #boardToolbar,
+  nav.controls-toolbar {
+    position: relative !important;
+    top: auto !important;
+    right: auto !important;
+    left: auto !important;
+    display: flex !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    flex: 0 0 auto !important;
+    align-items: center !important;
+    padding: 0.5rem 1.25rem !important;
+    margin: 0 !important;
+    background-color: rgba(2, 6, 23, 0.5) !important;
+    border-bottom: 1px solid rgba(30, 41, 59, 0.6) !important;
+    z-index: 20 !important;
+  }
+
+  #boardToolbarPrimary,
+  .board-toolbar-primary {
+    display: flex !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    flex-wrap: wrap !important;
+    gap: 0.75rem !important;
+  }
+
+  #boardToolbarPrimary .search-box,
+  #boardSearchInput,
+  #boardToolbarPrimary > .search-box {
+    width: 100% !important;
+    max-width: 320px !important;
+  }
+
+  #boardToolbarPrimary .search-box {
+    margin-right: auto !important;
+  }
+
+  #boardToolbarPrimary > #btnToggleFilters,
+  #boardToolbarPrimary > #btnToggleSelectionMode {
+    position: static !important;
+    display: inline-flex !important;
+    flex: 0 0 auto !important;
+    align-items: center !important;
+  }
+
+  #btnOpenMobileFilters,
+  .mobile-filter-trigger,
+  .mobile-selection-entry,
+  [aria-controls="mobileFiltersSheet"] {
+    display: none !important;
   }
 }

@@ -1,7 +1,7 @@
-import { SUPABASE_URL } from '../config/supabase.js';
+import { SUPABASE_URL } from '../config/supabase.js?v=apikey-fix-v1';
 
 const PROFILE_FIELDS = 'id,full_name,email,role,workspace_id,created_by_admin_id,avatar_path';
-const TICKET_FIELDS = 'id,title,description,status,priority,category,complexity_score,assigned_to,created_by,workspace_id,created_at,updated_at,due_date,sla_due_at,sla_warning_at,checklist';
+const TICKET_FIELDS = 'id,title,description,status,priority,category,complexity_score,assigned_to,created_by,workspace_id,created_at,updated_at,due_date,sla_due_at,sla_warning_at,checklist,is_archived,archived_at';
 const HISTORY_FIELDS = 'id,ticket_id,from_status,to_status,changed_at,changed_by,assigned_to_at_change';
 const COMMENT_FIELDS = 'id,ticket_id,author_id,body,created_at';
 const NOTIFICATION_FIELDS = 'id,user_id,ticket_id,kind,message,created_at,read_at';
@@ -46,6 +46,8 @@ function mapTicket(row, history = []) {
     slaDueAt: row.sla_due_at,
     slaWarningAt: row.sla_warning_at,
     checklist: row.checklist || [],
+    isArchived: Boolean(row.is_archived),
+    archivedAt: row.archived_at || null,
     statusHistory: history
       .filter((record) => record.ticket_id === row.id)
       .map((record) => ({
@@ -68,7 +70,9 @@ function toTicketRow(ticket) {
     complexity_score: ticket.complexityScore,
     assigned_to: ticket.assignedTo,
     due_date: ticket.dueDate,
-    checklist: ticket.checklist || []
+    checklist: ticket.checklist || [],
+    is_archived: Boolean(ticket.isArchived),
+    archived_at: ticket.archivedAt || null
   };
 }
 
@@ -179,6 +183,21 @@ export class SupabaseAdapter {
     );
     if (rows.length === 0) return [];
 
+    const ids = rows.map((ticket) => `"${ticket.id}"`).join(',');
+    const history = await this.client.requestRest(
+      `ticket_status_history?select=${HISTORY_FIELDS}&ticket_id=in.(${ids})&order=changed_at.asc`,
+      { accessToken }
+    );
+    return rows.map((ticket) => mapTicket(ticket, history));
+  }
+
+  async getArchivedTickets() {
+    const accessToken = await this.accessToken();
+    const rows = await this.client.requestRest(
+      `tickets?select=${TICKET_FIELDS}&is_archived=eq.true&order=archived_at.desc`,
+      { accessToken }
+    );
+    if (rows.length === 0) return [];
     const ids = rows.map((ticket) => `"${ticket.id}"`).join(',');
     const history = await this.client.requestRest(
       `ticket_status_history?select=${HISTORY_FIELDS}&ticket_id=in.(${ids})&order=changed_at.asc`,

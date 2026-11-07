@@ -26,7 +26,9 @@ create table if not exists public.tickets (
   updated_at timestamptz not null default now(),
   due_date timestamptz,
   checklist jsonb not null default '[]'::jsonb
-    constraint tickets_checklist_is_array check (jsonb_typeof(checklist) = 'array')
+    constraint tickets_checklist_is_array check (jsonb_typeof(checklist) = 'array'),
+  is_archived boolean not null default false,
+  archived_at timestamptz
 );
 
 create table if not exists public.ticket_status_history (
@@ -200,6 +202,6 @@ using ((select auth.uid()) is not null);
 revoke all on public.profiles, public.tickets, public.ticket_status_history from public, anon, authenticated;
 grant select on public.profiles, public.tickets, public.ticket_status_history to authenticated;
 grant insert (title, description, status, priority, assigned_to, due_date, checklist) on public.tickets to authenticated;
-grant update (title, description, status, priority, assigned_to, due_date, checklist) on public.tickets to authenticated;
+grant update (title, description, status, priority, assigned_to, due_date, checklist, is_archived, archived_at) on public.tickets to authenticated;
 grant delete on public.tickets to authenticated;
 grant usage on sequence public.ticket_number_seq to authenticated;

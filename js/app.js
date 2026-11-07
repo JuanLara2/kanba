@@ -1,10 +1,11 @@
-import { SupabaseClient } from './data/supabaseClient.js';
+import { SupabaseClient } from './data/supabaseClient.js?v=apikey-fix-v1';
 import { SupabaseAdapter } from './data/db.js?v=complexity-scoring-v1';
 import { AuthService } from './services/authService.js?v=user-role-management-v1';
 import { TicketService } from './services/ticketService.js?v=complexity-scoring-v1';
 import { FilterSortService } from './services/filterService.js';
 import { BoardView } from './ui/boardView.js?v=ui-polish-v1';
 import { ModalView } from './ui/modalView.js?v=ux-audit-v1';
+import { ArchivedTicketsModal } from './ui/archivedTicketsModal.js';
 import { DragDropController } from './ui/dragDrop.js?v=sound-feedback-v2';
 import { CalendarView, dueDateForCalendarDay } from './ui/calendarView.js?v=sound-feedback-v2';
 import { initializeThemeController } from './ui/themeController.js';
@@ -75,7 +76,7 @@ const profileModal = document.getElementById('profileModal');
 const profileAvatarInput = document.getElementById('profileAvatarInput');
 const profileFileName = document.getElementById('profileFileName');
 const filters = {
-  search: document.getElementById('filterSearch'),
+  search: document.getElementById('boardSearchInput'),
   assignedTo: document.getElementById('filterAssignee'),
   status: document.getElementById('filterStatus'),
   priority: document.getElementById('filterPriority'),
@@ -98,10 +99,12 @@ let realtimeRefreshTimeout;
 let boardView;
 let calendarView;
 let modalView;
+let archivedTicketsModal;
 let dragDropController;
 let passwordRecoveryAccessToken = null;
 let passwordRecoveryLinkExpired = false;
 let mobileStatusTicketId = null;
+let mobileStatusTrigger = null;
 let mobileActionTicketId = null;
 let mobileOverlayStack = [];
 let suppressMobileOverlayHistory = false;
@@ -145,6 +148,15 @@ async function bootstrap() {
     onUserSubmit: handleUserSubmit,
     onOverlayOpen: trackMobileOverlayOpen,
     onOverlayClose: trackMobileOverlayClose
+  });
+  archivedTicketsModal = new ArchivedTicketsModal({
+    modalEl: document.getElementById('archivedTicketsModal'),
+    ticketService,
+    onRestored: async () => {
+      await loadTickets();
+      renderBoard();
+      showToast('Ticket restaurado al tablero.');
+    }
   });
 
   dragDropController = new DragDropController({
@@ -592,7 +604,7 @@ function initPasswordToggle() {
 }
 
 function setProfileMenuOpen(isOpen, restoreFocus = false) {
-  const trigger = document.getElementById('btnUserProfile');
+  const trigger = document.getElementById('profileButton');
   const panel = document.getElementById('profileMenuPanel');
   if (!trigger || !panel) return;
   panel.classList.toggle('hidden', !isOpen);
@@ -601,7 +613,7 @@ function setProfileMenuOpen(isOpen, restoreFocus = false) {
 }
 
 function toggleProfileMenu() {
-  const trigger = document.getElementById('btnUserProfile');
+  const trigger = document.getElementById('profileButton');
   if (!trigger) return;
   const isOpen = trigger.getAttribute('aria-expanded') === 'true';
   setProfileMenuOpen(!isOpen);
@@ -807,7 +819,14 @@ function bindStaticEvents() {
   });
   document.getElementById('btnForgotPassword')?.addEventListener('click', handleForgotPassword);
   passwordRecoveryForm?.addEventListener('submit', handlePasswordRecoverySubmit);
-  document.getElementById('btnUserProfile')?.addEventListener('click', toggleProfileMenu);
+  document.getElementById('profileButton')?.addEventListener('click', toggleProfileMenu);
+  document.getElementById('btnOpenArchived')?.addEventListener('click', () => {
+    setProfileMenuOpen(false);
+    void archivedTicketsModal?.open();
+  });
+  window.addEventListener('ticket:archive-error', (event) => {
+    showToast(event.detail?.message || 'No se pudo restaurar el ticket.', 6000);
+  });
   document.getElementById('btnProfileMenuOpenProfile')?.addEventListener('click', () => {
     setProfileMenuOpen(false);
     openProfileModal();
@@ -828,7 +847,7 @@ function bindStaticEvents() {
   });
   document.addEventListener('pointerdown', (event) => {
     const profileMenu = document.getElementById('profileMenu');
-    const profileTrigger = document.getElementById('btnUserProfile');
+    const profileTrigger = document.getElementById('profileButton');
     const isOpen = profileTrigger?.getAttribute('aria-expanded') === 'true';
     if (!isOpen || !profileMenu || profileMenu.contains(event.target)) return;
     setProfileMenuOpen(false);
@@ -950,6 +969,9 @@ function bindStaticEvents() {
     if (mobileSelectionMode) exitMobileSelection();
     else startMobileSelection();
   });
+  document.getElementById('btnToggleSelectionMode')?.addEventListener('click', () => {
+    document.getElementById('btnStartBatchSelection')?.click();
+  });
   document.getElementById('btnExitBatchSelection').addEventListener('click', exitMobileSelection);
   document.getElementById('btnMobileBatchMove').addEventListener('click', () => {
     applyMobileBatchStatus(document.getElementById('mobileBatchStatus').value);
@@ -1011,6 +1033,27 @@ function bindStaticEvents() {
       showToast('Ticket eliminado correctamente');
     } catch (error) {
       showToast(error.message || 'No se pudo eliminar el ticket');
+    }
+  });
+  document.getElementById('btnArchiveTicket').addEventListener('click', async () => {
+    const ticketId = document.getElementById('formTicketId').value;
+    if (!ticketId) return;
+    const ticket = allTickets.find((item) => item.id === ticketId);
+    if (!ticket || !['cerrado', 'closed'].includes(ticket.status)) return;
+
+    if (!window.confirm(`¿Archivar el ticket ${ticketId}? El historial se conservará.`)) return;
+    const archiveButton = document.getElementById('btnArchiveTicket');
+    archiveButton.disabled = true;
+    try {
+      await ticketService.archiveTicket(ticketId);
+      navigator.vibrate?.([20, 30, 20]);
+      await loadTickets();
+      modalView.closeTicket();
+      renderBoard();
+      showToast('Ticket archivado correctamente');
+    } catch (error) {
+      archiveButton.disabled = false;
+      showToast(error.message || 'No se pudo archivar el ticket');
     }
   });
   document.getElementById('btnLogout')?.addEventListener('click', async () => {
@@ -1080,6 +1123,7 @@ function bindStaticEvents() {
     renderBoard();
   });
   document.getElementById('btnOpenMobileFilters').addEventListener('click', openMobileFilters);
+  document.getElementById('btnToggleFilters')?.addEventListener('click', openMobileFilters);
   document.getElementById('btnCloseMobileFilters').addEventListener('click', closeMobileFilters);
   document.getElementById('mobileFiltersBackdrop').addEventListener('click', closeMobileFilters);
   document.getElementById('btnApplyMobileFilters').addEventListener('click', closeMobileFilters);
@@ -1473,7 +1517,8 @@ function openMobileFilters() {
   layer.classList.remove('hidden');
   document.getElementById('mobileFiltersSheet').setAttribute('role', 'dialog');
   document.getElementById('mobileFiltersSheet').setAttribute('aria-modal', 'true');
-  document.getElementById('btnOpenMobileFilters').setAttribute('aria-expanded', 'true');
+  document.getElementById('btnOpenMobileFilters')?.setAttribute('aria-expanded', 'true');
+  document.getElementById('btnToggleFilters')?.setAttribute('aria-expanded', 'true');
   layer.querySelector('select, input').focus();
 }
 
@@ -1481,7 +1526,8 @@ function closeMobileFilters() {
   document.getElementById('mobileFiltersLayer').classList.add('hidden');
   document.getElementById('mobileFiltersSheet').removeAttribute('role');
   document.getElementById('mobileFiltersSheet').removeAttribute('aria-modal');
-  document.getElementById('btnOpenMobileFilters').setAttribute('aria-expanded', 'false');
+  document.getElementById('btnOpenMobileFilters')?.setAttribute('aria-expanded', 'false');
+  document.getElementById('btnToggleFilters')?.setAttribute('aria-expanded', 'false');
   trackMobileOverlayClose('filters');
   document.getElementById('btnOpenMobileFilters').focus();
 }
@@ -1666,7 +1712,9 @@ function openMobileStatusSheet(ticketId, trigger) {
   const ticket = allTickets.find((item) => item.id === ticketId);
   if (!ticket || !auth.canChangeStatus(activeUser, ticket)) return;
 
+  closeMobileStatusSheet(false);
   mobileStatusTicketId = ticketId;
+  mobileStatusTrigger = trigger || null;
   trackMobileOverlayOpen('status');
   document.getElementById('ticketStatusTicketId').textContent = ticket.id;
   const options = Object.values(STATUS_DEFINITIONS).map(({ id, name, colorHex }) => {
@@ -1685,16 +1733,37 @@ function openMobileStatusSheet(ticketId, trigger) {
   document.getElementById('ticketStatusLayer').classList.remove('hidden');
   container.querySelector('button:not(:disabled)')?.focus();
   if (trigger) trigger.setAttribute('aria-expanded', 'true');
+  document.addEventListener('click', handleStatusOutsideClick);
+  window.addEventListener('keydown', handleStatusDropdownEscape);
 }
 
-function closeMobileStatusSheet() {
-  document.getElementById('ticketStatusLayer').classList.add('hidden');
+function closeMobileStatusSheet(resetFocus = true) {
+  document.removeEventListener('click', handleStatusOutsideClick);
+  window.removeEventListener('keydown', handleStatusDropdownEscape);
+  const layer = document.getElementById('ticketStatusLayer');
+  const wasOpen = Boolean(mobileStatusTicketId) && !layer.classList.contains('hidden');
+  layer.classList.add('hidden');
   [...boardEl.querySelectorAll('.btn-change-status')]
     .find((button) => button.dataset.ticketId === mobileStatusTicketId)
     ?.setAttribute('aria-expanded', 'false');
-  trackMobileOverlayClose('status');
+  if (wasOpen) trackMobileOverlayClose('status');
   mobileStatusTicketId = null;
-  document.querySelector('#mobileStatusTabs .mobile-status-tab[aria-pressed="true"]')?.focus();
+  mobileStatusTrigger = null;
+  if (resetFocus) {
+    document.querySelector('#mobileStatusTabs .mobile-status-tab[aria-pressed="true"]')?.focus();
+  }
+}
+
+function handleStatusOutsideClick(event) {
+  const sheet = document.getElementById('ticketStatusSheet');
+  if (sheet?.contains(event.target) || mobileStatusTrigger?.contains(event.target)) return;
+  closeMobileStatusSheet();
+}
+
+function handleStatusDropdownEscape(event) {
+  if (event.key !== 'Escape' || document.getElementById('ticketStatusLayer').classList.contains('hidden')) return;
+  event.preventDefault();
+  closeMobileStatusSheet();
 }
 
 async function handleMobileStatusSelection(event) {
@@ -1704,13 +1773,13 @@ async function handleMobileStatusSelection(event) {
   const nextStatus = option.dataset.status;
   const options = [...document.querySelectorAll('.ticket-status-option')];
   options.forEach((button) => { button.disabled = true; });
+  closeMobileStatusSheet(false);
   try {
     await ticketService.changeTicketStatus(ticketId, nextStatus);
     if (nextStatus === 'closed') Haptics.dropSuccess();
     else Haptics.actionSuccess();
     if (nextStatus === 'resolved' || nextStatus === 'closed') soundManager.playTaskDone();
     else soundManager.playDrop();
-    closeMobileStatusSheet();
     await loadTickets();
     renderBoard();
     showToast('Estado actualizado');
@@ -2438,10 +2507,11 @@ function renderBoard() {
     sortDirection: filters.sortDirection.value
   };
 
+  const activeTickets = allTickets.filter((ticket) => !ticket.isArchived);
   const statusCountTickets = isMobileViewport()
-    ? FilterSortService.apply(allTickets, { ...criteria, status: 'ALL' }, usersMap)
+    ? FilterSortService.apply(activeTickets, { ...criteria, status: 'ALL' }, usersMap)
     : null;
-  const visibleTickets = FilterSortService.apply(allTickets, criteria, usersMap);
+  const visibleTickets = FilterSortService.apply(activeTickets, criteria, usersMap);
   boardView.render(
     visibleTickets,
     (ticket) => auth.canChangeStatus(activeUser, ticket),
@@ -2536,7 +2606,9 @@ function exportMetrics() {
 }
 
 function updateSlaOverview() {
-  const activeTickets = allTickets.filter((ticket) => !['resolved', 'closed'].includes(ticket.status));
+  const activeTickets = allTickets.filter((ticket) => (
+    !ticket.isArchived && !['resolved', 'closed'].includes(ticket.status)
+  ));
   const warningCount = activeTickets.filter((ticket) => ticketService.evaluateSLA(ticket).state === 'warning').length;
   const overdueCount = activeTickets.filter((ticket) => ticketService.evaluateSLA(ticket).state === 'overdue').length;
   document.getElementById('slaActiveCount').textContent = String(activeTickets.length);

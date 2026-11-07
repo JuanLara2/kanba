@@ -243,6 +243,14 @@
   flex-wrap: wrap;
 }
 
+#topNavUserActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  flex-wrap: nowrap;
+}
+
 .header-status-group {
   display: inline-flex;
   align-items: center;
@@ -282,6 +290,35 @@
   background: var(--bg-toolbar);
   border-bottom: 1px solid var(--border-subtle);
   align-items: center;
+}
+
+.board-toolbar-primary {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.board-toolbar-primary .search-box {
+  margin-right: auto;
+}
+
+#btnToggleFilters,
+#btnToggleSelectionMode,
+#boardToolbarPrimary {
+  position: static !important;
+}
+
+.controls-toolbar .search-box {
+  width: clamp(16rem, 23vw, 22rem);
+  flex: 0 1 22rem;
+}
+
+.desktop-toolbar-action {
+  height: 2.35rem;
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .search-box {
