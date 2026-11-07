@@ -2493,3 +2493,55 @@
     font-weight: 600;
   }
 }
+
+/* ========================================================
+   RESTAURAR TARJETAS Y ACTIVAR SCROLL VERTICAL EN MÓVIL
+   ======================================================== */
+@media (max-width: 768px) {
+  /* 1. Restaurar la altura y contenido completo de la tarjeta */
+  .kanban-grid .ticket-card,
+  .drop-zone .ticket-card {
+    height: auto !important;
+    min-height: fit-content !important;
+    max-height: none !important;
+    overflow: visible !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0.5rem !important;
+    padding: 0.85rem !important;
+    flex-shrink: 0 !important; /* Impide que las tarjetas se aplasten */
+  }
+
+  /* 2. Asegurar que el título y los controles internos sean visibles */
+  .ticket-card .card-body,
+  .ticket-card .card-title,
+  .ticket-card .card-footer,
+  .ticket-card [data-card-body],
+  .ticket-card [data-card-footer] {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    height: auto !important;
+    max-height: none !important;
+  }
+
+  .ticket-card .card-footer {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+  }
+
+  /* 3. Drop zone: scroll vertical obligatorio con margen inferior seguro */
+  .kanban-grid .drop-zone,
+  .kanban-col .drop-zone {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    height: 100% !important;
+    overflow-y: scroll !important; /* Fuerza la activación del scroll táctil */
+    -webkit-overflow-scrolling: touch !important;
+    overscroll-behavior-y: contain !important;
+    touch-action: pan-y !important;
+    padding: 0.65rem 0.5rem 7.5rem 0.5rem !important; /* Espacio para librar el botón '+' */
+    gap: 0.75rem !important;
+  }
+}
