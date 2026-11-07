@@ -34,19 +34,48 @@ export class BoardView {
 
   applyColumnFilter(dropZone, filter, category = '') {
     const currentUser = this.currentUserProvider();
-    const currentUserId = currentUser?.id || '';
+    const currentUserId = String(currentUser?.id || currentUser?.userId || '').trim().toLowerCase();
+    const sessionUserName = String(document.getElementById('sessionUserName')?.textContent || '').trim();
+    const currentUserName = String(currentUser?.fullName || currentUser?.name || sessionUserName).trim();
+    const normalizedUserName = this.normalizeUserName(currentUserName);
 
     dropZone.querySelectorAll('.ticket-card').forEach((card) => {
       let visible = true;
       if (filter === 'urgent') {
         visible = ['alta', 'urgente', 'high', 'urgent'].includes(card.dataset.priority || '');
       } else if (filter === 'mine') {
-        visible = Boolean(currentUserId) && card.dataset.assignedTo === currentUserId;
+        const assignedTo = String(card.dataset.assignedTo || '').trim().toLowerCase();
+        const assigneeName = this.normalizeUserName(card.dataset.assigneeName || '');
+        visible = Boolean(currentUserId && assignedTo === currentUserId)
+          || Boolean(normalizedUserName && assigneeName === normalizedUserName);
       } else if (filter === 'category') {
         visible = card.dataset.category === category;
       }
-      card.classList.toggle('column-filter-hidden', !visible);
+      card.classList.toggle('is-subtab-hidden', !visible);
     });
+  }
+
+  ticketMatchesCurrentUser(ticket) {
+    const currentUser = this.currentUserProvider();
+    if (!currentUser) return false;
+
+    const currentUserId = String(currentUser.id || currentUser.userId || '').trim().toLowerCase();
+    const assignedTo = String(ticket.assignedTo || '').trim().toLowerCase();
+    if (currentUserId && assignedTo === currentUserId) return true;
+
+    const sessionUserName = String(document.getElementById('sessionUserName')?.textContent || '').trim();
+    const currentUserName = this.normalizeUserName(currentUser.fullName || currentUser.name || sessionUserName);
+    const assigneeName = this.normalizeUserName(this.usersMap.get(ticket.assignedTo)?.fullName || '');
+    return Boolean(currentUserName && assigneeName === currentUserName);
+  }
+
+  normalizeUserName(value) {
+    return String(value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim()
+      .replace(/\s+/g, ' ')
+      .toLowerCase();
   }
 
   buildColumnSubTabs(colTickets) {
@@ -54,10 +83,7 @@ export class BoardView {
 
     const urgentTickets = colTickets.filter((ticket) =>
       ['Alta', 'Urgente', 'high', 'urgent'].includes(ticket.priority));
-    const currentUser = this.currentUserProvider();
-    const mineTickets = currentUser
-      ? colTickets.filter((ticket) => ticket.assignedTo === currentUser.id)
-      : [];
+    const mineTickets = colTickets.filter((ticket) => this.ticketMatchesCurrentUser(ticket));
 
     const chips = [`<button type="button" class="column-sub-tab active" data-filter="all" aria-pressed="true">Todos (${colTickets.length})</button>`];
     if (urgentTickets.length) {
@@ -198,6 +224,7 @@ export class BoardView {
       card.classList.add(`sla-${sla.state}`);
     }
     const assignee = this.usersMap.get(ticket.assignedTo) || { fullName: 'Sin asignar' };
+    card.dataset.assigneeName = assignee.fullName;
     const initial = assignee.fullName.charAt(0).toUpperCase();
     const assigneeAccent = this.getAssigneeAccent(assignee.fullName);
     const dueDateLabel = ticket.dueDate

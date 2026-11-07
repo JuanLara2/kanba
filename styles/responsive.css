@@ -2455,8 +2455,14 @@
   white-space: nowrap;
 }
 
-.ticket-card.column-filter-hidden {
+.ticket-card.is-subtab-hidden {
   display: none !important;
+  visibility: hidden !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
 }
 
 @media (max-width: 1023px) {
@@ -2544,4 +2550,23 @@
     padding: 0.65rem 0.5rem 7.5rem 0.5rem !important; /* Espacio para librar el botón '+' */
     gap: 0.75rem !important;
   }
+}
+
+/* ========================================================
+   OCULTAR TOTALMENTE TARJETAS FILTRADAS EN SUB-PESTAÑAS
+   ======================================================== */
+.ticket-card.is-subtab-hidden,
+.ticket-card[data-subtab-hidden="true"],
+.kanban-grid .ticket-card.is-subtab-hidden,
+.drop-zone .ticket-card.is-subtab-hidden {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  max-height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  pointer-events: none !important;
 }
