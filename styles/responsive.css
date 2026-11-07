@@ -2264,6 +2264,82 @@
 
 /* Desktop header and board toolbar */
 @media (min-width: 1024px) {
+  #mobileFiltersLayer:not(.hidden) {
+    display: block !important;
+    flex: 0 0 100%;
+    width: 100%;
+  }
+
+  #mobileFiltersLayer .mobile-filters-backdrop,
+  #mobileFiltersLayer .mobile-sheet-header,
+  #mobileFiltersLayer .mobile-filter-actions {
+    display: none !important;
+  }
+
+  #mobileFiltersLayer .mobile-filters-sheet {
+    position: static;
+    display: grid;
+    width: 100%;
+    max-height: none;
+    box-sizing: border-box;
+    padding: 0.75rem;
+    overflow: visible;
+    border: 1px solid #1e293b;
+    border-radius: 0.75rem;
+    background: rgba(15, 23, 42, 0.95);
+    box-shadow: 0 12px 28px rgba(2, 6, 23, 0.22);
+    color: #f1f5f9;
+  }
+
+  #mobileFiltersLayer .mobile-filter-controls {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.75rem;
+    width: 100%;
+    overflow: visible;
+  }
+
+  #mobileFiltersLayer .control-group,
+  #mobileFiltersLayer .control-group:last-child {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.375rem;
+  }
+
+  #mobileFiltersLayer .control-group label {
+    color: #94a3b8;
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1;
+    text-transform: uppercase;
+  }
+
+  #mobileFiltersLayer .control-group select,
+  #mobileFiltersLayer .control-group input {
+    height: 34px;
+    min-height: 34px;
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid #334155;
+    border-radius: 0.375rem;
+    background: #0f172a;
+    color: #f1f5f9;
+    color-scheme: dark;
+    padding: 0 0.75rem;
+  }
+
+  #mobileFiltersLayer .control-group:last-child {
+    grid-column: auto;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  #mobileFiltersLayer .control-group:last-child label {
+    grid-column: 1 / -1;
+  }
+
   #appShell,
   .app-shell {
     display: flex !important;
@@ -2400,6 +2476,65 @@
     display: inline-flex !important;
     flex: 0 0 auto !important;
     align-items: center !important;
+  }
+
+  html:not([data-theme]) #boardToolbar,
+  html[data-theme="dark"] #boardToolbar,
+  nav.controls-toolbar {
+    background-color: rgba(15, 23, 42, 0.8) !important;
+    border-bottom-color: rgba(51, 65, 85, 0.6) !important;
+  }
+
+  html:not([data-theme]) #boardSearchInput,
+  html[data-theme="dark"] #boardSearchInput {
+    border-color: #334155 !important;
+    background-color: #0f172a !important;
+    color: #f8fafc !important;
+  }
+
+  html:not([data-theme]) #btnToggleFilters,
+  html:not([data-theme]) #btnToggleSelectionMode,
+  html[data-theme="dark"] #btnToggleFilters,
+  html[data-theme="dark"] #btnToggleSelectionMode {
+    border-color: #334155 !important;
+    background-color: #1e293b !important;
+    color: #f1f5f9 !important;
+  }
+
+  html[data-theme="light"] #boardToolbar {
+    background-color: #ffffff !important;
+    border-bottom-color: #e2e8f0 !important;
+  }
+
+  html[data-theme="light"] #boardSearchInput {
+    border-color: #cbd5e1 !important;
+    background-color: #f8fafc !important;
+    color: #0f172a !important;
+  }
+
+  html[data-theme="light"] #btnToggleFilters,
+  html[data-theme="light"] #btnToggleSelectionMode {
+    border-color: #cbd5e1 !important;
+    background-color: #ffffff !important;
+    color: #334155 !important;
+  }
+
+  html[data-theme="pink"] #boardToolbar {
+    background-color: #fff8fb !important;
+    border-bottom-color: #f3bfd0 !important;
+  }
+
+  html[data-theme="pink"] #boardSearchInput {
+    border-color: #f3bfd0 !important;
+    background-color: #ffffff !important;
+    color: #4a1930 !important;
+  }
+
+  html[data-theme="pink"] #btnToggleFilters,
+  html[data-theme="pink"] #btnToggleSelectionMode {
+    border-color: #f3bfd0 !important;
+    background-color: #ffffff !important;
+    color: #865b6d !important;
   }
 
   #btnOpenMobileFilters,
