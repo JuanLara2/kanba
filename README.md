@@ -79,13 +79,22 @@ Los cambios compatibles con la cola offline se aplican de forma optimista y se g
    export const SUPABASE_ANON_KEY = 'your-publishable-key';
    ```
 
-5. Despliega la función de Supabase para la creación de usuarios:
+5. Guarda la clave de Groq como secreto de Supabase y despliega la función de sugerencias:
+
+   ```bash
+   supabase secrets set GROQ_API_KEY=your-groq-api-key
+   supabase functions deploy generate-subtasks
+   ```
+
+   La clave de Groq solo se usa en la Edge Function; no la agregues a archivos del frontend ni al repositorio. La función usa `openai/gpt-oss-20b`, reemplazo recomendado por Groq para `llama-3.1-8b-instant`.
+
+6. Despliega la función de Supabase para la creación de usuarios:
 
    ```bash
    supabase functions deploy admin-create-user
    ```
 
-6. Configura el primer perfil Admin mediante un procedimiento de aprovisionamiento confiable. La función `admin-create-user` requiere que quien la invoque ya tenga el rol Admin; por eso no crea por sí sola el primer administrador.
+7. Configura el primer perfil Admin mediante un procedimiento de aprovisionamiento confiable. La función `admin-create-user` requiere que quien la invoque ya tenga el rol Admin; por eso no crea por sí sola el primer administrador.
 
 > La URL y la clave publishable/anon se usan en el cliente y no son secretos. Nunca incluyas una clave `service_role` en el frontend ni en el repositorio. Mantén las claves privilegiadas en secretos del entorno de Supabase.
 

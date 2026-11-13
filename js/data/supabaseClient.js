@@ -4,6 +4,30 @@ export class SupabaseClient {
   constructor({ url = SUPABASE_URL, anonKey = SUPABASE_ANON_KEY } = {}) {
     this.url = url.replace(/\/+$/, '');
     this.anonKey = anonKey;
+    this.getAccessToken = null;
+    this.functions = {
+      invoke: (name, { body } = {}) => this.invokeFunction(name, body)
+    };
+  }
+
+  setAccessTokenProvider(provider) {
+    this.getAccessToken = provider;
+  }
+
+  async invokeFunction(name, body) {
+    try {
+      if (!/^[a-z0-9-]+$/i.test(name)) throw new Error('Nombre de Edge Function no válido.');
+      const accessToken = await this.getAccessToken?.();
+      if (!accessToken) throw new Error('Inicia sesión para usar las sugerencias con IA.');
+      const data = await this.request('functions/v1', encodeURIComponent(name), {
+        method: 'POST',
+        body,
+        accessToken
+      });
+      return { data, error: null };
+    } catch (error) {
+      return { data: null, error };
+    }
   }
 
   get isConfigured() {

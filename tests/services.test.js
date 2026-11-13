@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { AuthService } from '../js/services/authService.js';
+import { AIService } from '../js/services/AIService.js';
 import { SupabaseAdapter } from '../js/data/db.js';
 import { FilterSortService } from '../js/services/filterService.js';
 import { SupabaseClient } from '../js/data/supabaseClient.js';
@@ -12,6 +13,66 @@ import { initializeThemeController, THEME_STORAGE_KEY } from '../js/ui/themeCont
 import { CalendarView, dueDateForCalendarDay, getMonthGridDates, localDateKey } from '../js/ui/calendarView.js';
 import { DragDropController } from '../js/ui/dragDrop.js';
 import { Haptics } from '../js/utils/haptics.js';
+
+test('AIService invokes the secure function and returns only clean bounded subtasks', async () => {
+  let invocation;
+  const service = new AIService({
+    functions: {
+      async invoke(name, options) {
+        invocation = { name, options };
+        return {
+          data: { subtasks: ['  Revisar requisitos  ', '', null, 'x'.repeat(240)] },
+          error: null
+        };
+      }
+    }
+  });
+
+  const subtasks = await service.suggestSubtasks('Título', 'Descripción');
+  assert.deepEqual(invocation, {
+    name: 'generate-subtasks',
+    options: { body: { title: 'Título', description: 'Descripción' } }
+  });
+  assert.deepEqual(subtasks, ['Revisar requisitos', 'x'.repeat(200)]);
+});
+
+test('AIService surfaces Edge Function errors', async () => {
+  const service = new AIService({
+    functions: {
+      async invoke() {
+        return { data: null, error: new Error('Edge Function no disponible') };
+      }
+    }
+  });
+
+  await assert.rejects(service.suggestSubtasks('Título', 'Descripción'), /Edge Function no disponible/);
+});
+
+test('SupabaseClient invokes Edge Functions with the active session token', async () => {
+  const originalFetch = globalThis.fetch;
+  let request;
+  const client = new SupabaseClient({
+    url: 'https://project.example.supabase.co',
+    anonKey: 'publishable-key'
+  });
+  client.setAccessTokenProvider(async () => 'user-session-token');
+  globalThis.fetch = async (url, options) => {
+    request = { url, options };
+    return new Response(JSON.stringify({ subtasks: ['Validar cambios'] }), { status: 200 });
+  };
+
+  try {
+    const result = await client.functions.invoke('generate-subtasks', {
+      body: { title: 'Título', description: 'Descripción' }
+    });
+    assert.deepEqual(result, { data: { subtasks: ['Validar cambios'] }, error: null });
+    assert.equal(request.url, 'https://project.example.supabase.co/functions/v1/generate-subtasks');
+    assert.equal(request.options.headers.Authorization, 'Bearer user-session-token');
+    assert.deepEqual(JSON.parse(request.options.body), { title: 'Título', description: 'Descripción' });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
 
 test('haptics emit semantic patterns only when the device is supported and active', () => {
   const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator');

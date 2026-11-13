@@ -152,6 +152,7 @@ export class ModalView {
 
     this.canManageChecklist = Boolean(permissions.canManageChecklist);
     document.getElementById('ticketChecklistSection').classList.toggle('hidden', !ticket && !this.canManageChecklist);
+    document.getElementById('btnSuggestSubtasks').classList.toggle('hidden', !this.canManageChecklist);
     this.renderChecklist();
     document.getElementById('formTitle').disabled = !canEditContent;
     document.getElementById('formDescription').disabled = !canEditContent;
@@ -238,6 +239,15 @@ export class ModalView {
     input.value = '';
     this.renderChecklist();
     input.focus();
+  }
+
+  addChecklistItems(items) {
+    if (!this.canManageChecklist) throw new Error('No tienes permiso para modificar las subtareas.');
+    if (this.checklistDraft.length + items.length > 100) {
+      throw new Error('El checklist admite hasta 100 subtareas. Elimina algunas antes de agregar las sugerencias.');
+    }
+    this.checklistDraft.push(...items.map((text) => ({ text, completed: false })));
+    this.renderChecklist();
   }
 
   removeChecklistItem(index) {

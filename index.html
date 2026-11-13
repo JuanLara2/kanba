@@ -10,7 +10,7 @@
     <meta name="theme-color" content="#151a2a" />
     <link rel="stylesheet" href="styles/base.css?v=password-username-v1" />
     <link rel="stylesheet" href="styles/layout.css?v=brand-logo-v1" />
-    <link rel="stylesheet" href="styles/components.css?v=brand-logo-v1" />
+    <link rel="stylesheet" href="styles/components.css?v=ai-subtask-suggestions-v1" />
     <link rel="stylesheet" href="styles/responsive.css?v=theme-toolbar-v1" />
     <link rel="stylesheet" href="styles/splash.css?v=brand-logo-v1" />
   </head>
@@ -514,6 +514,10 @@
                 </div>
                 <span id="checklistProgressText" class="checklist-progress-text">0/0 · 0%</span>
               </header>
+              <div class="ai-subtask-toolbar">
+                <button id="btnSuggestSubtasks" type="button" class="btn btn-outline">✨ Sugerir subtareas con IA</button>
+              </div>
+              <section id="aiSubtaskPreview" class="ai-subtask-preview hidden" aria-label="Previsualización de subtareas sugeridas"></section>
               <div
                 id="checklistProgressTrack"
                 class="checklist-progress-track"
@@ -876,6 +880,6 @@
       </section>
     </div>
 
-    <script type="module" src="js/app.js?v=mine-filter-v3"></script>
+    <script type="module" src="js/app.js?v=ai-subtask-suggestions-v1"></script>
   </body>
 </html>

@@ -1,10 +1,12 @@
-import { SupabaseClient } from './data/supabaseClient.js?v=apikey-fix-v1';
+import { SupabaseClient } from './data/supabaseClient.js?v=ai-subtask-suggestions-v1';
 import { SupabaseAdapter } from './data/db.js?v=complexity-scoring-v1';
 import { AuthService } from './services/authService.js?v=user-role-management-v1';
 import { TicketService } from './services/ticketService.js?v=complexity-scoring-v1';
+import { AIService } from './services/AIService.js';
 import { FilterSortService } from './services/filterService.js';
 import { BoardView } from './ui/boardView.js?v=ui-polish-v1';
-import { ModalView } from './ui/modalView.js?v=ux-audit-v1';
+import { ModalView } from './ui/modalView.js?v=ai-subtask-suggestions-v1';
+import { AiSubtaskPreviewUI } from './ui/AiSubtaskPreviewUI.js';
 import { ArchivedTicketsModal } from './ui/archivedTicketsModal.js';
 import { DragDropController } from './ui/dragDrop.js?v=sound-feedback-v2';
 import { CalendarView, dueDateForCalendarDay } from './ui/calendarView.js?v=sound-feedback-v2';
@@ -25,7 +27,9 @@ const client = new SupabaseClient();
 let auth;
 const db = new SupabaseAdapter(client, () => auth.getAccessToken());
 auth = new AuthService(client, db);
+client.setAccessTokenProvider(() => auth.getAccessToken());
 const ticketService = new TicketService(db, auth);
+const aiService = new AIService(client);
 const outbox = new OutboxService();
 const mutations = new MutationDispatcher({
   outbox,
@@ -99,6 +103,7 @@ let realtimeRefreshTimeout;
 let boardView;
 let calendarView;
 let modalView;
+let aiSubtaskPreviewUI;
 let archivedTicketsModal;
 let dragDropController;
 let passwordRecoveryAccessToken = null;
@@ -135,6 +140,12 @@ async function bootstrap() {
   splashScreen.setProgress(20, 'Preparando espacio de trabajo...');
   initializeThemeController();
   boardView = new BoardView(boardEl, ticketService, usersMap, () => activeUser);
+  aiSubtaskPreviewUI = new AiSubtaskPreviewUI({
+    modalEl,
+    aiService,
+    onConfirm: handleAiSubtasksConfirm,
+    onError: (error) => showToast(error.message || 'No se pudieron sugerir subtareas.', 6000)
+  });
   modalView = new ModalView({
     modalEl,
     form,
@@ -777,6 +788,16 @@ async function handleProfileAvatarRemoval() {
 }
 
 function bindStaticEvents() {
+  window.addEventListener('ticket:checklist-updated', (event) => {
+    const ticket = event.detail?.ticket;
+    const index = allTickets.findIndex((item) => item.id === ticket?.id);
+    if (index < 0 || !Array.isArray(ticket.checklist)) return;
+    allTickets[index] = ticket;
+    if (modalView.currentTicketId === ticket.id) modalView.syncChecklist(ticket.checklist);
+    renderBoard();
+    renderMobileSearchResults();
+  });
+
   initPasswordToggle();
   const userRoleSelect = document.getElementById('userRole');
   userRoleSelect?.addEventListener('change', updateUserRoleDescription);
@@ -1182,6 +1203,7 @@ function navigateBottomTab(view) {
 }
 
 async function openNewTicketModal() {
+  aiSubtaskPreviewUI?.reset();
   const user = await auth.getCurrentUser();
   modalView.openTicket(null, {
     canManageAssignment: auth.canAssignOrSetDue(user),
@@ -2118,6 +2140,7 @@ function handleBottomSheetKeydown(event) {
 }
 
 async function openTicketForEditing(ticketId) {
+  aiSubtaskPreviewUI?.reset();
   const ticket = allTickets.find((item) => item.id === ticketId);
   if (!ticket) return;
   const user = await auth.getCurrentUser();
@@ -2242,6 +2265,32 @@ function syncNewWorkspaceForm() {
   }
 
   updateUserRoleDescription();
+}
+
+async function handleAiSubtasksConfirm(subtasks) {
+  if (!modalView.canManageChecklist) {
+    throw new Error('No tienes permiso para modificar las subtareas.');
+  }
+  const checklist = modalView.getChecklist();
+  if (checklist.length + subtasks.length > 100) {
+    throw new Error('El checklist admite hasta 100 subtareas. Elimina algunas antes de agregar las sugerencias.');
+  }
+
+  if (!modalView.currentTicketId) {
+    modalView.addChecklistItems(subtasks);
+    return null;
+  }
+
+  const ticket = allTickets.find((item) => item.id === modalView.currentTicketId);
+  if (!ticket || !auth.canEditTicket(activeUser, ticket)) {
+    throw new Error('No tienes permiso para modificar este ticket.');
+  }
+  const updatedTicket = await ticketService.updateTicket({
+    ...ticket,
+    checklist: [...checklist, ...subtasks.map((text) => ({ text, completed: false }))]
+  });
+  modalView.syncChecklist(updatedTicket.checklist);
+  return updatedTicket;
 }
 
 async function handleTicketSubmit(event) {

@@ -860,6 +860,83 @@ html[data-theme="light"] .theme-picker select option {
   white-space: nowrap;
 }
 
+.ai-subtask-toolbar {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.ai-subtask-toolbar .btn {
+  min-height: 2.5rem;
+}
+
+.ai-subtask-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 0.8rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--bg-input);
+}
+
+.ai-subtask-preview-heading {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.ai-subtask-preview-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ai-subtask-preview-item {
+  display: grid;
+  grid-template-columns: 2rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ai-subtask-preview-check {
+  display: grid;
+  min-height: 2.5rem;
+  place-items: center;
+}
+
+.ai-subtask-preview-check input {
+  width: 1.15rem;
+  height: 1.15rem;
+  accent-color: #10b981;
+}
+
+.ai-subtask-preview-item > input {
+  min-width: 0;
+  width: 100%;
+  min-height: 2.5rem;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  background: var(--bg-list-item);
+  color: var(--text-main);
+  font-size: 0.84rem;
+}
+
+.ai-subtask-preview-status {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.76rem;
+}
+
+.ai-subtask-preview-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
 .checklist-items {
   display: flex;
   flex-direction: column;
