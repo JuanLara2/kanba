@@ -88,6 +88,8 @@ Los cambios compatibles con la cola offline se aplican de forma optimista y se g
 
    La clave de Groq solo se usa en la Edge Function; no la agregues a archivos del frontend ni al repositorio. La función usa `openai/gpt-oss-20b`, reemplazo recomendado por Groq para `llama-3.1-8b-instant`.
 
+   La misma función también ofrece resumen de ticket, borrador de respuesta, recomendaciones de categoría/prioridad, evaluación orientativa de bloqueos y resumen de hasta 100 tickets activos. Las recomendaciones se aplican solo tras confirmación; los borradores no se publican automáticamente. Los títulos, descripciones y, al redactar respuestas, los comentarios recientes se envían a Groq para procesarlos.
+
 6. Despliega la función de Supabase para la creación de usuarios:
 
    ```bash

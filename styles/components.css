@@ -860,6 +860,97 @@ html[data-theme="light"] .theme-picker select option {
   white-space: nowrap;
 }
 
+.ai-board-summary,
+.ai-ticket-assistant,
+.ai-response-draft {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.ai-board-summary {
+  margin: 0.75rem 0;
+}
+
+.ai-ticket-assistant {
+  padding: 0.85rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--bg-list-item);
+}
+
+.ai-ticket-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.ai-ticket-actions .btn,
+.ai-response-draft .btn,
+.ai-board-summary > .btn {
+  min-height: 2.4rem;
+}
+
+.ai-assistant-output {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.55rem;
+  padding: 0.8rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--bg-input);
+  color: var(--text-main);
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+.ai-assistant-output h5,
+.ai-assistant-output p,
+.ai-assistant-output ul {
+  margin: 0;
+}
+
+.ai-assistant-output ul {
+  padding-left: 1.25rem;
+}
+
+.ai-assistant-editable {
+  width: 100%;
+  min-height: 5rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  background: var(--bg-list-item);
+  color: var(--text-main);
+  font: inherit;
+}
+
+.ai-assistant-note {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+}
+
+.ai-risk-level {
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+}
+
+.ai-risk-level--low {
+  color: #047857;
+  background: rgba(16, 185, 129, 0.14);
+}
+
+.ai-risk-level--medium {
+  color: #b45309;
+  background: rgba(245, 158, 11, 0.14);
+}
+
+.ai-risk-level--high {
+  color: #b91c1c;
+  background: rgba(239, 68, 68, 0.14);
+}
+
 .ai-subtask-toolbar {
   display: flex;
   justify-content: flex-start;

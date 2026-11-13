@@ -10,7 +10,7 @@
     <meta name="theme-color" content="#151a2a" />
     <link rel="stylesheet" href="styles/base.css?v=password-username-v1" />
     <link rel="stylesheet" href="styles/layout.css?v=brand-logo-v1" />
-    <link rel="stylesheet" href="styles/components.css?v=ai-subtask-suggestions-v1" />
+    <link rel="stylesheet" href="styles/components.css?v=ai-assistant-v1" />
     <link rel="stylesheet" href="styles/responsive.css?v=theme-toolbar-v1" />
     <link rel="stylesheet" href="styles/splash.css?v=brand-logo-v1" />
   </head>
@@ -242,6 +242,11 @@
       </nav>
       <section id="boardPanel" role="tabpanel" aria-labelledby="boardTab">
         <p id="mobileRefreshStatus" class="mobile-refresh-status" role="status" aria-live="polite"></p>
+        <section class="ai-board-summary" aria-label="Resumen inteligente del tablero">
+          <button id="btnAiBoardSummary" class="btn btn-outline" type="button">✨ Resumir tablero con IA</button>
+          <small class="ai-assistant-note">El resumen usa los tickets activos de tu espacio y es orientativo.</small>
+          <div id="aiBoardSummaryOutput" class="ai-assistant-output hidden" aria-live="polite"></div>
+        </section>
         <section id="mobileBatchToolbar" class="mobile-batch-toolbar hidden" aria-label="Acciones para tickets seleccionados">
           <header class="mobile-batch-header">
             <strong id="mobileBatchSelectionCount" aria-live="polite">0 seleccionados</strong>
@@ -506,6 +511,16 @@
               <textarea class="ticket-form-control" id="formDescription" rows="4" required placeholder="Detalles del requerimiento..."></textarea>
             </div>
 
+            <section id="ticketAiAssistant" class="ai-ticket-assistant" aria-label="Asistente de IA para el ticket">
+              <small class="ai-assistant-note">El contenido se procesa con Groq. Revisa las sugerencias antes de aplicarlas.</small>
+              <div class="ai-ticket-actions">
+                <button id="btnAiTicketSummary" type="button" class="btn btn-outline">Resumir ticket</button>
+                <button id="btnAiTicketRecommendations" type="button" class="btn btn-outline">Sugerir categoría y prioridad</button>
+                <button id="btnAiTicketRisk" type="button" class="btn btn-outline">Analizar bloqueos y riesgos</button>
+              </div>
+              <div id="aiTicketAssistantOutput" class="ai-assistant-output hidden" aria-live="polite"></div>
+            </section>
+
             <section id="ticketChecklistSection" class="ticket-checklist-editor" aria-labelledby="checklistHeading">
               <header class="checklist-editor-header">
                 <div>
@@ -565,6 +580,9 @@
                     <button id="btnDeleteTemplate" type="button" class="btn btn-danger hidden">Eliminar seleccionada</button>
                   </div>
                 </div>
+              </div>
+              <div class="ai-response-draft">
+                <button id="btnAiResponseDraft" type="button" class="btn btn-outline hidden">✨ Redactar respuesta con IA</button>
               </div>
               <div id="ticketCommentComposer" class="comment-composer">
                 <label for="ticketCommentInput">Escribe un comentario</label>
@@ -880,6 +898,6 @@
       </section>
     </div>
 
-    <script type="module" src="js/app.js?v=ai-subtask-suggestions-v1"></script>
+    <script type="module" src="js/app.js?v=ai-assistant-v1"></script>
   </body>
 </html>

@@ -1,12 +1,13 @@
-import { SupabaseClient } from './data/supabaseClient.js?v=ai-subtask-suggestions-v1';
+import { SupabaseClient } from './data/supabaseClient.js?v=ai-assistant-v1';
 import { SupabaseAdapter } from './data/db.js?v=complexity-scoring-v1';
 import { AuthService } from './services/authService.js?v=user-role-management-v1';
 import { TicketService } from './services/ticketService.js?v=complexity-scoring-v1';
-import { AIService } from './services/AIService.js';
+import { AIService } from './services/AIService.js?v=ai-assistant-v1';
 import { FilterSortService } from './services/filterService.js';
 import { BoardView } from './ui/boardView.js?v=ui-polish-v1';
-import { ModalView } from './ui/modalView.js?v=ai-subtask-suggestions-v1';
-import { AiSubtaskPreviewUI } from './ui/AiSubtaskPreviewUI.js';
+import { ModalView } from './ui/modalView.js?v=ai-assistant-v1';
+import { AiSubtaskPreviewUI } from './ui/AiSubtaskPreviewUI.js?v=ai-assistant-v1';
+import { AiTicketAssistantUI } from './ui/AiTicketAssistantUI.js?v=ai-assistant-v1';
 import { ArchivedTicketsModal } from './ui/archivedTicketsModal.js';
 import { DragDropController } from './ui/dragDrop.js?v=sound-feedback-v2';
 import { CalendarView, dueDateForCalendarDay } from './ui/calendarView.js?v=sound-feedback-v2';
@@ -104,6 +105,7 @@ let boardView;
 let calendarView;
 let modalView;
 let aiSubtaskPreviewUI;
+let aiTicketAssistantUI;
 let archivedTicketsModal;
 let dragDropController;
 let passwordRecoveryAccessToken = null;
@@ -159,6 +161,24 @@ async function bootstrap() {
     onUserSubmit: handleUserSubmit,
     onOverlayOpen: trackMobileOverlayOpen,
     onOverlayClose: trackMobileOverlayClose
+  });
+  aiTicketAssistantUI = new AiTicketAssistantUI({
+    modalEl,
+    aiService,
+    getTicket: getAiTicketContext,
+    getComments: async () => {
+      if (!modalView.currentTicketId) return [];
+      const comments = await ticketService.getComments(modalView.currentTicketId);
+      return comments.map((comment) => comment.body);
+    },
+    getCategories: () => [...document.getElementById('formCategory').options]
+      .map((option) => option.value)
+      .filter(Boolean),
+    getBoardTickets: () => allTickets.filter((ticket) => !ticket.isArchived),
+    canEditTicket: () => Boolean(modalView.canEditContent),
+    canCommentTicket: () => Boolean(modalView.canComment),
+    onError: (error) => showToast(error.message || 'No se pudo completar la solicitud de IA.', 6000),
+    onNotice: showToast
   });
   archivedTicketsModal = new ArchivedTicketsModal({
     modalEl: document.getElementById('archivedTicketsModal'),
@@ -449,6 +469,7 @@ async function loadTickets() {
     allTickets = tickets;
     showToast(error.message || 'No se pudo consultar la cola de acciones offline.');
   }
+  aiTicketAssistantUI?.clearBoardSummary();
 }
 
 function initializePasswordRecovery() {
@@ -1204,6 +1225,7 @@ function navigateBottomTab(view) {
 
 async function openNewTicketModal() {
   aiSubtaskPreviewUI?.reset();
+  aiTicketAssistantUI?.reset();
   const user = await auth.getCurrentUser();
   modalView.openTicket(null, {
     canManageAssignment: auth.canAssignOrSetDue(user),
@@ -2141,6 +2163,7 @@ function handleBottomSheetKeydown(event) {
 
 async function openTicketForEditing(ticketId) {
   aiSubtaskPreviewUI?.reset();
+  aiTicketAssistantUI?.reset();
   const ticket = allTickets.find((item) => item.id === ticketId);
   if (!ticket) return;
   const user = await auth.getCurrentUser();
@@ -2265,6 +2288,21 @@ function syncNewWorkspaceForm() {
   }
 
   updateUserRoleDescription();
+}
+
+function getAiTicketContext() {
+  const dueDateInput = document.getElementById('formDueDate').value;
+  const parsedDueDate = dueDateInput ? new Date(dueDateInput) : null;
+  return {
+    id: modalView.currentTicketId,
+    title: document.getElementById('formTitle').value.trim(),
+    description: document.getElementById('formDescription').value.trim(),
+    status: document.getElementById('formInitialStatus').value,
+    priority: document.getElementById('formPriority').value,
+    category: document.getElementById('formCategory').value,
+    dueDate: parsedDueDate && !Number.isNaN(parsedDueDate.getTime()) ? parsedDueDate.toISOString() : '',
+    checklist: modalView.getChecklist()
+  };
 }
 
 async function handleAiSubtasksConfirm(subtasks) {
@@ -2535,6 +2573,8 @@ function renderBoard() {
   if (!boardView) return;
 
   if (!activeUser) {
+    document.getElementById('btnAiBoardSummary')?.classList.add('hidden');
+    aiTicketAssistantUI?.clearBoardSummary();
     boardEl.innerHTML = '';
     mobileSelectionMode = false;
     selectedMobileTicketIds.clear();
@@ -2545,6 +2585,7 @@ function renderBoard() {
     return;
   }
 
+  document.getElementById('btnAiBoardSummary')?.classList.remove('hidden');
   const criteria = {
     search: filters.search.value,
     assignedTo: filters.assignedTo.value,

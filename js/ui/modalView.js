@@ -92,7 +92,9 @@ export class ModalView {
     if (!btnArchive) return;
 
     const isClosed = currentStatus === 'cerrado' || currentStatus === 'closed';
-    btnArchive.disabled = !isClosed || !this.currentTicketId;
+    const canArchive = isClosed && Boolean(this.currentTicketId);
+    btnArchive.classList.toggle('hidden', !canArchive);
+    btnArchive.disabled = !canArchive;
     btnArchive.setAttribute(
       'title',
       isClosed ? 'Archivar este ticket cerrado' : 'Debes marcar el ticket como Cerrado para poder archivarlo'
@@ -115,6 +117,8 @@ export class ModalView {
     const canEditContent = !ticket || Boolean(permissions.canEdit);
     const canSave = !ticket || canEditContent || Boolean(permissions.canManageAssignment);
     this.currentTicketId = ticket?.id || null;
+    this.canEditContent = canEditContent;
+    this.canComment = Boolean(permissions.canComment);
 
     if (ticket) {
       heading.textContent = 'Editar solicitud';
@@ -153,6 +157,11 @@ export class ModalView {
     this.canManageChecklist = Boolean(permissions.canManageChecklist);
     document.getElementById('ticketChecklistSection').classList.toggle('hidden', !ticket && !this.canManageChecklist);
     document.getElementById('btnSuggestSubtasks').classList.toggle('hidden', !this.canManageChecklist);
+    document.getElementById('ticketAiAssistant').classList.toggle('hidden', !canEditContent && !permissions.canComment);
+    document.getElementById('btnAiTicketSummary').classList.toggle('hidden', !canEditContent);
+    document.getElementById('btnAiTicketRecommendations').classList.toggle('hidden', !canEditContent);
+    document.getElementById('btnAiTicketRisk').classList.toggle('hidden', !canEditContent);
+    document.getElementById('btnAiResponseDraft').classList.toggle('hidden', !permissions.canComment);
     this.renderChecklist();
     document.getElementById('formTitle').disabled = !canEditContent;
     document.getElementById('formDescription').disabled = !canEditContent;
@@ -208,11 +217,15 @@ export class ModalView {
     document.getElementById('btnReopenTicket').classList.add('hidden');
     document.getElementById('ticketHistorySection').classList.add('hidden');
     document.getElementById('ticketCommentsSection').classList.add('hidden');
+    document.getElementById('ticketAiAssistant').classList.add('hidden');
+    document.getElementById('btnAiResponseDraft').classList.add('hidden');
     document.getElementById('ticketCommentComposer').classList.remove('hidden');
     document.getElementById('ticketCommentInput').value = '';
     this.currentTicketId = null;
     this.checklistDraft = [];
     this.canManageChecklist = false;
+    this.canEditContent = false;
+    this.canComment = false;
     this.renderChecklist();
     this.form.querySelectorAll('input, textarea, select').forEach((field) => {
       field.disabled = false;

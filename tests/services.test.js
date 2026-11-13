@@ -31,9 +31,103 @@ test('AIService invokes the secure function and returns only clean bounded subta
   const subtasks = await service.suggestSubtasks('Título', 'Descripción');
   assert.deepEqual(invocation, {
     name: 'generate-subtasks',
-    options: { body: { title: 'Título', description: 'Descripción' } }
+    options: { body: { action: 'subtasks', title: 'Título', description: 'Descripción' } }
   });
   assert.deepEqual(subtasks, ['Revisar requisitos', 'x'.repeat(200)]);
+});
+
+test('AIService validates summaries, drafts, ticket recommendations, and risk reports', async () => {
+  const requests = [];
+  const responses = {
+    ticket_summary: { summary: 'Resumen breve.' },
+    response_draft: { draft: 'Hola, revisaremos el caso.' },
+    ticket_recommendations: { category: 'Soporte', priority: 'Alta', rationale: 'Impacto reportado.' },
+    ticket_risk: { level: 'medium', reasons: ['Fecha cercana'], actions: ['Confirmar alcance'] }
+  };
+  const service = new AIService({
+    functions: {
+      async invoke(name, options) {
+        requests.push(options.body);
+        return { data: responses[options.body.action], error: null };
+      }
+    }
+  });
+  const ticket = {
+    id: 'TCK-1',
+    title: 'Revisar acceso',
+    description: 'El acceso falla.',
+    status: 'open',
+    priority: 'Media',
+    checklist: [{ text: 'Revisar logs', completed: false }]
+  };
+
+  assert.equal(await service.summarizeTicket(ticket), 'Resumen breve.');
+  assert.equal(await service.draftResponse(ticket, ['Comentario reciente']), 'Hola, revisaremos el caso.');
+  assert.deepEqual(await service.recommendTicketFields(ticket, ['Soporte']), {
+    category: 'Soporte',
+    priority: 'Alta',
+    rationale: 'Impacto reportado.'
+  });
+  assert.deepEqual(await service.assessTicketRisk(ticket), {
+    level: 'medium',
+    reasons: ['Fecha cercana'],
+    actions: ['Confirmar alcance']
+  });
+  assert.deepEqual(requests.map((request) => request.action), [
+    'ticket_summary',
+    'response_draft',
+    'ticket_recommendations',
+    'ticket_risk'
+  ]);
+  assert.deepEqual(requests[1].comments, ['Comentario reciente']);
+  assert.equal(requests[2].categories[0], 'Soporte');
+  assert.equal(requests[3].checklist[0].text, 'Revisar logs');
+});
+
+test('AIService rejects recommendations outside the supplied category options', async () => {
+  const service = new AIService({
+    functions: {
+      async invoke() {
+        return {
+          data: { category: 'Inventada', priority: 'Alta', rationale: 'No válida' },
+          error: null
+        };
+      }
+    }
+  });
+
+  await assert.rejects(
+    service.recommendTicketFields({ title: 'Título', description: 'Descripción' }, ['Soporte']),
+    /recomendaciones válidas/
+  );
+});
+
+test('AIService summarizes board tickets without silently dropping tickets above the limit', async () => {
+  let request;
+  const service = new AIService({
+    functions: {
+      async invoke(name, options) {
+        request = options.body;
+        return {
+          data: { summary: 'Hay tareas activas.', blocked: [], overdue: [], highlights: [] },
+          error: null
+        };
+      }
+    }
+  });
+  const tickets = [{
+    id: 'TCK-1',
+    title: 'Ticket',
+    status: 'open',
+    priority: 'Media',
+    checklist: [{ completed: true }, { completed: false }]
+  }];
+
+  const report = await service.summarizeBoard(tickets);
+  assert.equal(report.summary, 'Hay tareas activas.');
+  assert.equal(request.tickets[0].checklistTotal, 2);
+  assert.equal(request.tickets[0].checklistCompleted, 1);
+  await assert.rejects(service.summarizeBoard(Array(101).fill(tickets[0])), /hasta 100 tickets/);
 });
 
 test('AIService surfaces Edge Function errors', async () => {
