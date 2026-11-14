@@ -10,7 +10,7 @@
     <meta name="theme-color" content="#151a2a" />
     <link rel="stylesheet" href="styles/base.css?v=password-username-v1" />
     <link rel="stylesheet" href="styles/layout.css?v=brand-logo-v1" />
-    <link rel="stylesheet" href="styles/components.css?v=ai-assistant-v5" />
+    <link rel="stylesheet" href="styles/components.css?v=ai-assistant-v7" />
     <link rel="stylesheet" href="styles/responsive.css?v=theme-toolbar-v1" />
     <link rel="stylesheet" href="styles/splash.css?v=brand-logo-v1" />
   </head>
@@ -244,7 +244,8 @@
         <p id="mobileRefreshStatus" class="mobile-refresh-status" role="status" aria-live="polite"></p>
         <details id="aiBoardAssistant" class="ai-board-assistant">
           <summary class="ai-board-assistant-toggle">
-            <span><span aria-hidden="true">✨</span> Asistente IA del tablero</span>
+            <span class="ai-board-assistant-title"><span aria-hidden="true">✨</span> Asistente IA del tablero</span>
+            <small class="ai-board-privacy-note" title="La pregunta y los títulos, descripciones, estados, prioridades, categorías y fechas de los tickets visibles se envían a Groq. Las respuestas son orientativas y no modifican tickets.">Procesado con Groq · Máx. 100 tickets visibles <span aria-hidden="true">ⓘ</span></small>
             <svg class="ai-board-chevron" viewBox="0 0 20 20" aria-hidden="true"><path d="m5 7 5 5 5-5"/></svg>
           </summary>
           <div class="ai-board-assistant-content">
@@ -253,27 +254,24 @@
                 <span aria-hidden="true">✨</span>
                 <span>Resumir tablero con IA</span>
               </button>
-              <small class="ai-board-privacy-note" title="La pregunta y los títulos, descripciones, estados, prioridades, categorías y fechas de los tickets visibles se envían a Groq. Las respuestas son orientativas y no modifican tickets.">Procesado con Groq · Máx. 100 tickets visibles <span aria-hidden="true">ⓘ</span></small>
             </div>
-            <div class="ai-board-assistant-question">
-              <form id="aiBoardQuestionForm" class="ai-board-question-form">
-                <label for="aiBoardQuestion">Pregunta sobre el tablero</label>
-                <div class="ai-board-question-input-wrap">
-                  <input id="aiBoardQuestion" class="ticket-form-control" type="text" maxlength="300" required placeholder="Ej.: ¿Qué tickets urgentes siguen abiertos?" />
-                  <div class="ai-board-question-input-actions">
-                    <button id="btnAiBoardQuestionClear" class="ai-board-question-icon-button" type="button" aria-label="Limpiar pregunta">×</button>
-                    <button id="btnAiBoardQuestion" class="ai-board-question-icon-button ai-board-question-submit" type="submit" aria-label="Preguntar al tablero">➤</button>
-                  </div>
+            <form id="aiBoardQuestionForm" class="ai-board-question-form">
+              <label for="aiBoardQuestion">Pregunta sobre el tablero</label>
+              <div class="ai-board-question-input-wrap">
+                <input id="aiBoardQuestion" class="ticket-form-control" type="text" maxlength="300" required placeholder="Ej.: ¿Qué tickets urgentes siguen abiertos?" />
+                <div class="ai-board-question-input-actions">
+                  <button id="btnAiBoardQuestionClear" class="ai-board-question-icon-button" type="button" aria-label="Limpiar pregunta">×</button>
+                  <button id="btnAiBoardQuestion" class="ai-board-question-icon-button ai-board-question-submit" type="submit" aria-label="Preguntar al tablero">➤</button>
                 </div>
-              </form>
-              <div id="aiBoardQuestionSuggestions" class="ai-board-question-suggestions" aria-label="Preguntas sugeridas">
-                <button type="button" data-ai-board-prompt="¿Qué está bloqueado?">¿Qué está bloqueado?</button>
-                <button type="button" data-ai-board-prompt="Tickets por vencer">Tickets por vencer</button>
-                <button type="button" data-ai-board-prompt="Resumen de pendientes">Resumen de pendientes</button>
               </div>
+            </form>
+            <div id="aiBoardQuestionSuggestions" class="ai-board-question-suggestions" aria-label="Preguntas sugeridas">
+              <button type="button" data-ai-board-prompt="¿Qué está bloqueado?">Bloqueados</button>
+              <button type="button" data-ai-board-prompt="Tickets por vencer">Por vencer</button>
+              <button type="button" data-ai-board-prompt="Resumen de pendientes">Pendientes</button>
             </div>
-            <div id="aiBoardSummaryOutput" class="ai-assistant-output hidden" aria-live="polite"></div>
           </div>
+          <div id="aiBoardSummaryOutput" class="ai-assistant-output hidden" aria-live="polite"></div>
         </details>
         <section id="mobileBatchToolbar" class="mobile-batch-toolbar hidden" aria-label="Acciones para tickets seleccionados">
           <header class="mobile-batch-header">
