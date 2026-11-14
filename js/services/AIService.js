@@ -96,6 +96,121 @@ export class AIService {
     };
   }
 
+  async askBoardQuestion(question, tickets) {
+    const normalizedQuestion = typeof question === 'string' ? question.trim() : '';
+    if (!normalizedQuestion || normalizedQuestion.length > 300) {
+      throw new Error('Escribe una pregunta de hasta 300 caracteres.');
+    }
+    if (!Array.isArray(tickets) || tickets.length > 100) {
+      throw new Error('La consulta admite hasta 100 tickets visibles. Aplica filtros para reducir la cantidad.');
+    }
+    const boardTickets = tickets.filter((ticket) => ticket && !ticket.isArchived).map((ticket) => ({
+      id: String(ticket.id || '').trim().slice(0, 40),
+      title: String(ticket.title || '').trim().slice(0, 200),
+      description: String(ticket.description || '').trim().slice(0, 1000),
+      status: String(ticket.status || '').slice(0, 40),
+      priority: String(ticket.priority || '').slice(0, 40),
+      category: String(ticket.category || '').slice(0, 100),
+      dueDate: String(ticket.dueDate || '').slice(0, 40)
+    })).filter((ticket) => ticket.id && ticket.title);
+    if (!boardTickets.length) throw new Error('No hay tickets visibles para consultar.');
+
+    const data = await this.invoke('board_question', {
+      question: normalizedQuestion,
+      today: this.getBogotaDate(),
+      tickets: boardTickets
+    });
+    if (typeof data.answer !== 'string' || !Array.isArray(data.ticketIds)) {
+      throw new Error('La respuesta de IA no contiene una consulta válida.');
+    }
+    const allowed = new Map(boardTickets.map((ticket) => [ticket.id, ticket]));
+    const seen = new Set();
+    const relatedTickets = data.ticketIds.map((id) => {
+      if (typeof id !== 'string' || !allowed.has(id) || seen.has(id)) {
+        throw new Error('La respuesta de IA contiene una referencia de ticket no válida.');
+      }
+      seen.add(id);
+      const ticket = allowed.get(id);
+      return { id: ticket.id, title: ticket.title, status: ticket.status };
+    }).slice(0, 10);
+    return {
+      answer: this.requireText(data.answer, 'La respuesta').slice(0, 1500),
+      tickets: relatedTickets
+    };
+  }
+
+  async findSimilarTickets(ticket, existingTickets) {
+    const candidateIds = new Set();
+    const candidates = (Array.isArray(existingTickets) ? existingTickets : [])
+      .filter((candidate) => (
+        candidate
+        && typeof candidate.id === 'string'
+        && candidate.id.trim()
+        && candidate.id !== ticket.id
+        && !candidate.isArchived
+        && typeof candidate.title === 'string'
+        && candidate.title.trim()
+      ))
+      .filter((candidate) => {
+        if (candidateIds.has(candidate.id)) return false;
+        candidateIds.add(candidate.id);
+        return true;
+      })
+      .map((candidate, index) => ({
+        candidate,
+        index,
+        createdAt: Date.parse(candidate.createdAt || '') || 0
+      }))
+      .sort((left, right) => right.createdAt - left.createdAt || left.index - right.index);
+    const selected = candidates.slice(0, 100).map(({ candidate }) => ({
+      id: String(candidate.id).slice(0, 40),
+      title: candidate.title.trim().slice(0, 200),
+      description: String(candidate.description || '').trim().slice(0, 1000),
+      status: String(candidate.status || '').slice(0, 40)
+    }));
+    if (!selected.length) throw new Error('No hay otros tickets disponibles para comparar.');
+
+    const data = await this.invoke('duplicate_detection', {
+      ticketId: String(ticket.id || '').slice(0, 40),
+      ...this.ticketFields(ticket),
+      candidates: selected
+    });
+    if (!Array.isArray(data.matches) || data.checkedCount !== selected.length) {
+      throw new Error('La respuesta de IA no contiene una búsqueda de tickets válida.');
+    }
+
+    const allowed = new Map(selected.map((candidate) => [candidate.id, candidate]));
+    const seen = new Set();
+    const matches = data.matches.map((match) => {
+      if (
+        !match
+        || typeof match !== 'object'
+        || typeof match.id !== 'string'
+        || !allowed.has(match.id)
+        || !['high', 'medium'].includes(match.similarity)
+        || typeof match.reason !== 'string'
+        || !match.reason.trim()
+        || seen.has(match.id)
+      ) {
+        throw new Error('La respuesta de IA contiene una coincidencia no válida.');
+      }
+      seen.add(match.id);
+      const candidate = allowed.get(match.id);
+      return {
+        id: candidate.id,
+        title: candidate.title,
+        status: candidate.status,
+        similarity: match.similarity,
+        reason: match.reason.trim().slice(0, 300)
+      };
+    }).slice(0, 5);
+    return {
+      matches,
+      checkedCount: selected.length,
+      totalCount: candidates.length
+    };
+  }
+
   ticketFields(ticket) {
     return {
       title: String(ticket.title || '').trim().slice(0, 200),

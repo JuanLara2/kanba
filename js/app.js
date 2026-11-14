@@ -1,13 +1,13 @@
-import { SupabaseClient } from './data/supabaseClient.js?v=ai-assistant-v1';
+import { SupabaseClient } from './data/supabaseClient.js?v=ai-assistant-v5';
 import { SupabaseAdapter } from './data/db.js?v=complexity-scoring-v1';
 import { AuthService } from './services/authService.js?v=user-role-management-v1';
 import { TicketService } from './services/ticketService.js?v=complexity-scoring-v1';
-import { AIService } from './services/AIService.js?v=ai-assistant-v1';
+import { AIService } from './services/AIService.js?v=ai-assistant-v5';
 import { FilterSortService } from './services/filterService.js';
 import { BoardView } from './ui/boardView.js?v=ui-polish-v1';
-import { ModalView } from './ui/modalView.js?v=ai-assistant-v1';
-import { AiSubtaskPreviewUI } from './ui/AiSubtaskPreviewUI.js?v=ai-assistant-v1';
-import { AiTicketAssistantUI } from './ui/AiTicketAssistantUI.js?v=ai-assistant-v1';
+import { ModalView } from './ui/modalView.js?v=ai-assistant-v5';
+import { AiSubtaskPreviewUI } from './ui/AiSubtaskPreviewUI.js?v=ai-assistant-v5';
+import { AiTicketAssistantUI } from './ui/AiTicketAssistantUI.js?v=ai-assistant-v5';
 import { ArchivedTicketsModal } from './ui/archivedTicketsModal.js';
 import { DragDropController } from './ui/dragDrop.js?v=sound-feedback-v2';
 import { CalendarView, dueDateForCalendarDay } from './ui/calendarView.js?v=sound-feedback-v2';
@@ -175,6 +175,8 @@ async function bootstrap() {
       .map((option) => option.value)
       .filter(Boolean),
     getBoardTickets: () => allTickets.filter((ticket) => !ticket.isArchived),
+    getVisibleBoardTickets,
+    onOpenTicket: openTicketForEditing,
     canEditTicket: () => Boolean(modalView.canEditContent),
     canCommentTicket: () => Boolean(modalView.canComment),
     onError: (error) => showToast(error.message || 'No se pudo completar la solicitud de IA.', 6000),
@@ -2573,7 +2575,7 @@ function renderBoard() {
   if (!boardView) return;
 
   if (!activeUser) {
-    document.getElementById('btnAiBoardSummary')?.classList.add('hidden');
+    document.getElementById('aiBoardAssistant')?.classList.add('hidden');
     aiTicketAssistantUI?.clearBoardSummary();
     boardEl.innerHTML = '';
     mobileSelectionMode = false;
@@ -2585,18 +2587,8 @@ function renderBoard() {
     return;
   }
 
-  document.getElementById('btnAiBoardSummary')?.classList.remove('hidden');
-  const criteria = {
-    search: filters.search.value,
-    assignedTo: filters.assignedTo.value,
-    status: filters.status.value,
-    priority: filters.priority.value,
-    category: filters.category.value,
-    dueFilter: filters.dueFilter.value,
-    sortField: filters.sortField.value,
-    sortDirection: filters.sortDirection.value
-  };
-
+  document.getElementById('aiBoardAssistant')?.classList.remove('hidden');
+  const criteria = getBoardFilterCriteria();
   const activeTickets = allTickets.filter((ticket) => !ticket.isArchived);
   const statusCountTickets = isMobileViewport()
     ? FilterSortService.apply(activeTickets, { ...criteria, status: 'ALL' }, usersMap)
@@ -2623,6 +2615,24 @@ function renderBoard() {
     calendarView.render(visibleTickets, auth.canAssignOrSetDue(activeUser));
   }
   renderMetrics();
+}
+
+function getVisibleBoardTickets() {
+  const activeTickets = allTickets.filter((ticket) => !ticket.isArchived);
+  return FilterSortService.apply(activeTickets, getBoardFilterCriteria(), usersMap);
+}
+
+function getBoardFilterCriteria() {
+  return {
+    search: filters.search.value,
+    assignedTo: filters.assignedTo.value,
+    status: filters.status.value,
+    priority: filters.priority.value,
+    category: filters.category.value,
+    dueFilter: filters.dueFilter.value,
+    sortField: filters.sortField.value,
+    sortDirection: filters.sortDirection.value
+  };
 }
 
 function renderMetrics() {

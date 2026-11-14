@@ -1,19 +1,40 @@
 export class AiTicketAssistantUI {
-  constructor({ modalEl, aiService, getTicket, getComments, getCategories, getBoardTickets, canEditTicket, canCommentTicket, onError, onNotice }) {
+  constructor({ modalEl, aiService, getTicket, getComments, getCategories, getBoardTickets, getVisibleBoardTickets, onOpenTicket, canEditTicket, canCommentTicket, onError, onNotice }) {
     this.modalEl = modalEl;
     this.aiService = aiService;
     this.getTicket = getTicket;
     this.getComments = getComments;
     this.getCategories = getCategories;
     this.getBoardTickets = getBoardTickets;
+    this.getVisibleBoardTickets = getVisibleBoardTickets;
+    this.onOpenTicket = onOpenTicket;
     this.canEditTicket = canEditTicket;
     this.canCommentTicket = canCommentTicket;
     this.onError = onError;
     this.onNotice = onNotice;
     this.ticketOutput = document.getElementById('aiTicketAssistantOutput');
     this.boardOutput = document.getElementById('aiBoardSummaryOutput');
+    this.boardQuestionInput = document.getElementById('aiBoardQuestion');
+    this.boardQuestionClearButton = document.getElementById('btnAiBoardQuestionClear');
+    this.boardQuestionButton = document.getElementById('btnAiBoardQuestion');
+    this.boardSummaryButton = document.getElementById('btnAiBoardSummary');
+    this.boardQuestionSuggestions = document.getElementById('aiBoardQuestionSuggestions');
     this.requestId = 0;
     this.boardRequestId = 0;
+    this.boardActionButtons = [this.boardSummaryButton, this.boardQuestionButton];
+    this.boardActionButtonMarkup = new Map(
+      this.boardActionButtons.map((button) => [button.id, button.innerHTML])
+    );
+    this.boardActionButtonLabels = new Map(
+      this.boardActionButtons.map((button) => [button.id, button.getAttribute('aria-label')])
+    );
+    this.ticketActionButtons = [...this.modalEl.querySelectorAll(
+      '#btnAiTicketSummary, #btnAiTicketRecommendations, #btnAiTicketRisk, #btnAiFindDuplicates, #btnAiResponseDraft'
+    )];
+    this.ticketActionButtonMarkup = new Map(
+      this.ticketActionButtons.map((button) => [button.id, button.innerHTML])
+    );
+    this.validationField = null;
     this.bindEvents();
   }
 
@@ -25,21 +46,39 @@ export class AiTicketAssistantUI {
       if (action === 'use-response') this.useResponseDraft();
       if (action === 'apply-recommendations') this.applyRecommendations();
     });
+    this.boardOutput.addEventListener('click', (event) => this.handleBoardOutputClick(event));
 
-    document.getElementById('btnAiTicketSummary').addEventListener('click', () => void this.runTicketAction('summary'));
-    document.getElementById('btnAiTicketRecommendations').addEventListener('click', () => void this.runTicketAction('recommendations'));
-    document.getElementById('btnAiTicketRisk').addEventListener('click', () => void this.runTicketAction('risk'));
-    document.getElementById('btnAiResponseDraft').addEventListener('click', () => void this.runTicketAction('response'));
-    document.getElementById('btnAiBoardSummary').addEventListener('click', () => void this.runBoardSummary());
+    document.getElementById('btnAiTicketSummary').addEventListener('click', (event) => void this.runTicketAction('summary', event.currentTarget));
+    document.getElementById('btnAiTicketRecommendations').addEventListener('click', (event) => void this.runTicketAction('recommendations', event.currentTarget));
+    document.getElementById('btnAiTicketRisk').addEventListener('click', (event) => void this.runTicketAction('risk', event.currentTarget));
+    document.getElementById('btnAiFindDuplicates').addEventListener('click', (event) => void this.runTicketAction('duplicates', event.currentTarget));
+    document.getElementById('btnAiResponseDraft').addEventListener('click', (event) => void this.runTicketAction('response', event.currentTarget));
+    document.getElementById('formTitle').addEventListener('input', () => this.clearResolvedAIValidation());
+    document.getElementById('formDescription').addEventListener('input', () => this.clearResolvedAIValidation());
+    this.boardSummaryButton.addEventListener('click', () => void this.runBoardSummary());
+    document.getElementById('aiBoardQuestionForm').addEventListener('submit', (event) => {
+      event.preventDefault();
+      void this.runBoardQuestion();
+    });
+    this.boardQuestionClearButton.addEventListener('click', () => {
+      this.boardQuestionInput.value = '';
+      this.boardQuestionInput.focus();
+    });
+    this.boardQuestionSuggestions.addEventListener('click', (event) => {
+      const prompt = event.target.closest('[data-ai-board-prompt]')?.dataset.aiBoardPrompt;
+      if (!prompt) return;
+      this.boardQuestionInput.value = prompt;
+      void this.runBoardQuestion();
+    });
   }
 
-  async runTicketAction(action) {
+  async runTicketAction(action, button) {
     const ticket = this.getTicket();
-    if (!ticket.title || !ticket.description) {
-      this.onError(new Error('Completa el título y la descripción antes de usar la IA.'));
+    if (['recommendations', 'risk', 'summary'].includes(action) && !this.canEditTicket()) {
+      this.onError(new Error('No tienes permiso para analizar este ticket.'));
       return;
     }
-    if (['recommendations', 'risk', 'summary'].includes(action) && !this.canEditTicket()) {
+    if (action === 'duplicates' && ticket.id && !this.canEditTicket()) {
       this.onError(new Error('No tienes permiso para analizar este ticket.'));
       return;
     }
@@ -49,11 +88,14 @@ export class AiTicketAssistantUI {
     }
 
     const requestId = ++this.requestId;
-    const buttons = [...this.modalEl.querySelectorAll('#btnAiTicketSummary, #btnAiTicketRecommendations, #btnAiTicketRisk, #btnAiResponseDraft')];
-    buttons.forEach((button) => { button.disabled = true; });
-    this.clearTicketOutput(false);
-    this.setTicketStatus('Generando sugerencia…');
-    try {
+    const loadingLabels = {
+      summary: 'Resumiendo…',
+      response: 'Redactando…',
+      recommendations: 'Analizando…',
+      risk: 'Analizando…',
+      duplicates: 'Buscando…'
+    };
+    await this.ejecutarAccionIA(button, async () => {
       let result;
       if (action === 'summary') result = { summary: await this.aiService.summarizeTicket(ticket) };
       if (action === 'response') {
@@ -64,27 +106,122 @@ export class AiTicketAssistantUI {
         result = await this.aiService.recommendTicketFields(ticket, this.getCategories());
       }
       if (action === 'risk') result = await this.aiService.assessTicketRisk(ticket);
-      if (requestId !== this.requestId || this.modalEl.classList.contains('hidden')) return;
+      if (action === 'duplicates') result = await this.aiService.findSimilarTickets(ticket, this.getBoardTickets());
+      if (requestId !== this.requestId || this.modalEl.classList.contains('hidden')) return false;
       if (JSON.stringify(this.getTicket()) !== JSON.stringify(ticket)) {
         this.setTicketStatus('El ticket cambió durante la solicitud. Genera de nuevo la sugerencia.');
-        return;
+        return false;
       }
       this.renderTicketResult(action, result);
+      return true;
+    }, loadingLabels[action] || 'Procesando…', requestId);
+  }
+
+  async ejecutarAccionIA(button, callbackAsync, loadingLabel, requestId) {
+    if (!this.validateTicketAIInput()) return false;
+
+    const originalMarkup = this.ticketActionButtonMarkup.get(button.id) || button.innerHTML;
+    this.ticketActionButtons.forEach((actionButton) => {
+      actionButton.disabled = true;
+      actionButton.classList.remove('is-loading', 'is-success', 'is-error');
+    });
+    button.classList.add('is-loading');
+    button.setAttribute('aria-busy', 'true');
+    button.setAttribute('aria-label', 'Analizando tablero...');
+    button.innerHTML = `<span class="ai-action-spinner" aria-hidden="true"></span><span>${loadingLabel}</span>`;
+    this.clearTicketOutput(false);
+    this.setTicketStatus('Procesando con IA…');
+
+    try {
+      const completed = await callbackAsync();
+      if (requestId !== this.requestId || completed === false) return false;
+      button.classList.remove('is-loading');
+      button.classList.add('is-success');
+      button.innerHTML = '<span aria-hidden="true">✓</span><span>Listo</span>';
+      await this.wait(2000);
+      return true;
     } catch (error) {
-      if (requestId !== this.requestId) return;
+      if (requestId !== this.requestId) return false;
+      button.classList.remove('is-loading');
+      button.classList.add('is-error');
+      button.innerHTML = '<span aria-hidden="true">✕</span><span>Error al procesar</span>';
       this.setTicketStatus(error.message || 'No se pudo completar la solicitud de IA.');
       this.onError(error);
+      await this.wait(2500);
+      return false;
     } finally {
-      if (requestId === this.requestId) buttons.forEach((button) => { button.disabled = false; });
+      if (requestId === this.requestId) {
+        this.ticketActionButtons.forEach((actionButton) => {
+          actionButton.innerHTML = this.ticketActionButtonMarkup.get(actionButton.id) || originalMarkup;
+          actionButton.classList.remove('is-loading', 'is-success', 'is-error');
+          actionButton.removeAttribute('aria-busy');
+          actionButton.disabled = false;
+        });
+      }
     }
   }
 
+  validateTicketAIInput() {
+    const title = document.getElementById('formTitle');
+    const description = document.getElementById('formDescription');
+    if (description.value.trim().length < 10) {
+      this.showAIValidation('Escribe una descripción de al menos 10 caracteres para usar la IA.', description);
+      return false;
+    }
+    if (!title.value.trim()) {
+      this.showAIValidation('Escribe un título antes de usar la IA.', title);
+      return false;
+    }
+    this.clearAIValidation();
+    return true;
+  }
+
+  showAIValidation(message, field) {
+    this.clearAIValidation();
+    this.validationField = field;
+    field.setAttribute('aria-invalid', 'true');
+    if (field.id === 'formDescription') field.classList.add('ai-validation-error');
+    const messageElement = document.getElementById('aiTicketValidationMessage');
+    messageElement.textContent = message;
+    messageElement.classList.remove('hidden');
+    field.focus();
+  }
+
+  clearResolvedAIValidation() {
+    if (!this.validationField) return;
+    const resolved = this.validationField.id === 'formDescription'
+      ? this.validationField.value.trim().length >= 10
+      : Boolean(this.validationField.value.trim());
+    if (resolved) this.clearAIValidation();
+  }
+
+  clearAIValidation() {
+    if (this.validationField) {
+      this.validationField.removeAttribute('aria-invalid');
+      this.validationField.classList.remove('ai-validation-error');
+    }
+    this.validationField = null;
+    const messageElement = document.getElementById('aiTicketValidationMessage');
+    messageElement.textContent = '';
+    messageElement.classList.add('hidden');
+  }
+
+  wait(milliseconds) {
+    return new Promise((resolve) => setTimeout(resolve, milliseconds));
+  }
+
+  restoreTicketActionButtons() {
+    this.ticketActionButtons.forEach((button) => {
+      button.innerHTML = this.ticketActionButtonMarkup.get(button.id) || button.innerHTML;
+      button.classList.remove('is-loading', 'is-success', 'is-error');
+      button.removeAttribute('aria-busy');
+      button.disabled = false;
+    });
+  }
+
   async runBoardSummary() {
-    const button = document.getElementById('btnAiBoardSummary');
     const requestId = ++this.boardRequestId;
-    button.disabled = true;
-    this.boardOutput.replaceChildren();
-    this.setBoardStatus('Analizando tickets activos…');
+    this.startBoardAction(this.boardSummaryButton);
     try {
       const tickets = this.getBoardTickets();
       if (!tickets.length) {
@@ -103,8 +240,70 @@ export class AiTicketAssistantUI {
       this.setBoardStatus(error.message || 'No se pudo generar el resumen del tablero.');
       this.onError(error);
     } finally {
-      if (requestId === this.boardRequestId) button.disabled = false;
+      if (requestId === this.boardRequestId) this.restoreBoardActions();
     }
+  }
+
+  async runBoardQuestion() {
+    const question = this.boardQuestionInput?.value.trim();
+    if (!question) {
+      this.setBoardStatus('Escribe una pregunta sobre el tablero.');
+      return;
+    }
+
+    const requestId = ++this.boardRequestId;
+    this.startBoardAction(this.boardQuestionButton);
+    try {
+      const tickets = this.getVisibleBoardTickets();
+      if (!tickets.length) {
+        this.setBoardStatus('No hay tickets visibles para consultar. Ajusta los filtros del tablero.');
+        return;
+      }
+      if (tickets.length > 100) {
+        this.setBoardStatus('La consulta admite hasta 100 tickets visibles. Aplica filtros en el tablero para acotar la búsqueda.');
+        return;
+      }
+      const result = await this.aiService.askBoardQuestion(question, tickets);
+      if (requestId !== this.boardRequestId) return;
+      this.renderBoardAnswer(question, result);
+    } catch (error) {
+      if (requestId !== this.boardRequestId) return;
+      this.setBoardStatus(error.message || 'No se pudo consultar el tablero.');
+      this.onError(error);
+    } finally {
+      if (requestId === this.boardRequestId) this.restoreBoardActions();
+    }
+  }
+
+  startBoardAction(button) {
+    this.setBoardActionsDisabled(true);
+    this.boardQuestionSuggestions.classList.add('hidden');
+    button.classList.add('is-loading');
+    button.setAttribute('aria-busy', 'true');
+    const spinner = '<span class="ai-action-spinner" aria-hidden="true"></span>';
+    button.innerHTML = button === this.boardQuestionButton
+      ? spinner
+      : `${spinner}<span>Analizando tablero...</span>`;
+    this.boardOutput.replaceChildren();
+    this.setBoardStatus('Analizando tablero...', true);
+  }
+
+  setBoardActionsDisabled(disabled) {
+    this.boardActionButtons.forEach((button) => { button.disabled = disabled; });
+    this.boardQuestionInput.disabled = disabled;
+    this.boardQuestionClearButton.disabled = disabled;
+  }
+
+  restoreBoardActions() {
+    this.boardActionButtons.forEach((button) => {
+      button.innerHTML = this.boardActionButtonMarkup.get(button.id);
+      button.classList.remove('is-loading');
+      button.removeAttribute('aria-busy');
+      const label = this.boardActionButtonLabels.get(button.id);
+      if (label) button.setAttribute('aria-label', label);
+      else button.removeAttribute('aria-label');
+    });
+    this.setBoardActionsDisabled(false);
   }
 
   renderTicketResult(action, result) {
@@ -145,6 +344,38 @@ export class AiTicketAssistantUI {
         this.createAction('Descartar', 'dismiss', 'btn btn-outline')
       );
       this.pendingRecommendations = result;
+    } else if (action === 'duplicates') {
+      this.appendHeading(fragment, 'Tickets similares para revisar');
+      if (result.matches.length) {
+        const statusNames = {
+          new: 'Nuevo',
+          open: 'Abierto',
+          in_progress: 'En progreso',
+          resolved: 'Resuelto',
+          closed: 'Cerrado',
+          blocked: 'Bloqueado'
+        };
+        const list = document.createElement('ul');
+        result.matches.forEach((match) => {
+          const item = document.createElement('li');
+          const level = match.similarity === 'high' ? 'Similitud alta' : 'Similitud posible';
+          const status = match.status ? ` · ${statusNames[match.status] || match.status}` : '';
+          item.textContent = `${match.id} · ${match.title}${status} (${level}) — ${match.reason}`;
+          list.appendChild(item);
+        });
+        fragment.appendChild(list);
+      } else {
+        this.appendText(fragment, 'No encontré coincidencias claras entre los tickets revisados.');
+      }
+      if (result.totalCount > result.checkedCount) {
+        this.appendText(fragment, `Se revisaron los ${result.checkedCount} tickets más recientes de ${result.totalCount}.`);
+      } else {
+        this.appendText(fragment, `Tickets revisados: ${result.checkedCount}.`);
+      }
+      const note = document.createElement('p');
+      note.className = 'ai-assistant-note';
+      note.textContent = 'La similitud es orientativa; confirma manualmente antes de descartar o cerrar un ticket.';
+      fragment.append(note, this.createAction('Cerrar', 'dismiss', 'btn btn-outline'));
     } else {
       this.appendHeading(fragment, 'Riesgo y posibles bloqueos');
       const levelNames = { low: 'Bajo', medium: 'Medio', high: 'Alto' };
@@ -162,13 +393,118 @@ export class AiTicketAssistantUI {
 
   renderBoardReport(report) {
     const fragment = document.createDocumentFragment();
-    this.appendHeading(fragment, 'Resumen del tablero');
-    this.appendText(fragment, report.summary);
+    this.appendBoardResultHeader(fragment, 'Resumen del tablero');
+    this.appendHighlightedText(fragment, report.summary);
     this.appendList(fragment, 'Bloqueados', report.blocked);
     this.appendList(fragment, 'Vencidos', report.overdue);
     this.appendList(fragment, 'Otros puntos a revisar', report.highlights);
     this.boardOutput.replaceChildren(fragment);
     this.boardOutput.classList.remove('hidden');
+  }
+
+  renderBoardAnswer(question, result) {
+    const fragment = document.createDocumentFragment();
+    const statusNames = {
+      new: 'Nuevo',
+      open: 'Abierto',
+      in_progress: 'En progreso',
+      resolved: 'Resuelto',
+      closed: 'Cerrado',
+      blocked: 'Bloqueado'
+    };
+    this.appendBoardResultHeader(fragment, 'Respuesta del tablero');
+    this.appendHeading(fragment, 'Tu pregunta');
+    this.appendText(fragment, question);
+    this.appendHeading(fragment, 'Respuesta');
+    this.appendHighlightedText(fragment, result.answer);
+    if (result.tickets.length) {
+      this.appendHeading(fragment, 'Tickets relacionados');
+      const relatedTickets = document.createElement('div');
+      relatedTickets.className = 'ai-board-related-tickets';
+      result.tickets.forEach((ticket) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'ai-board-related-ticket';
+        button.dataset.aiBoardTicketId = ticket.id;
+        button.setAttribute('aria-label', `Abrir ticket ${ticket.id}: ${ticket.title}`);
+
+        const main = document.createElement('span');
+        main.className = 'ai-board-related-ticket-main';
+        const id = document.createElement('strong');
+        id.className = 'ticket-id-highlight';
+        id.textContent = ticket.id;
+        const title = document.createElement('span');
+        title.className = 'ai-board-related-ticket-title';
+        title.textContent = ticket.title;
+        main.append(id, title);
+
+        const meta = document.createElement('span');
+        meta.className = 'ai-board-related-ticket-meta';
+        const status = document.createElement('span');
+        status.className = 'ai-board-related-ticket-status';
+        status.textContent = statusNames[ticket.status] || ticket.status || 'Sin estado';
+        const arrow = document.createElement('span');
+        arrow.className = 'ai-board-related-ticket-arrow';
+        arrow.setAttribute('aria-hidden', 'true');
+        arrow.textContent = '›';
+        meta.append(status, arrow);
+
+        button.append(main, meta);
+        relatedTickets.appendChild(button);
+      });
+      fragment.appendChild(relatedTickets);
+    }
+    this.boardOutput.replaceChildren(fragment);
+    this.boardOutput.classList.remove('hidden');
+  }
+
+  appendBoardResultHeader(parent, title) {
+    const header = document.createElement('div');
+    header.className = 'ai-board-result-heading';
+    const heading = document.createElement('h5');
+    heading.textContent = title;
+    header.append(heading, this.createBoardCloseButton());
+    parent.appendChild(header);
+  }
+
+  createBoardCloseButton() {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'ai-board-result-close';
+    button.dataset.aiBoardAction = 'close';
+    button.setAttribute('aria-label', 'Cerrar resultados');
+    button.textContent = '×';
+    return button;
+  }
+
+  appendHighlightedText(parent, value) {
+    const paragraph = document.createElement('p');
+    const text = String(value || '');
+    const ticketIdPattern = /TCK-\d+/gi;
+    let position = 0;
+    let match;
+    while ((match = ticketIdPattern.exec(text)) !== null) {
+      paragraph.appendChild(document.createTextNode(text.slice(position, match.index)));
+      const highlightedId = document.createElement('span');
+      highlightedId.className = 'ticket-id-highlight';
+      highlightedId.textContent = match[0];
+      paragraph.appendChild(highlightedId);
+      position = ticketIdPattern.lastIndex;
+    }
+    paragraph.appendChild(document.createTextNode(text.slice(position)));
+    if (text) parent.appendChild(paragraph);
+  }
+
+  handleBoardOutputClick(event) {
+    if (event.target.closest('[data-ai-board-action="close"]')) {
+      this.clearBoardSummary();
+      return;
+    }
+    const ticketId = event.target.closest('[data-ai-board-ticket-id]')?.dataset.aiBoardTicketId;
+    if (!ticketId || !this.onOpenTicket) return;
+    Promise.resolve(this.onOpenTicket(ticketId)).catch((error) => {
+      this.onError(error);
+    });
   }
 
   appendHeading(parent, text) {
@@ -217,13 +553,27 @@ export class AiTicketAssistantUI {
     this.ticketOutput.classList.remove('hidden');
   }
 
-  setBoardStatus(message) {
+  setBoardStatus(message, loading = false) {
+    const fragment = document.createDocumentFragment();
+    const header = document.createElement('div');
+    header.className = 'ai-board-result-heading';
+    header.appendChild(this.createBoardCloseButton());
     const status = document.createElement('p');
-    status.className = 'ai-assistant-note';
+    status.className = loading ? 'ai-board-status' : 'ai-assistant-note';
     status.setAttribute('role', 'status');
     status.setAttribute('aria-live', 'polite');
-    status.textContent = message;
-    this.boardOutput.replaceChildren(status);
+    if (loading) {
+      const spinner = document.createElement('span');
+      spinner.className = 'ai-action-spinner';
+      spinner.setAttribute('aria-hidden', 'true');
+      const text = document.createElement('span');
+      text.textContent = message;
+      status.append(spinner, text);
+    } else {
+      status.textContent = message;
+    }
+    fragment.append(header, status);
+    this.boardOutput.replaceChildren(fragment);
     this.boardOutput.classList.remove('hidden');
   }
 
@@ -256,7 +606,10 @@ export class AiTicketAssistantUI {
   }
 
   clearTicketOutput(invalidate = true) {
-    if (invalidate) this.requestId += 1;
+    if (invalidate) {
+      this.requestId += 1;
+      this.restoreTicketActionButtons();
+    }
     this.pendingRecommendations = null;
     this.ticketOutput.replaceChildren();
     this.ticketOutput.classList.add('hidden');
@@ -264,15 +617,15 @@ export class AiTicketAssistantUI {
 
   reset() {
     this.clearTicketOutput();
-    this.modalEl.querySelectorAll('#btnAiTicketSummary, #btnAiTicketRecommendations, #btnAiTicketRisk, #btnAiResponseDraft')
-      .forEach((button) => { button.disabled = false; });
+    this.clearAIValidation();
     this.clearBoardSummary();
   }
 
   clearBoardSummary() {
     this.boardRequestId += 1;
-    document.getElementById('btnAiBoardSummary').disabled = false;
+    this.restoreBoardActions();
     this.boardOutput.replaceChildren();
     this.boardOutput.classList.add('hidden');
+    this.boardQuestionSuggestions.classList.remove('hidden');
   }
 }

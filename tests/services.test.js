@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { AuthService } from '../js/services/authService.js';
 import { AIService } from '../js/services/AIService.js';
+import { AiTicketAssistantUI } from '../js/ui/AiTicketAssistantUI.js';
 import { SupabaseAdapter } from '../js/data/db.js';
 import { FilterSortService } from '../js/services/filterService.js';
 import { SupabaseClient } from '../js/data/supabaseClient.js';
@@ -102,6 +103,131 @@ test('AIService rejects recommendations outside the supplied category options', 
   );
 });
 
+test('AI ticket action helper validates input and restores buttons after success or failure', async () => {
+  const createButton = (id) => {
+    const classes = new Set();
+    const attributes = new Set();
+    return {
+      id,
+      innerHTML: id,
+      disabled: false,
+      classList: {
+        add: (...names) => names.forEach((name) => classes.add(name)),
+        remove: (...names) => names.forEach((name) => classes.delete(name)),
+        contains: (name) => classes.has(name)
+      },
+      setAttribute: (name) => attributes.add(name),
+      removeAttribute: (name) => attributes.delete(name),
+      hasAttribute: (name) => attributes.has(name)
+    };
+  };
+  const assistant = Object.create(AiTicketAssistantUI.prototype);
+  assistant.ticketActionButtons = Array.from({ length: 4 }, (_, index) => createButton(`ai-${index}`));
+  assistant.ticketActionButtonMarkup = new Map(assistant.ticketActionButtons.map((button) => [button.id, button.innerHTML]));
+  assistant.requestId = 1;
+  assistant.validateTicketAIInput = () => false;
+  let called = false;
+  assert.equal(await assistant.ejecutarAccionIA(assistant.ticketActionButtons[0], async () => {
+    called = true;
+  }, 'Procesando…', 1), false);
+  assert.equal(called, false);
+  assert.equal(assistant.ticketActionButtons.some((button) => button.disabled), false);
+
+  assistant.validateTicketAIInput = () => true;
+  assistant.clearTicketOutput = () => {};
+  assistant.setTicketStatus = () => {};
+  const waits = [];
+  assistant.wait = async (milliseconds) => {
+    waits.push(milliseconds);
+    assert.equal(assistant.ticketActionButtons.every((button) => button.disabled), true);
+    const activeButton = assistant.ticketActionButtons[waits.length - 1];
+    assert.equal(activeButton.classList.contains(waits.length === 1 ? 'is-success' : 'is-error'), true);
+  };
+  const errors = [];
+  assistant.onError = (error) => errors.push(error);
+
+  assert.equal(await assistant.ejecutarAccionIA(
+    assistant.ticketActionButtons[0],
+    async () => {
+      assert.equal(assistant.ticketActionButtons.every((button) => button.disabled), true);
+      return true;
+    },
+    'Resumiendo…',
+    1
+  ), true);
+  assert.equal(await assistant.ejecutarAccionIA(
+    assistant.ticketActionButtons[1],
+    async () => { throw new Error('Proveedor no disponible'); },
+    'Analizando…',
+    1
+  ), false);
+  assert.deepEqual(waits, [2000, 2500]);
+  assert.match(errors[0].message, /Proveedor no disponible/);
+  assert.equal(assistant.ticketActionButtons.every((button) => !button.disabled), true);
+  assert.equal(assistant.ticketActionButtons.every((button) => !button.classList.contains('is-loading')), true);
+  assert.equal(assistant.ticketActionButtons.every((button) => !button.hasAttribute('aria-busy')), true);
+  assert.deepEqual(assistant.ticketActionButtons.map((button) => button.innerHTML), ['ai-0', 'ai-1', 'ai-2', 'ai-3']);
+});
+
+test('AI ticket validation requires ten description characters and clears the inline warning', () => {
+  const originalDocument = Object.getOwnPropertyDescriptor(globalThis, 'document');
+  const createField = (id, value) => {
+    const classes = new Set();
+    const attributes = new Set();
+    return {
+      id,
+      value,
+      classList: {
+        add: (name) => classes.add(name),
+        remove: (name) => classes.delete(name),
+        contains: (name) => classes.has(name)
+      },
+      setAttribute: (name) => attributes.add(name),
+      removeAttribute: (name) => attributes.delete(name),
+      hasAttribute: (name) => attributes.has(name),
+      focus() {}
+    };
+  };
+  const title = createField('formTitle', 'Solicitud');
+  const description = createField('formDescription', '123456789');
+  const message = {
+    textContent: '',
+    classList: {
+      add(name) { this.hidden = name === 'hidden'; },
+      remove(name) { this.hidden = name === 'hidden' ? false : this.hidden; },
+      contains(name) { return name === 'hidden' ? this.hidden : false; },
+      hidden: true
+    }
+  };
+  Object.defineProperty(globalThis, 'document', {
+    configurable: true,
+    value: {
+      getElementById(id) {
+        return { formTitle: title, formDescription: description, aiTicketValidationMessage: message }[id];
+      }
+    }
+  });
+
+  try {
+    const assistant = Object.create(AiTicketAssistantUI.prototype);
+    assistant.validationField = null;
+    assert.equal(assistant.validateTicketAIInput(), false);
+    assert.equal(description.classList.contains('ai-validation-error'), true);
+    assert.equal(description.hasAttribute('aria-invalid'), true);
+    assert.match(message.textContent, /al menos 10 caracteres/);
+
+    description.value = '1234567890';
+    assistant.clearResolvedAIValidation();
+    assert.equal(message.textContent, '');
+    assert.equal(message.classList.contains('hidden'), true);
+    assert.equal(description.classList.contains('ai-validation-error'), false);
+    assert.equal(assistant.validateTicketAIInput(), true);
+  } finally {
+    if (originalDocument) Object.defineProperty(globalThis, 'document', originalDocument);
+    else delete globalThis.document;
+  }
+});
+
 test('AIService summarizes board tickets without silently dropping tickets above the limit', async () => {
   let request;
   const service = new AIService({
@@ -128,6 +254,142 @@ test('AIService summarizes board tickets without silently dropping tickets above
   assert.equal(request.tickets[0].checklistTotal, 2);
   assert.equal(request.tickets[0].checklistCompleted, 1);
   await assert.rejects(service.summarizeBoard(Array(101).fill(tickets[0])), /hasta 100 tickets/);
+});
+
+test('AIService answers board questions with validated ticket references', async () => {
+  let request;
+  const service = new AIService({
+    functions: {
+      async invoke(name, options) {
+        request = { name, body: options.body };
+        return {
+          data: {
+            answer: 'Hay un ticket urgente abierto.',
+            ticketIds: ['TCK-1']
+          },
+          error: null
+        };
+      }
+    }
+  });
+  const tickets = [{
+    id: 'TCK-1',
+    title: 'Falla de acceso',
+    description: 'No deja ingresar.',
+    status: 'open',
+    priority: 'Urgente',
+    category: 'Accesos',
+    dueDate: '2026-11-14T12:00:00Z'
+  }];
+
+  const result = await service.askBoardQuestion('¿Qué tickets urgentes siguen abiertos?', tickets);
+
+  assert.equal(request.name, 'generate-subtasks');
+  assert.equal(request.body.action, 'board_question');
+  assert.equal(request.body.question, '¿Qué tickets urgentes siguen abiertos?');
+  assert.match(request.body.today, /^\d{4}-\d{2}-\d{2}$/);
+  assert.equal(request.body.tickets[0].category, 'Accesos');
+  assert.deepEqual(result, {
+    answer: 'Hay un ticket urgente abierto.',
+    tickets: [{ id: 'TCK-1', title: 'Falla de acceso', status: 'open' }]
+  });
+});
+
+test('AIService rejects board questions with invalid citations and oversized boards', async () => {
+  const service = new AIService({
+    functions: {
+      async invoke() {
+        return { data: { answer: 'Respuesta', ticketIds: ['TCK-UNKNOWN'] }, error: null };
+      }
+    }
+  });
+  const ticket = { id: 'TCK-1', title: 'Ticket', description: 'Descripción' };
+
+  await assert.rejects(service.askBoardQuestion('Pregunta', [ticket]), /referencia de ticket no válida/);
+  await assert.rejects(service.askBoardQuestion('Pregunta', Array(101).fill(ticket)), /hasta 100 tickets/);
+});
+
+test('AIService checks the 100 most recent non-archived tickets and validates similar-ticket matches', async () => {
+  let request;
+  const service = new AIService({
+    functions: {
+      async invoke(name, options) {
+        request = options.body;
+        return {
+          data: {
+            checkedCount: 100,
+            matches: [{ id: 'TCK-1200', similarity: 'high', reason: 'Describe el mismo fallo.' }]
+          },
+          error: null
+        };
+      }
+    }
+  });
+  const existingTickets = Array.from({ length: 101 }, (_, index) => ({
+    id: `TCK-${1100 + index}`,
+    title: `Ticket ${index}`,
+    description: 'Descripción',
+    status: 'open',
+    createdAt: new Date(Date.UTC(2026, 0, 1, index)).toISOString()
+  }));
+  existingTickets.push({
+    id: 'TCK-ARCHIVED',
+    title: 'Archivado',
+    description: 'No comparar',
+    isArchived: true,
+    createdAt: '2027-01-01T00:00:00.000Z'
+  });
+  existingTickets.push({
+    id: 'TCK-999',
+    title: 'Ticket actual',
+    description: 'No compararse a sí mismo',
+    createdAt: '2027-01-02T00:00:00.000Z'
+  });
+
+  const result = await service.findSimilarTickets({
+    id: 'TCK-999',
+    title: 'Falla al ingresar',
+    description: 'No permite iniciar sesión.'
+  }, existingTickets);
+
+  assert.equal(request.action, 'duplicate_detection');
+  assert.equal(request.candidates.length, 100);
+  assert.equal(request.candidates[0].id, 'TCK-1200');
+  assert.equal(request.candidates.at(-1).id, 'TCK-1101');
+  assert.equal(request.candidates.some((candidate) => ['TCK-999', 'TCK-ARCHIVED'].includes(candidate.id)), false);
+  assert.equal(result.checkedCount, 100);
+  assert.equal(result.totalCount, 101);
+  assert.deepEqual(result.matches, [{
+    id: 'TCK-1200',
+    title: 'Ticket 100',
+    status: 'open',
+    similarity: 'high',
+    reason: 'Describe el mismo fallo.'
+  }]);
+});
+
+test('AIService rejects similar-ticket matches outside the supplied candidate list', async () => {
+  const service = new AIService({
+    functions: {
+      async invoke() {
+        return {
+          data: {
+            checkedCount: 1,
+            matches: [{ id: 'TCK-HALLUCINATED', similarity: 'high', reason: 'No existe en la lista.' }]
+          },
+          error: null
+        };
+      }
+    }
+  });
+
+  await assert.rejects(
+    service.findSimilarTickets(
+      { title: 'Título', description: 'Descripción' },
+      [{ id: 'TCK-1', title: 'Ticket existente', description: 'Descripción' }]
+    ),
+    /coincidencia no válida/
+  );
 });
 
 test('AIService surfaces Edge Function errors', async () => {
